@@ -1,0 +1,78 @@
+<Topology>
+  <Name>Create-Drone-From-Container-VHD</Name>
+  <Location>westus</Location>
+  <ResourceGroup>my_resource_group</ResourceGroup>
+  <NetworkSecurityGroup>
+    <Name>nsg</Name>
+    <Rule>
+      <Name>ssl-rule</Name>
+      <Description>Allow SSL over HTTP</Description>
+      <Access>Allow</Access>
+      <Protocol>Tcp</Protocol>
+      <Direction>Inbound</Direction>
+      <Priority>100</Priority>
+      <SourceAddressPrefix>Internet</SourceAddressPrefix>
+      <SourcePortRange>*</SourcePortRange>
+      <DestinationAddressPrefix>*</DestinationAddressPrefix>
+      <DestinationPortRange>443</DestinationPortRange>
+    </Rule>
+    <Rule>
+      <Name>ssh-rule</Name>
+      <Description>Allow SSH</Description>
+      <Access>Allow</Access>
+      <Protocol>Tcp</Protocol>
+      <Direction>Inbound</Direction>
+      <Priority>101</Priority>
+      <SourceAddressPrefix>Internet</SourceAddressPrefix>
+      <SourcePortRange>*</SourcePortRange>
+      <DestinationAddressPrefix>*</DestinationAddressPrefix>
+      <DestinationPortRange>22</DestinationPortRange>
+    </Rule>
+  </NetworkSecurityGroup>
+  <Network>
+    <Name>network</Name>
+    <AddressPrefix>172.19.0.0/16</AddressPrefix>
+    <Subnet>
+      <Name>Subnet1</Name>
+      <AddressPrefix>172.19.0.0/24</AddressPrefix>
+      <NetworkSecurityGroup>nsg</NetworkSecurityGroup>
+    </Subnet>
+  </Network>
+  <VirtualMachine>
+    <Name>OpenLogic-CentOS-73-LATEST</Name>
+    <VMSize>Standard_D2_v2</VMSize>
+    <EnableBootDiagnostics>Yes</EnableBootDiagnostics>
+    <NIC>
+      <Name>OpenLogic-CentOS-73-LATEST-NIC</Name>
+      <Subnet>Subnet1</Subnet>
+      <PublicIPName>OpenLogic-CentOS-73-LATEST</PublicIPName>
+      <NetworkSecurityGroup>nsg</NetworkSecurityGroup>
+      <Allocation>Dynamic</Allocation>
+    </NIC>
+    <OSDisk>
+      <Uri>https://jplintakex.blob.core.windows.net/ready-for-bvt/OpenLogic-CentOS-73-LATEST.vhd</Uri>
+      <CreateOption>attach</CreateOption>
+      <Linux>Yes</Linux>
+    </OSDisk>
+  </VirtualMachine>
+  <VirtualMachine>
+    <Name>Ubuntu1604-LTS-LATEST</Name>
+    <VMSize>Standard_D2_v2</VMSize>
+    <EnableBootDiagnostics>No</EnableBootDiagnostics>
+    <NIC>
+      <Name>Ubuntu1604-LTS-LATEST-NIC</Name>
+      <Subnet>Subnet1</Subnet>
+      <PublicIPName>Ubuntu1604-LTS-LATEST</PublicIPName>
+      <NetworkSecurityGroup>nsg</NetworkSecurityGroup>
+      <Allocation>Dynamic</Allocation>
+    </NIC>
+    <OSDisk>
+      <Uri>https://jplintakex.blob.core.windows.net/ready-for-bvt/Ubuntu1604-LTS-LATEST.vhd</Uri>
+      <CreateOption>attach</CreateOption>
+      <Linux>Yes</Linux>
+    </OSDisk>
+  </VirtualMachine>  
+</Topology>
+
+
+

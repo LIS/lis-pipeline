@@ -1,0 +1,33 @@
+source ./secrets.sh
+useradd -d /home/$TEST_USER_ACCOUNT_NAME -s /bin/bash -G admin -m $TEST_USER_ACCOUNT_NAME
+passwd $TEST_USER_ACCOUNT_NAME
+apt-get update
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/14.04/prod.list | sudo tee /etc/apt/sources.list.d/microsoft.list
+apt-get update
+apt-get install -y powershell'
+apt-get install -y psrp-
+vi /etc/opt/omi/conf/omiserver.conf
+Restart OMI
+vi /etc/ssh/sshd_config
+kill -HUP `pidof sshd`
+apt-get install -y git
+ssh-keygen
+Add key to GitHub
+
+git clone git@github.com:FawcettJohnW/Framework-Scripts.git
+cp Framework-Scripts/update_and_copy.ps1 runonce.d/
+vi /etc/crontab
+	@reboot root /root/Framework-Scripts/runonce.ps1
+
+apt-get install -y openssl
+ufw allow 443
+ufw allow 5986
+
+Check OMI and PSRP:
+   . "C:\Framework-Scripts\secrets.ps1"
+   $o = New-PSSessionOption -SkipCACheck -SkipRevocationCheck -SkipCNCheck
+   $pw=convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PASS"
+   $cred=new-object -typename system.management.automation.pscredential -argumentlist "$TEST_USER_ACCOUNT_NAME",$pw
+   $session=new-PSSession -computername $ipAddress -credential $cred -authentication Basic -UseSSL -Port 443 -SessionOption $o
+   invoke-command -session $session -ScriptBlock {/bin/uname -r}
