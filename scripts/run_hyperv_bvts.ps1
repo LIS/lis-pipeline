@@ -3,53 +3,14 @@ param (
     [Parameter(Mandatory=$false)] [string] $VMNames="Unknown",
     [Parameter(Mandatory=$false)] [string] $TestXml="bvt_tests.xml",
     [Parameter(Mandatory=$false)] [string] $LogDir="TestResults",
-    [Parameter(Mandatory=$false)] [int] $VMCheckTimeout = 30
+    [Parameter(Mandatory=$false)] [int] $VMCheckTimeout = 10
 )
 
 $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $env:scriptPath = $scriptPath
 . "$scriptPath\common_functions.ps1"
-. "$scriptPath\backend.ps1"
-
-function CreateWait-JobFromScript {
-     param(
-         [Parameter(Mandatory=$true)]
-         [String] $ScriptBlock,
-         [Parameter(Mandatory=$true)]
-         [int] $Timeout = 100,
-         [Parameter(Mandatory=$false)]
-         [array] $ArgumentList,
-         [Parameter(Mandatory=$false)]
-         [string] $JobName="Hyperv-Borg-Job-{0}",
-         [Parameter(Mandatory=$false)]
-         [string]$ScriptPath=$env:scriptPath
-     )
-     $JobName = $JobName -f @(Get-Random 1000000)
-     try {
-         $initScript = '. "{0}"' -f @("$scriptPath\backend.ps1")
-         $s = [Scriptblock]::Create($ScriptBlock)
-         $job = Start-Job -Name $JobName -ScriptBlock $s `
-             -ArgumentList $ArgumentList `
-             -InitializationScript ([Scriptblock]::Create($initScript))
-         $jobResult = Wait-Job $job -Timeout $Timeout -Force
-         Stop-Job $JobName -ErrorAction SilentlyContinue -Confirm:$false
-         $output = Receive-Job $JobName -Keep
-         if ($jobResult.State -ne "Completed") {
-             Write-Output "Job $JobName failed with output >>`r`n $output`r`n <<"
-             throw "Job $JobName failed with output >> $output <<"
-         } else {
-             Write-Output "Job $JobName succeeded with output >>`r`n $output`r`n <<"
-         }
-     } catch {
-         if (!($PSItem -like "Job $JobName failed with output*")) {
-             Write-Output "Job $JobName failed with error: >> `r`n$PSItem`r`n <<"
-         }
-         throw
-     } finally {
-         Remove-Job $JobName -ErrorAction SilentlyContinue
-     }
- }
+. "$scriptPath\job_manager.ps1"
 
 function Cleanup-Environment () {
     param($VMNames, $LisaPath)
@@ -75,46 +36,43 @@ function Get-StartLISAScript () {
         $xmlContents.config.Vms.vm.vmName = "${VMName}"
         $newXmlPath = "$LisaPath\$vmName.xml" 
         $xmlContents.save($newXmlPath)
-        & "$LisaPath/lisa.ps1" run $newXmlPath -CliLogDir $LogDir
-        if (-not $?) {
-            throw "lisa failed to start"
+        pushd $LisaPath
+        $process = Start-Process powershell -ArgumentList @("$LisaPath\lisa.ps1", "run", $newXmlPath, "-cliLogDir", $LogDir) `
+                    -PassThru -RedirectStandardOutput output.txt -RedirectStandardError error.txt -NoNewWindow
+        $process.waitForExit()
+        Get-Content "$LogDir\bvt_suite*\ica.log" -Encoding ASCII -Raw | Write-Output
+        popd
+        if ($process.ExitCode -ne 0) {
+            throw "LISA has failed."
         }
     }
     return $scriptBlock
 }
 
-Workflow Start-LISAJobs () {
-    param($VMNames, $LisaPath, $TestXml, $LogDir, $VMCheckTimeout)
-    InlineScript {
-        Write-Host "Running LISA..."
+function Start-LISAJobs () {
+    param($VMNames, $LisaPath, $TestXml, $LogDir, $VMCheckTimeout, $JobManager)
+    Write-Host "Running LISA..."
+    $scriptBlock = Get-StartLISAScript
+    $topic = "LISA-" + (Get-Random 100000)
+    foreach ($vmName in $VMNames) {
+        $argumentList = @($vmName, $LisaPath, $TestXml, $LogDir)
+        $JobManager.AddJob( $topic, $scriptBlock, $argumentList, $uninit)
     }
-    $errors = 0
-    $suffix = Get-Random 1000000
-    $scriptBlock = $null
-    $vmTested = @()
-    foreach -parallel ($vmName in $VMNames) {
-        $Workflow:scriptBlock = Get-StartLISAScript
-        try {
-            if (!$Workflow:scriptBlock) {
-                Start-Sleep 1
-            }
-            if (!$Workflow:scriptBlock) {
-                throw "Failure in PowerShell language."
-            }
-            CreateWait-JobFromScript -ScriptBlock $Workflow:scriptBlock `
-                -ArgumentList @($vmName, $LisaPath, $TestXml, $LogDir) `
-                -Timeout $VMCheckTimeout -JobName "Start-$vmName-$suffix-{0}"
-            $Workflow:vmTested += $vmName
-        } catch {
-            $Workflow:errors += 1
-        }
+    $JobManager.WaitForJobsCompletion($topic, $VMCheckTimeout)
+    $jobOutput = $JobManager.GetJobOutputs($topic)
+    Write-Host $jobOutput
+    $errors = $JobManager.GetJobErrors($topic)
+    $JobManager.RemoveTopic($topic)
+    if ($errors) {
+        throw "Failed to run LISA jobs."
+    } else {
+        Write-Host "Finished LISA jobs."
     }
-    if ($Workflow:errors) {
-        throw "Starting LISA jobs failed."
-    }
-    InlineScript {
-        Write-Host "Finished LISA starting jobs state."
-    }
+    $JobManager.WaitForJobsCompletion("Start-LISA", $VMCheckTimeout)
+    $jobOutput = $JobManager.GetJobOutputs("Start-LISA")
+    Write-Host $jobOutput
+    $JobManager.RemoveTopic("Start-Lisa")
+    Write-Host "Finished LISA starting jobs state."
 }
 
 function Main () {
@@ -131,7 +89,10 @@ function Main () {
     }
 
     Cleanup-Environment $vmNames $LisaPath
-    Start-LISAJobs $vmNames $LisaPath $TestXml $LogDir $VMCheckTimeout
+
+    $jobManager = [PSJobManager]::new()
+
+    Start-LISAJobs $vmNames $LisaPath $TestXml $LogDir $VMCheckTimeout $jobManager
 }
 
 Main
