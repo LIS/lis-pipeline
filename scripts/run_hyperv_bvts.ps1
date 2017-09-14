@@ -40,6 +40,10 @@ function Get-StartLISAScript () {
             pushd $LisaPath
             $process = Start-Process powershell -ArgumentList @("$LisaPath\lisa.ps1", "run", $newXmlPath, "-cliLogDir", $LogDir) `
                         -PassThru -RedirectStandardOutput "$vmName-output.txt" -RedirectStandardError "$vmName-error.txt" -NoNewWindow
+            # Ugly hack in order to still have access to the process exit code.
+            # Without caching the process handle, the exit code wil always be $null if
+            # Start-Process is used without the -Wait parameter.
+            $handle = $process.Handle
             while ($true) {
                 if (Test-Path "$LogDir\$VMName*\ica.log") {
                     Get-Content -Encoding Ascii -Raw "$LogDir\$VMName*\ica.log" | Write-Output
@@ -53,7 +57,7 @@ function Get-StartLISAScript () {
                 Start-Sleep 1
             }
             if ($process.ExitCode -ne 0) {
-                Write-Output ("Lisa has failed with exit code: {0}" -f @($process.ExitCode))
+                Write-Output ("Lisa has failed with exit code: {0}`r`n" -f @($process.ExitCode))
                 throw "LISA has failed."
             }
         } catch  {
