@@ -46,21 +46,21 @@ class PSJobManager {
         }
         if ($job.State -eq [System.Management.Automation.JobState]::Completed) {
             Write-Host "Job Completed"
-            $this.Jobs[$Topic].AddLast($job)
+            $this.Jobs[$Topic] += $job
         } elseif ($job.State -eq [System.Management.Automation.JobState]::Failed) {
             Write-Host "Job failed to start" -ForegroundColor Red
             $output = Receive-Job -Job $job -Keep
             $state = $job.State
-            Remove-Job -Job $job
+            Remove-Job -Job $job -Force
             Write-host "Job with state: $state failed with output `r`n$output`r`n" -ForegroundColor Red
         } elseif ($job.State -eq [System.Management.Automation.JobState]::Stopped){
             Write-Host "Job is Stopped, adding it to the Topic"
-            $this.Jobs[$Topic].AddLast($job)
+            $this.Jobs[$Topic] += $job
         } elseif ($this.Jobs.Contains($Topic)) {
-            $this.Jobs[$Topic].AddLast($job)
+            $this.Jobs[$Topic] += $job
         } else {
-            $this.Jobs[$Topic] = New-Object Collections.Generic.LinkedList[object]
-            $this.Jobs[$Topic].AddLast($job)
+            $this.Jobs[$Topic] = @()
+            $this.Jobs[$Topic] += $job
         }
     }
 
@@ -71,55 +71,48 @@ class PSJobManager {
     #>
     [void] RemoveTopic ($Topic) {
         Write-Host "Removing jobs from topic: $Topic"
-        $current = $this.Jobs[$Topic].First
-        while (-not ($current -eq $null)) {
-            $timeout = 5
-            while ($Timeout -gt 0) {
-                try {
-                    Remove-Job $current.Value -Force
-                    $timeout = 0
-                } catch {
-                    Start-Sleep 1
-                    $timeout -= 1
-                }
-            }
-            $current = $current.Next
+        foreach ($job in $this.Jobs[$Topic]) {
+            Remove-Job $job -Force
         }
         $this.Jobs.Remove($Topic)
     }
 
-    [Collections.Generic.LinkedList[object]] GetJobsFromTopic ($Topic) {
+    [Array] GetJobsFromTopic ($Topic) {
         if ($this.Jobs.Contains($Topic)) {
             return $this.Jobs[$Topic]
         } else {
-            Write-Host "No Topic with $Topic name found."
+            Write-Host "No topic with $Topic name found."
             return $null
         }
     }
-    
-    [Array] WaitForJobsCompletion ($Topic, $Timeout) {
-        Write-Host "Waiting for jobs completion"
-        $statuses = @()
-        $current = $this.Jobs[$Topic].First
-        $jobTimeout = $Timeout
-        while (-not ($current -eq $null)) {
-            $status = [System.Management.Automation.JobState]::Running
-            $Timeout =  $jobTimeout
-            $jobTimeout = $Timeout
-            while (($status -in $this.RunningStates) -and ($jobTimeout -gt 0)) {
-                if ($current.Value.State -in $this.RunningStates) {
-                    Write-Host ("Waiting for job {0} to finish, remaining time: {1}" -f @($current.Value.Name, $jobTimeout))
-                    $status = $current.Value.State
-                    Start-Sleep 1
-                    $jobTimeout -= 1
-                } else {
-                    $statuses += $current.Value.State
-                    break
+
+    [void] WaitForJobsCompletion ($Topic, $Timeout) {
+        Write-Host "Waiting for jobs completion..."
+        $jobsCount = $this.Jobs[$Topic].Count
+        while ($Timeout -ne 0 -and $jobsCount -ne 0) {
+            $jobsCount = 0
+            foreach ($job in $this.Jobs[$Topic]) {
+                if ($job.State -in $this.RunningStates) {
+                    Write-Host ("Waiting for job {0} to finish, remaining time: {1}" -f @($job.Name, $Timeout))
+                    $jobsCount += 1
+                }
+                $output = $this.GetJobOutput($job.Name)
+                if ($output) {
+                    Write-Host ("Current output for job {0} >> {1}" -f @($job.Name, $output))
                 }
             }
-            $current = $current.Next
+            Start-Sleep 1
+            $Timeout -= 1
         }
-        return $statuses
+    }
+
+    <#
+    .SYSNOPSIS
+
+    Job results for the specified Topic.
+    #>
+    [String] GetJobOutput ($JobName) {
+        return (Receive-Job -Name $JobName -ErrorAction SilentlyContinue)
     }
 
     <#
@@ -128,33 +121,29 @@ class PSJobManager {
     Job results for the specified Topic.
     #>
     [Array] GetJobOutputs ($Topic) {
-        Write-Host "Retrieving Output from Jobs in Topic: $Topic"
+        Write-Host "Retrieving output of jobs for $Topic"
         $results = @()
-        $current = $this.Jobs[$Topic].First
-        while(-not ($current -eq $null)) {
-            $result = $current.Value | Receive-Job -Keep -ErrorAction SilentlyContinue
+        foreach ($job in $this.Jobs[$Topic]) {
+            $result = Receive-Job $job -ErrorAction SilentlyContinue
             $results += $result 
-            $current = $current.Next
         }
         return $results
     }
-    
+
     <#
     .SYSNOPSIS
 
-    Job errors for the specified Topic.
+    Get the number of failed jobs for the specified Topic.
     #>
-    [Array] GetJobErrors($Topic) {
-        Write-Host "Retrieving Output from Jobs in Topic: $Topic"
-        $states = 0
-        $current = $this.Jobs[$Topic].First
-        while(-not ($current -eq $null)) {
-            if ($current.Value.State -ne [System.Management.Automation.JobState]::Completed) {
-                $states += 1
-                Write-Host ("Job {0} failed." -f @($current.Value.Name))
+    [int] GetJobErrors($Topic) {
+        Write-Host "Retrieving the number of failed jobs for $Topic..."
+        $errors = 0
+        foreach ($job in $this.Jobs[$Topic]) {
+            if ($job.State -ne [System.Management.Automation.JobState]::Completed) {
+                $errors += 1
+                Write-Host ("Job {0} failed." -f @($job.Name))
             }
-            $current = $current.Next
         }
-        return $states
+        return $errors
     }
 }

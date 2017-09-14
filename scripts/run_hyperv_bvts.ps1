@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $env:scriptPath = $scriptPath
 . "$scriptPath\common_functions.ps1"
-. "$scriptPath\job_manager.ps1"
+. "$scriptPath\JobManager.ps1"
 
 function Cleanup-Environment () {
     param($VMNames, $LisaPath)
@@ -39,9 +39,18 @@ function Get-StartLISAScript () {
         pushd $LisaPath
         $process = Start-Process powershell -ArgumentList @("$LisaPath\lisa.ps1", "run", $newXmlPath, "-cliLogDir", $LogDir) `
                     -PassThru -RedirectStandardOutput output.txt -RedirectStandardError error.txt -NoNewWindow
-        $process.waitForExit()
-        Get-Content "$LogDir\bvt_suite*\ica.log" -Encoding ASCII -Raw | Write-Output
-        popd
+        while ($true) {
+            if (Test-Path "$LogDir\$VMName*\ica.log") {
+                Get-Content -Encoding Ascii -Raw "$LogDir\$VMName*\ica.log" | Write-Output
+            }
+            if (Test-Path "$LogDir\bvt_suite*\ica.log") {
+                Get-Content -Encoding Ascii -Raw "$LogDir\bvt_suite*\ica.log" | Write-Output
+            }
+            if ($process.HasExited) {
+                break
+            }
+            Start-Sleep 1
+        }
         if ($process.ExitCode -ne 0) {
             throw "LISA has failed."
         }
@@ -59,8 +68,8 @@ function Start-LISAJobs () {
         $JobManager.AddJob( $topic, $scriptBlock, $argumentList, $uninit)
     }
     $JobManager.WaitForJobsCompletion($topic, $VMCheckTimeout)
-    $jobOutput = $JobManager.GetJobOutputs($topic)
-    Write-Host $jobOutput
+    $jobsOutputs = $JobManager.GetJobOutputs($topic)
+    Write-Host $jobsOutputs
     $errors = $JobManager.GetJobErrors($topic)
     $JobManager.RemoveTopic($topic)
     if ($errors) {
@@ -68,15 +77,9 @@ function Start-LISAJobs () {
     } else {
         Write-Host "Finished LISA jobs."
     }
-    $JobManager.WaitForJobsCompletion("Start-LISA", $VMCheckTimeout)
-    $jobOutput = $JobManager.GetJobOutputs("Start-LISA")
-    Write-Host $jobOutput
-    $JobManager.RemoveTopic("Start-Lisa")
-    Write-Host "Finished LISA starting jobs state."
 }
 
 function Main () {
-    
     if (-not (Test-Path $LisaPath)) {
         Write-Host "Invalid path $LisaPath for lisa folder." -ForegroundColor Red
         exit 1
@@ -96,3 +99,4 @@ function Main () {
 }
 
 Main
+
