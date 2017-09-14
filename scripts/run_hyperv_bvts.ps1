@@ -32,27 +32,33 @@ function Cleanup-Environment () {
 function Get-StartLISAScript () {
     $scriptBlock = {
         param($VMName, $LisaPath, $TestXml, $LogDir)
-        [xml]$xmlContents = Get-Content -Path $TestXml
-        $xmlContents.config.Vms.vm.vmName = "${VMName}"
-        $newXmlPath = "$LisaPath\$vmName.xml" 
-        $xmlContents.save($newXmlPath)
-        pushd $LisaPath
-        $process = Start-Process powershell -ArgumentList @("$LisaPath\lisa.ps1", "run", $newXmlPath, "-cliLogDir", $LogDir) `
-                    -PassThru -RedirectStandardOutput output.txt -RedirectStandardError error.txt -NoNewWindow
-        while ($true) {
-            if (Test-Path "$LogDir\$VMName*\ica.log") {
-                Get-Content -Encoding Ascii -Raw "$LogDir\$VMName*\ica.log" | Write-Output
+        try {
+            [xml]$xmlContents = Get-Content -Path $TestXml
+            $xmlContents.config.Vms.vm.vmName = "${VMName}"
+            $newXmlPath = "$LisaPath\$vmName.xml"
+            $xmlContents.save($newXmlPath)
+            pushd $LisaPath
+            $process = Start-Process powershell -ArgumentList @("$LisaPath\lisa.ps1", "run", $newXmlPath, "-cliLogDir", $LogDir) `
+                        -PassThru -RedirectStandardOutput "$vmName-output.txt" -RedirectStandardError "$vmName-error.txt" -NoNewWindow
+            while ($true) {
+                if (Test-Path "$LogDir\$VMName*\ica.log") {
+                    Get-Content -Encoding Ascii -Raw "$LogDir\$VMName*\ica.log" | Write-Output
+                }
+                if (Test-Path "$LogDir\bvt_suite*\ica.log") {
+                    Get-Content -Encoding Ascii -Raw "$LogDir\bvt_suite*\ica.log" | Write-Output
+                }
+                if ($process.HasExited) {
+                    break
+                }
+                Start-Sleep 1
             }
-            if (Test-Path "$LogDir\bvt_suite*\ica.log") {
-                Get-Content -Encoding Ascii -Raw "$LogDir\bvt_suite*\ica.log" | Write-Output
+            if ($process.ExitCode -ne 0) {
+                Write-Output ("Lisa has failed with exit code: {0}" -f @($process.ExitCode))
+                throw "LISA has failed."
             }
-            if ($process.HasExited) {
-                break
-            }
-            Start-Sleep 1
-        }
-        if ($process.ExitCode -ne 0) {
-            throw "LISA has failed."
+        } catch  {
+            Write-Output $_
+            throw
         }
     }
     return $scriptBlock
