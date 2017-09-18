@@ -37,6 +37,10 @@ class Instance {
         $this.Backend.CreateInstanceFromGeneralized($this.Name, $this.useInitialPW)
     }
 
+    [void] StartInstance () {
+        $this.Backend.StartInstance($this.Name)
+    }
+
     [void] StopInstance () {
         $this.Backend.StopInstance($this.Name)
     }
@@ -72,7 +76,8 @@ class HypervInstance : Instance {
     [String] $VHDPath
     [String] $DvdDrive
 
-    HypervInstance ($Backend, $Name) : base ($Backend, $Name) {
+    HypervInstance ($Backend, $Name, $VHDPath) : base ($Backend, $Name) {
+        $this.VHDPath = $VHDPath
     }
 
     [void] CreateInstance () {
@@ -725,8 +730,7 @@ class HypervBackend : Backend {
                          -DynamicMemoryEnabled $false
             Enable-VMIntegrationService -VMName $InstanceName `
                                         -Name "*"
-            Start-VM -Name $InstanceName
-            write-verbose "VM $InstanceName has been created and started."
+            write-verbose "VM $InstanceName has been created."
 
         }
         $params = @{
@@ -750,9 +754,23 @@ class HypervBackend : Backend {
         $params = @{
             "ScriptBlock"={
                 param($InstanceName, $DvdDrive)
-                Set-VMDvdDrive -VM $InstanceName -Path $DvdDrive
+                Set-VMDvdDrive -VMName $InstanceName -Path $DvdDrive
             };
             "ArgumentList"=@($InstanceName, $DvdDrive);
+        }
+        $this.RunHypervCommand($params)
+    }
+
+    [void] StartInstance ($InstanceName) {
+        Write-Verbose ("Starting $InstanceName on backend" + $this.Name)
+        $params = @{
+            "ScriptBlock" = {
+                param($InstanceName)
+                if (Get-VM -Name $InstanceName -ErrorAction SilentlyContinue) {
+                    Start-VM -Name $InstanceName
+                }
+            };
+            "ArgumentList"=@($InstanceName);
         }
         $this.RunHypervCommand($params)
     }
@@ -837,12 +855,7 @@ class HypervBackend : Backend {
             "ScriptBlock"=$scriptBlock;
             "ArgumentList"=@($InstanceName);
         }
-        $ip = ""
-        do {
-            Start-Sleep -s 10
-            $ip = $this.RunHypervCommand($params)
-        } while([string]::IsNullOrWhiteSpace($ip))
-
+        $ip = $this.RunHypervCommand($params)
         return $ip
     }
 
