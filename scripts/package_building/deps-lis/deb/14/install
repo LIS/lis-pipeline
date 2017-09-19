@@ -1,0 +1,9 @@
+hv_kvp_daemon /usr/sbin
+hv_vss_daemon /usr/sbin
+hv_fcopy_daemon /usr/sbin
+hv_get_dhcp_info /usr/libexec/hypervkvpd
+hv_get_dns_info /usr/libexec/hypervkvpd
+hv_set_ifconfig /usr/libexec/hypervkvpd
+debian/hv-kvp-daemon.conf /etc/init/
+debian/hv-vss-daemon.conf /etc/init/
+debian/hv-fcopy-daemon.conf /etc/init/

@@ -1,0 +1,11 @@
+Source: hyperv-daemons
+Maintainer: test <test@mail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: kernel_ver
+Section: utils
+
+Package: hyperv-daemons  
+Priority: extra  
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}  
+Description: Installs hv_kvp_daemon hv_fcopy_daemon hv_vss_daemon
