@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -xe
 
 . utils.sh
 
@@ -36,7 +36,7 @@ function prepare_env_debian (){
     if [[ $build_state == "daemons" ]];then
         mkdir -p ./${build_state}/hyperv-daemons/debian
     else
-        mkdir ./${build_state}
+        mkdir -p ./${build_state}
     fi  
     popd
 }
@@ -54,7 +54,7 @@ function prepare_env_rhel (){
 %_topdir ${base_dir}/${build_state}/rpmbuild
 %_tmppath ${base_dir}/${build_state}/rpmbuild/tmp
 EOF
-    mkdir ./${build_state}
+    mkdir -p ./${build_state}
     popd
 }
 
@@ -80,12 +80,16 @@ function get_sources_git (){
     base_dir="$1"
     source_path="$2"
     git_branch="$3"
-    
+    source="${base_dir}/kernel/linux"
+
     pushd "${base_dir}/kernel"
-    git clone "$source_path"
-    source="${base_dir}/kernel/$(ls)"
+    if [[ ! -d "${source}" ]];then
+        git clone "$source_path" > /dev/null
+    fi
     pushd "${source}"
-    git checkout "$git_branch"
+    git reset --hard > /dev/null
+    git fetch > /dev/null
+    git checkout "$git_branch" > /dev/null
     popd
     popd
     echo "$source"
@@ -260,7 +264,7 @@ function build_kernel (){
     destination_path="$5"
     thread_number="$6"
     build_state="kernel"
-    
+
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path)"
     prepare_kernel_"${os_family}" "$source"
@@ -349,6 +353,9 @@ function main {
             --destination_path)
                 DESTINATION_PATH="$2" 
                 shift 2;;
+            --build_path)
+                BASE_DIR="$2"
+                shift 2;;
             --mount_destination)
                 MOUNT_DESTINATION="$2" 
                 shift 2;;
@@ -379,10 +386,8 @@ function main {
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
     fi
-    if [[ -e "$BASE_DIR" ]];then
-        clean_env_"$os_FAMILY" "$BASE_DIR" 
-    else
-        mkdir "$BASE_DIR"
+    if [[ ! -e "$BASE_DIR" ]];then
+        mkdir -p "$BASE_DIR"
     fi
     if [[ "$USE_CCACHE" == "True" ]];then
         PATH=/usr/lib/ccache:$PATH
