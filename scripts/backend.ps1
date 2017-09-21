@@ -1,6 +1,11 @@
 ##### Install PowerShell 5 using https://github.com/DarwinJS/ChocoPackages/blob/master/PowerShell/v5.1/tools/ChocolateyInstall.ps1#L107-L173
 ##### For 2008 R2, run the .ps1 from: https://download.microsoft.com/download/6/F/5/6F5FF66C-6775-42B0-86C4-47D41F2DA187/Win7AndW2K8R2-KB3191566-x64.zip
 
+$ErrorActionPreference = "Stop"
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$env:scriptPath = $scriptPath
+. "$scriptPath\common_functions.ps1"
+
 class Instance {
     [Backend] $Backend
     [String] $Name
@@ -163,8 +168,6 @@ class Backend {
 
 class AzureBackend : Backend {
     [String] $Name = "AzureBackend"
-    [String] $SecretsPath = "C:\Framework-Scripts\secrets.ps1"
-    [String] $CommonFunctionsPath = "C:\Framework-Scripts\common_functions.ps1"
     [String] $ProfilePath = "C:\Azure\ProfileContext.ctx"
     [String] $ResourceGroupName = "smoke_working_resource_group"
     [String] $StorageAccountName = "smokework"
@@ -186,36 +189,10 @@ class AzureBackend : Backend {
 
     AzureBackend ($Params) : base ($Params) {
         Write-Verbose "Starting the backend"
-        if (Test-Path $this.CommonFunctionsPath) {
-            . $this.CommonFunctionsPath
-        } else {
-            Write-Verbose "Throwing for no common functions"
-            throw "??? Common Functions file file does not exist."
-        }
-        write-Verbose "Backend CP 1"
-        if (Test-Path $this.SecretsPath) {
-            . $this.SecretsPath
-        } else {
-            Write-Verbose "Throwing for no secrets functions"
-            throw "Secrets file does not exist."
-        }
         write-Verbose "Backend CP 2"
     }
 
     [Instance] GetInstanceWrapper ($InstanceName) {
-        if (Test-Path $this.CommonFunctionsPath) {
-            . $this.CommonFunctionsPath
-        } else {
-            Write-Verbose "Throwing (2) for no secrets functions"
-            throw "??? Common Functions file file does not exist."
-        }
-
-        if (Test-Path $this.SecretsPath) {
-            . $this.SecretsPath
-        } else {
-            Write-Verbose "Throwing (2) for no secrets functions"
-            throw "Secrets file does not exist."
-        }
 write-verbose  "Checkpoint 1"
         $this.suffix = $this.suffix -replace "_","-"
         login_azure $this.ResourceGroupName $this.StorageAccountName $this.Location
