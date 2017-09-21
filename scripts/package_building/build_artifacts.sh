@@ -9,11 +9,10 @@ function install_deps_rhel {
     # Installing packages required for the build process.
     #
     rpm_packages=(rpm-build rpmdevtools yum-utils ncurses-devel hmaccalc zlib-devel \ 
-    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc)
-    yum -y update  
-    yum groups mark install "Development Tools"
-    yum -y groupinstall "Development Tools"
-    yum -y install ${rpm_packages[@]}
+    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot)
+    sudo yum groups mark install "Development Tools"
+    sudo yum -y groupinstall "Development Tools"
+    sudo yum -y install ${rpm_packages[@]}
 }
 
 function install_deps_debian {
@@ -21,7 +20,7 @@ function install_deps_debian {
     # Installing packages required for the build process.
     #
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
-    devscripts build-essential lintian debhelper git wget bc)    
+    devscripts build-essential lintian debhelper git wget bc fakeroot)
     DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
 }
 
@@ -85,7 +84,9 @@ function get_sources_git (){
     base_dir="$1"
     source_path="$2"
     git_branch="$3"
-    source="${base_dir}/kernel/linux"
+    git_folder_git_extension=${source_path##*/}
+    git_folder=${git_folder_git_extension%%.*}
+    source="${base_dir}/kernel/${git_folder}"
 
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
@@ -245,7 +246,7 @@ function build_rhel {
     thread_number="$4"
     destination_path="$5"
     spec="$6"
-    
+
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
         make rpm -j"${thread_number}"
@@ -400,13 +401,13 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
+
     if [[ "$USE_CCACHE" == "True" ]];then
         PATH=/usr/lib/ccache:$PATH
     fi
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
     fi
-
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
