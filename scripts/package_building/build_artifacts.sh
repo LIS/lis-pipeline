@@ -392,6 +392,11 @@ function main {
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
     fi
+
+    if [[ "$CLEAN_ENV" == "True" ]];then
+        clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
+    fi
+
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
@@ -401,15 +406,11 @@ function main {
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
     fi
-    
+
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
-    
-    if [[ "$CLEAN_ENV" == "True" ]];then
-        clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
-    fi
 }
 
 main $@
