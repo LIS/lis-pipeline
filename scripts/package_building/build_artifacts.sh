@@ -160,7 +160,7 @@ function prepare_daemons_debian (){
     popd
     pushd "${base_dir}/daemons/hyperv-daemons"
     dch --create --distribution unstable --package "hyperv-daemons" \
-    --newversion "$kernel_version" "First Build"
+        --newversion "$kernel_version" "jenkins"
     for i in *.sh;do
         mv "$i" "${i%.*}"
     done
@@ -269,9 +269,10 @@ function build_kernel (){
     destination_path="$5"
     thread_number="$6"
     build_state="kernel"
+    git_branch="$7"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path)"
+    source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path"
 }
@@ -288,7 +289,7 @@ function build_daemons (){
     destination_path="$6"
     dep_path="$7"
     build_state="daemons"
-    
+
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     prepare_daemons_"${os_family}" "$base_dir" "$source" "$debian_version" "$dep_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
@@ -402,9 +403,9 @@ function main {
     fi
     
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
-    "$THREAD_NUMBER"
+        "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
-    "$DESTINATION_PATH" "$DEP_PATH"
+        "$DESTINATION_PATH" "$DEP_PATH"
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
