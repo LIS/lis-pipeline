@@ -34,6 +34,7 @@ function prepare_env_debian (){
     
     pushd "$base_dir"
     if [[ $build_state == "daemons" ]];then
+        rm -rf ./${build_state}
         mkdir -p ./${build_state}/hyperv-daemons/debian
     else
         mkdir -p ./${build_state}
@@ -54,6 +55,10 @@ function prepare_env_rhel (){
 %_topdir ${base_dir}/${build_state}/rpmbuild
 %_tmppath ${base_dir}/${build_state}/rpmbuild/tmp
 EOF
+
+    if [[ $build_state == "daemons" ]];then
+        rm -rf ./${build_state}
+    fi
     mkdir -p ./${build_state}
     popd
 }
