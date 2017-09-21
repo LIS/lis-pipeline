@@ -134,6 +134,7 @@ function prepare_kernel_rhel (){
     
     pushd "${source}"
     make olddefconfig
+    sed -i -e "s/%changelog*/ /g" "${source}/tools/hv/lis-daemon.spec"
     popd
 }
 
