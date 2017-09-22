@@ -133,8 +133,10 @@ function prepare_kernel_rhel (){
     source="$1"
     
     pushd "${source}"
+    if [[ -e "tools/hv/lis-daemon.spec" ]];then
+        mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
+    fi
     make olddefconfig
-    sed -i -e "s/%changelog*/ /g" "${source}/tools/hv/lis-daemon.spec"
     popd
 }
 
@@ -199,10 +201,12 @@ function prepare_daemons_rhel (){
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
-    if [[ -e "SOURCES/"*.spec ]];then
-        spec="$(ls SOURCES/*.spec)"
-        spec="${spec##*/}"
-        mv -f "SOURCE/${spec}" "SPECS/${spec}"
+    if [[ -e "SOURCES/"*.oldspec ]];then
+        temp_spec="$(ls SOURCES/*.oldspec)"
+        temp_spec="${temp_spec##*/}"
+        spec="${temp_spec%.oldspec*}"
+        spec="${spec}.spec"
+        mv -f "SOURCE/${temp_spec}" "SPECS/${spec}"
     else
         sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
         sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
