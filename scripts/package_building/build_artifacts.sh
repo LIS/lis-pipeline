@@ -110,8 +110,8 @@ function get_sources_local (){
     
     pushd "${base_dir}/kernel"
     cp -rf "$source_path" .
-    popd
     echo "${base_dir}/kernel/$(ls)"
+    popd
 }
 
 function prepare_kernel_debian (){
@@ -120,8 +120,12 @@ function prepare_kernel_debian (){
     #
     source="$1"
     
-    pushd "${source}"
-    make olddefconfig
+    pushd "${source}"  
+    if [[ -e "$AZURE_CONFIG" ]];then
+        cp "$AZURE_CONFIG" .config
+    else
+        make olddefconfig
+    fi
     touch REPORTING-BUGS
     popd
 }
@@ -136,7 +140,11 @@ function prepare_kernel_rhel (){
     if [[ -e "tools/hv/lis-daemon.spec" ]];then
         mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
     fi
-    make olddefconfig
+    if [[ -e "$AZURE_CONFIG" ]];then
+        cp "$AZURE_CONFIG" .config
+    else
+        make olddefconfig
+    fi
     popd
 }
 
@@ -338,6 +346,7 @@ function main {
     THREAD_NUMBER="2"
     INSTALL_DEPS="True"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
+    AZURE_CONFIG="./Microsoft/config-azure"
     
     while true;do
         case "$1" in
