@@ -9,7 +9,7 @@ function install_deps_rhel {
     # Installing packages required for the build process.
     #
     rpm_packages=(rpm-build rpmdevtools yum-utils ncurses-devel hmaccalc zlib-devel \ 
-    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot)
+    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot crudini)
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
@@ -20,7 +20,7 @@ function install_deps_debian {
     # Installing packages required for the build process.
     #
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
-    devscripts build-essential lintian debhelper git wget bc fakeroot)
+    devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
     DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
 }
 
@@ -87,7 +87,11 @@ function get_sources_git (){
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
-
+    
+    branch=`crudini --get "./kernel_versions.ini" BRANCHES $git_branch`||true
+    if [[ "$branch" != "" ]];then
+        git_branch="$branch"
+    fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
         git clone "$source_path" > /dev/null
