@@ -1,6 +1,6 @@
 param (
+    [String] $JobPath = 'C:\var\lava\tmp\1',
     [String] $VHDPath = "C:\path\to\example.vhdx",
-    [String] $ConfigDrivePath = "C:\path\to\configdrive\",
     [String] $UserdataPath = "C:\path\to\userdata.sh",
     [String[]] $KernelURL = @(
         "http://URL/TO/linux-headers.deb",
@@ -11,18 +11,22 @@ param (
 )
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$scriptPath = (get-item $scriptPath ).parent.FullName
-. "$scriptPath\backend.ps1"
+
+$scriptPath1 = (get-item $scriptPath ).parent.FullName
+. "$scriptPath1\backend.ps1"
 
 function Main {
     $backend = [HypervBackend]::new(@("localhost"))
     $instance = [HypervInstance]::new($backend, $InstanceName, $VHDPath)
 
-    & "./setup_metadata.ps1" $ConfigDrivePath $UserdataPath $KernelURL $MkIsoFS
+    & "$scriptPath/setup_metadata.ps1" $JobPath $UserdataPath $KernelURL $MkIsoFS
+    if ($LastExitCode -ne 0) {
+        throw
+    }
 
     $instance.Cleanup()
     $instance.CreateInstance()
-    $instance.AttachVMDvdDrive("$ConfigDrivePath.iso")
+    $instance.AttachVMDvdDrive("$JobPath\configdrive.iso")
     $instance.StartInstance()
 }
 
