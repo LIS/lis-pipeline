@@ -21,7 +21,7 @@ function install_deps_debian {
     #
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
-    DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
+    DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
 }
 
 function prepare_env_debian (){
@@ -243,7 +243,7 @@ function build_debian (){
     
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        make-kpkg --initrd kernel_image kernel_headers -j"${thread_number}"
+        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"${thread_number}"
         popd
     else
         pushd "${base_dir}/daemons/hyperv-daemons"
