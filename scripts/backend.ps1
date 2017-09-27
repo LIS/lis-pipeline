@@ -6,6 +6,7 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $env:scriptPath = $scriptPath
 . "$scriptPath\common_functions.ps1"
 
+
 class Instance {
     [Backend] $Backend
     [String] $Name
@@ -417,7 +418,6 @@ write-verbose  "Checkpoint 1"
 
         Get-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName 
         $VNIC.NetworkSecurityGroup = $sg
-        
         Set-AzureRmNetworkInterface -NetworkInterface $VNIC
 
         write-verbose "Adding the network interface" 
@@ -639,7 +639,7 @@ write-verbose  "Checkpoint 1"
     }
 
     [Object] GetPSSession ($InstanceName) {
-        return ([Backend]$this).GetPSSession()
+        return ([Backend]$this).GetPSSession($InstanceName)
     }
 
     [Object] GetVM($instanceName) {
