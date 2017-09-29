@@ -213,21 +213,13 @@ function prepare_daemons_rhel (){
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
-    if [[ -e "SOURCES/"*.oldspec ]];then
-        temp_spec="$(ls SOURCES/*.oldspec)"
-        temp_spec="${temp_spec##*/}"
-        spec="${temp_spec%.oldspec*}"
-        spec="${spec}.spec"
-        mv -f "SOURCE/${temp_spec}" "SPECS/${spec}"
-    else
-        sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
-        sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
-        sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
-        sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
-        sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
-        spec="$(ls SPECS/*.spec)"
-        spec="${spec##*/}"
-    fi
+    sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
+    sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
+    sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
+    sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
+    sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
+    spec="$(ls SPECS/*.spec)"
+    spec="${spec##*/}"
     popd
 }
 
