@@ -13,6 +13,10 @@ function install_deps_rhel {
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
+    
+    if [[ "$USE_CCACHE" == "True" ]];then
+        PATH="/usr/lib64/ccache:"$PATH
+    fi
 }
 
 function install_deps_debian {
@@ -22,6 +26,10 @@ function install_deps_debian {
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
+    
+    if [[ "$USE_CCACHE" == "True" ]];then
+        PATH="/usr/lib/ccache:"$PATH
+    fi
 }
 
 function prepare_env_debian (){
@@ -412,9 +420,6 @@ function main {
         mkdir -p "$BASE_DIR"
     fi
 
-    if [[ "$USE_CCACHE" == "True" ]];then
-        PATH=/usr/lib/ccache:$PATH
-    fi
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
     fi
