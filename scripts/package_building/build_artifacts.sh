@@ -76,13 +76,20 @@ function get_sources_http (){
     #
     base_dir="$1"
     source_path="$2"
+    git_branch="$3"
     
     pushd "${base_dir}/kernel"
     wget $source_path
     tarBall="$(ls *tar*)"
     tar xf $tarBall
     popd
-    echo "${base_dir}/kernel/${tarBall%.tar*}"
+    source="${base_dir}/kernel/${tarBall%.tar*}"
+    echo "$source"
+    pushd "$source"
+    if [[ -d ".git" ]];then
+        git checkout $git_branch||true
+    fi
+    popd   
 }
 
 function get_sources_git (){
@@ -119,10 +126,17 @@ function get_sources_local (){
     #
     base_dir="$1"
     source_path="$2"
+    git_branch="$3"
     
     pushd "${base_dir}/kernel"
     cp -rf "$source_path" .
-    echo "${base_dir}/kernel/$(ls)"
+    source="${base_dir}/kernel/$(ls)"
+    echo "$source"
+    popd
+    pushd "$source"
+    if [[ -d ".git" ]];then
+        git checkout $git_branch||true
+    fi
     popd
 }
 
@@ -343,6 +357,7 @@ function main {
     
     BASE_DIR="$(pwd)/temp_build"
     DEP_PATH="$(pwd)/deps-lis/${os_PACKAGE}"
+    INI_FILE="$(pwd)/kernel_versions.ini"
     USE_CCACHE="False"
     GIT_BRANCH="master"
     CLEAN_ENV="False"
@@ -351,6 +366,7 @@ function main {
     INSTALL_DEPS="True"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     AZURE_CONFIG="./Microsoft/config-azure"
+    DEFAULT_BRANCH="stable"
     
     while true;do
         case "$1" in
@@ -411,7 +427,12 @@ function main {
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
     fi
-
+    
+    if [[ "$GIT_BRANCH" == "" ]];then
+        GIT_BRANCH="$DEFAULT_BRANCH"
+    fi
+    GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
+    
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
     fi
