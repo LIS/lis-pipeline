@@ -169,3 +169,11 @@ get_branch_from_ini() {
     fi
     echo $branch
 }
+
+copy_artifacts() {
+    artifacts_folder=$1
+    destination_path=$2
+    
+    cp "$artifacts_folder"/*.rpm "$destination_path" 2> /dev/null || true
+    cp "$artifacts_folder"/*.deb "$destination_path" 2> /dev/null || true
+}
