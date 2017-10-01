@@ -264,7 +264,7 @@ function build_debian (){
         debuild -us -uc
         popd
     fi
-    cp "${base_dir}/${build_state}/"*.deb "$destination_path"
+    copy_artifacts "${base_dir}/${build_state}/" "$destination_path"
 }
 
 function build_rhel {
@@ -287,7 +287,7 @@ function build_rhel {
         rpmbuild -ba "SPECS/$spec"
         popd
     fi
-    cp "${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"*.rpm "$destination_path"
+    copy_artifacts "${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/" "$destination_path"
 }
 
 function build_kernel (){
@@ -427,11 +427,19 @@ function main {
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
     fi
-    
+        
     if [[ "$GIT_BRANCH" == "" ]];then
         GIT_BRANCH="$DEFAULT_BRANCH"
     fi
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
+    
+    DESTINATION_PATH="$DESTINATION_PATH/$branch_name-$(date +'%d%m%Y')"    
+    if [[ -d "$DESTINATION_PATH" ]];then
+        rm -rf "$DESTINATION_PATH/"*
+        mkdir "$DESTINATION_PATH/$os_PACKAGE"
+    else
+        mkdir -p "$DESTINATION_PATH/$os_PACKAGE"
+    fi
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
