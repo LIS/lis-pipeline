@@ -327,6 +327,14 @@ function build_daemons (){
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
+function get_job_number (){
+    muliplier="$1"
+    cores="$(cat /proc/cpuinfo | grep -c processor)"
+    
+    result="$(expr $cpu*$nr | bc)"
+    echo ${result%.*}
+}
+
 function clean_env_debian (){
     #
     # Removing sources and files required by the build process.
@@ -426,6 +434,10 @@ function main {
             mkdir -p "$DESTINATION_PATH"
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
+    fi
+    
+    if [[ "${THREAD_NUMBER:0:1}" == "x" ]];then
+        THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x*})"
     fi
         
     if [[ "$GIT_BRANCH" == "" ]];then
