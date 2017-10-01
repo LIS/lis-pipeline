@@ -158,3 +158,14 @@ pushd() {
 popd() {
     command popd "$@" > /dev/null
 }
+
+get_branch_from_ini() {
+    git_branch="$1"
+    ini_file="$2"
+    
+    branch=`crudini --get "$ini_file" BRANCHES $git_branch`||true
+    if [[ "$branch" == "" ]];then
+        branch="$git_branch"
+    fi
+    echo $branch
+}
