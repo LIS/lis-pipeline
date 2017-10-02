@@ -103,17 +103,14 @@ function get_sources_git (){
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
-    branch=`crudini --get "./kernel_versions.ini" BRANCHES $git_branch`||true
-    if [[ "$branch" != "" ]];then
-        git_branch="$branch"
-    fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
         git clone "$source_path" > /dev/null
     fi
-    pushd "${source}"
+    pushd "$source"
     git reset --hard > /dev/null
     git fetch > /dev/null
+    git pull
     git checkout "$git_branch" > /dev/null
     popd
     popd
@@ -146,7 +143,7 @@ function prepare_kernel_debian (){
     #
     source="$1"
     
-    pushd "${source}"  
+    pushd "$source"  
     if [[ -e "$AZURE_CONFIG" ]];then
         cp "$AZURE_CONFIG" .config
     else
@@ -183,7 +180,7 @@ function prepare_daemons_debian (){
     dep_path="$3"
     debian_version="$4"
     
-    pushd "${source}"
+    pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
@@ -193,7 +190,7 @@ function prepare_daemons_debian (){
         exit 3
     else 
         cp ./tools/hv/* "${base_dir}/daemons/hyperv-daemons"
-        sed -i "s#\.\./\.\.#'${source}'#g" "${base_dir}/daemons/hyperv-daemons/Makefile"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/hyperv-daemons/Makefile"
     fi
     popd
     pushd "${base_dir}/daemons/hyperv-daemons"
@@ -202,7 +199,7 @@ function prepare_daemons_debian (){
     for i in *.sh;do
         mv "$i" "${i%.*}"
     done
-    if [ ${debian_version} -ge 15 ];then
+    if [ "$debian_version" -ge 15 ];then
         cp "${dep_path}/16/"* "./debian"
     else
         cp "${dep_path}/14/"* "./debian"
@@ -221,8 +218,9 @@ function prepare_daemons_rhel (){
     pushd "${base_dir}/daemons"
     yumdownloader --source hyperv-daemons
     rpm -ivh *.rpm
+    rm -f *.rpm
     popd
-    pushd "${source}"
+    pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
@@ -232,7 +230,7 @@ function prepare_daemons_rhel (){
         exit 3
     else 
         cp -f ./tools/hv/* "${base_dir}/daemons/rpmbuild/SOURCES"
-        sed -i "s#\.\./\.\.#'${source}'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
@@ -245,8 +243,7 @@ function prepare_daemons_rhel (){
         sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
-        spec="$(ls SPECS/*.spec)"
-        spec="${spec##*/}"
+        spec="hyperv-daemons.spec"
     fi
     popd
 }
@@ -263,7 +260,7 @@ function build_debian (){
     
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"${thread_number}"
+        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
         popd
     else
         pushd "${base_dir}/daemons/hyperv-daemons"
@@ -286,7 +283,7 @@ function build_rhel {
 
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        make rpm -j"${thread_number}"
+        make rpm -j"$thread_number"
         popd
     else
         pushd "${base_dir}/daemons/rpmbuild"
@@ -450,13 +447,10 @@ function main {
         GIT_BRANCH="$DEFAULT_BRANCH"
     fi
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
-    
-    DESTINATION_PATH="$DESTINATION_PATH/$branch_name-$(date +'%d%m%Y')"    
-    if [[ -d "$DESTINATION_PATH" ]];then
-        rm -rf "$DESTINATION_PATH/"*
-        mkdir "$DESTINATION_PATH/$os_PACKAGE"
-    else
-        mkdir -p "$DESTINATION_PATH/$os_PACKAGE"
+
+    DESTINATION_PATH="$DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"    
+    if [[ ! -d "$DESTINATION_PATH" ]];then
+        sudo mkdir -p "$DESTINATION_PATH/$os_PACKAGE"
     fi
     
     if [[ "$CLEAN_ENV" == "True" ]];then
@@ -466,7 +460,9 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
-
+    
+    DESTINATION_PATH="${DESTINATION_PATH}/${os_PACKAGE}"
+    
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
     fi

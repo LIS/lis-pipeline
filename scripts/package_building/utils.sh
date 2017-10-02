@@ -174,6 +174,12 @@ copy_artifacts() {
     artifacts_folder=$1
     destination_path=$2
     
-    cp "$artifacts_folder"/*.rpm "$destination_path" 2> /dev/null || true
-    cp "$artifacts_folder"/*.deb "$destination_path" 2> /dev/null || true
+    rpm_exists="$(ls $artifacts_folder/*.rpm || true)"
+    if [[ "$rpm_exists" != "" ]];then
+        sudo cp "$artifacts_folder"/*.rpm "$destination_path"
+    fi
+    deb_exists="$(ls $artifacts_folder/*.deb || true)"
+    if [[ "$deb_exists" != "" ]];then
+        sudo cp "$artifacts_folder"/*.deb "$destination_path"
+    fi
 }

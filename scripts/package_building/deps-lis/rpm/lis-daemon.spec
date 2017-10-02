@@ -31,7 +31,7 @@ Source11:		70-hv_fcopy.rules
 Source12:		hv_fcopy_daemon.service
 Source13:		Makefile	
 BuildRoot:		%{_tmppath}/%{name}-%{version}-build
-Requires:		kernel >= 3.10.0-384.el7
+Requires:		kernel >= 3.10.0-123
 BuildRequires:		systemd, kernel-headers
 Requires(post):		systemd
 Requires(preun):	systemd
@@ -105,8 +105,8 @@ fi
 if [ $1 > 1 ] ; then
     # Upgrade
     systemctl --no-reload disable hv_kvp_daemon.service  >/dev/null 2>&1 || :
-	systemctl --no-reload disable hv_vss_daemon.service  >/dev/null 2>&1 || :
-	systemctl --no-reload disable hv_fcopy_daemon.service  >/dev/null 2>&1 || :
+    systemctl --no-reload disable hv_vss_daemon.service  >/dev/null 2>&1 || :
+    systemctl --no-reload disable hv_fcopy_daemon.service  >/dev/null 2>&1 || :
 fi
 
 %postun 
