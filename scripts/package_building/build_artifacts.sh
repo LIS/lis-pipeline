@@ -180,8 +180,8 @@ function prepare_daemons_debian (){
     #
     base_dir="$1"
     source="$2"
-    debian_version="$3"
-    dep_path="$4"
+    dep_path="$3"
+    debian_version="$4"
     
     pushd "${source}"
     # Get kernel version
@@ -216,6 +216,7 @@ function prepare_daemons_rhel (){
     #
     base_dir="$1"
     source="$2"
+    dep_path="$3"
     
     pushd "${base_dir}/daemons"
     yumdownloader --source hyperv-daemons
@@ -235,13 +236,18 @@ function prepare_daemons_rhel (){
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
-    sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
-    sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
-    sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
-    sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
-    sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
-    spec="$(ls SPECS/*.spec)"
-    spec="${spec##*/}"
+    if [[ -e "${dep_path}/lis-daemon.spec" ]];then
+        cp "${dep_path}/lis-daemon.spec" "./SPECS"
+        spec="lis-daemon.spec"
+    else
+        sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
+        sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
+        sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
+        sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
+        sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
+        spec="$(ls SPECS/*.spec)"
+        spec="${spec##*/}"
+    fi
     popd
 }
 
@@ -323,7 +329,7 @@ function build_daemons (){
     build_state="daemons"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    prepare_daemons_"${os_family}" "$base_dir" "$source" "$debian_version" "$dep_path"
+    prepare_daemons_"${os_family}" "$base_dir" "$source" "$dep_path" "$debian_version"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
