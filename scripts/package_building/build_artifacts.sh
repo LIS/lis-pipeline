@@ -257,7 +257,9 @@ function build_debian (){
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
-    
+
+    artifacts_dir="${base_dir}/${build_state}/"
+    rm -f $artifacts_dir/*.deb
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
         fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
@@ -267,7 +269,7 @@ function build_debian (){
         debuild -us -uc
         popd
     fi
-    copy_artifacts "${base_dir}/${build_state}/" "$destination_path"
+    copy_artifacts "$artifacts_dir" "$destination_path"
 }
 
 function build_rhel {
@@ -281,6 +283,8 @@ function build_rhel {
     destination_path="$5"
     spec="$6"
 
+    artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+    rm -f $artifacts_dir/*
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
         make rpm -j"$thread_number"
@@ -290,7 +294,7 @@ function build_rhel {
         rpmbuild -ba "SPECS/$spec"
         popd
     fi
-    copy_artifacts "${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/" "$destination_path"
+    copy_artifacts "$artifacts_dir" "$destination_path"
 }
 
 function build_kernel (){
