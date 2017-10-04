@@ -158,3 +158,28 @@ pushd() {
 popd() {
     command popd "$@" > /dev/null
 }
+
+get_branch_from_ini() {
+    git_branch="$1"
+    ini_file="$2"
+    
+    branch=`crudini --get "$ini_file" BRANCHES $git_branch`||true
+    if [[ "$branch" == "" ]];then
+        branch="$git_branch"
+    fi
+    echo $branch
+}
+
+copy_artifacts() {
+    artifacts_folder=$1
+    destination_path=$2
+    
+    rpm_exists="$(ls $artifacts_folder/*.rpm || true)"
+    if [[ "$rpm_exists" != "" ]];then
+        sudo cp "$artifacts_folder"/*.rpm "$destination_path"
+    fi
+    deb_exists="$(ls $artifacts_folder/*.deb || true)"
+    if [[ "$deb_exists" != "" ]];then
+        sudo cp "$artifacts_folder"/*.deb "$destination_path"
+    fi
+}

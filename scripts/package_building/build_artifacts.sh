@@ -13,6 +13,10 @@ function install_deps_rhel {
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
+    
+    if [[ "$USE_CCACHE" == "True" ]];then
+        PATH="/usr/lib64/ccache:"$PATH
+    fi
 }
 
 function install_deps_debian {
@@ -22,6 +26,10 @@ function install_deps_debian {
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
+    
+    if [[ "$USE_CCACHE" == "True" ]];then
+        PATH="/usr/lib/ccache:"$PATH
+    fi
 }
 
 function prepare_env_debian (){
@@ -68,13 +76,20 @@ function get_sources_http (){
     #
     base_dir="$1"
     source_path="$2"
+    git_branch="$3"
     
     pushd "${base_dir}/kernel"
     wget $source_path
     tarBall="$(ls *tar*)"
     tar xf $tarBall
     popd
-    echo "${base_dir}/kernel/${tarBall%.tar*}"
+    source="${base_dir}/kernel/${tarBall%.tar*}"
+    echo "$source"
+    pushd "$source"
+    if [[ -d ".git" ]];then
+        git checkout $git_branch||true
+    fi
+    popd   
 }
 
 function get_sources_git (){
@@ -88,18 +103,15 @@ function get_sources_git (){
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
-    branch=`crudini --get "./kernel_versions.ini" BRANCHES $git_branch`||true
-    if [[ "$branch" != "" ]];then
-        git_branch="$branch"
-    fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
         git clone "$source_path" > /dev/null
     fi
-    pushd "${source}"
+    pushd "$source"
     git reset --hard > /dev/null
     git fetch > /dev/null
     git checkout "$git_branch" > /dev/null
+    git pull > /dev/null
     popd
     popd
     echo "$source"
@@ -111,10 +123,17 @@ function get_sources_local (){
     #
     base_dir="$1"
     source_path="$2"
+    git_branch="$3"
     
     pushd "${base_dir}/kernel"
     cp -rf "$source_path" .
-    echo "${base_dir}/kernel/$(ls)"
+    source="${base_dir}/kernel/$(ls)"
+    echo "$source"
+    popd
+    pushd "$source"
+    if [[ -d ".git" ]];then
+        git checkout $git_branch||true
+    fi
     popd
 }
 
@@ -124,7 +143,7 @@ function prepare_kernel_debian (){
     #
     source="$1"
     
-    pushd "${source}"  
+    pushd "$source"  
     if [[ -e "$AZURE_CONFIG" ]];then
         cp "$AZURE_CONFIG" .config
     else
@@ -158,10 +177,10 @@ function prepare_daemons_debian (){
     #
     base_dir="$1"
     source="$2"
-    debian_version="$3"
-    dep_path="$4"
+    dep_path="$3"
+    debian_version="$4"
     
-    pushd "${source}"
+    pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
@@ -171,7 +190,7 @@ function prepare_daemons_debian (){
         exit 3
     else 
         cp ./tools/hv/* "${base_dir}/daemons/hyperv-daemons"
-        sed -i "s#\.\./\.\.#'${source}'#g" "${base_dir}/daemons/hyperv-daemons/Makefile"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/hyperv-daemons/Makefile"
     fi
     popd
     pushd "${base_dir}/daemons/hyperv-daemons"
@@ -180,7 +199,7 @@ function prepare_daemons_debian (){
     for i in *.sh;do
         mv "$i" "${i%.*}"
     done
-    if [ ${debian_version} -ge 15 ];then
+    if [ "$debian_version" -ge 15 ];then
         cp "${dep_path}/16/"* "./debian"
     else
         cp "${dep_path}/14/"* "./debian"
@@ -194,12 +213,14 @@ function prepare_daemons_rhel (){
     #
     base_dir="$1"
     source="$2"
+    dep_path="$3"
     
     pushd "${base_dir}/daemons"
     yumdownloader --source hyperv-daemons
     rpm -ivh *.rpm
+    rm -f *.rpm
     popd
-    pushd "${source}"
+    pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
@@ -209,24 +230,20 @@ function prepare_daemons_rhel (){
         exit 3
     else 
         cp -f ./tools/hv/* "${base_dir}/daemons/rpmbuild/SOURCES"
-        sed -i "s#\.\./\.\.#'${source}'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
-    if [[ -e "SOURCES/"*.oldspec ]];then
-        temp_spec="$(ls SOURCES/*.oldspec)"
-        temp_spec="${temp_spec##*/}"
-        spec="${temp_spec%.oldspec*}"
-        spec="${spec}.spec"
-        mv -f "SOURCE/${temp_spec}" "SPECS/${spec}"
+    if [[ -e "${dep_path}/lis-daemon.spec" ]];then
+        cp "${dep_path}/lis-daemon.spec" "./SPECS"
+        spec="lis-daemon.spec"
     else
         sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
         sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
         sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
-        spec="$(ls SPECS/*.spec)"
-        spec="${spec##*/}"
+        spec="hyperv-daemons.spec"
     fi
     popd
 }
@@ -240,17 +257,19 @@ function build_debian (){
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
-    
+
+    artifacts_dir="${base_dir}/${build_state}/"
+    rm -f $artifacts_dir/*.deb
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"${thread_number}"
+        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
         popd
     else
         pushd "${base_dir}/daemons/hyperv-daemons"
         debuild -us -uc
         popd
     fi
-    cp "${base_dir}/${build_state}/"*.deb "$destination_path"
+    copy_artifacts "$artifacts_dir" "$destination_path"
 }
 
 function build_rhel {
@@ -264,16 +283,18 @@ function build_rhel {
     destination_path="$5"
     spec="$6"
 
+    artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+    rm -f $artifacts_dir/*
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        make rpm -j"${thread_number}"
+        make rpm -j"$thread_number"
         popd
     else
         pushd "${base_dir}/daemons/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
     fi
-    cp "${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"*.rpm "$destination_path"
+    copy_artifacts "$artifacts_dir" "$destination_path"
 }
 
 function build_kernel (){
@@ -309,8 +330,16 @@ function build_daemons (){
     build_state="daemons"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    prepare_daemons_"${os_family}" "$base_dir" "$source" "$debian_version" "$dep_path"
+    prepare_daemons_"${os_family}" "$base_dir" "$source" "$dep_path" "$debian_version"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
+}
+
+function get_job_number (){
+    muliplier="$1"
+    cores="$(cat /proc/cpuinfo | grep -c processor)"
+    
+    result="$(expr $cpu*$nr | bc)"
+    echo ${result%.*}
 }
 
 function clean_env_debian (){
@@ -343,6 +372,7 @@ function main {
     
     BASE_DIR="$(pwd)/temp_build"
     DEP_PATH="$(pwd)/deps-lis/${os_PACKAGE}"
+    INI_FILE="$(pwd)/kernel_versions.ini"
     USE_CCACHE="False"
     GIT_BRANCH="master"
     CLEAN_ENV="False"
@@ -351,6 +381,7 @@ function main {
     INSTALL_DEPS="True"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     AZURE_CONFIG="./Microsoft/config-azure"
+    DEFAULT_BRANCH="stable"
     
     while true;do
         case "$1" in
@@ -411,7 +442,23 @@ function main {
             DESTINATION_PATH=`readlink -e "$DESTINATION_PATH"`
         fi
     fi
+    
+    if [[ "${THREAD_NUMBER:0:1}" == "x" ]];then
+        THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x*})"
+    fi
 
+    INITIAL_BRANCH_NAME=$GIT_BRANCH
+    if [[ "$GIT_BRANCH" == "" ]];then
+        GIT_BRANCH="$DEFAULT_BRANCH"
+    fi
+    GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
+
+    BASE_DESTINATION_PATH=$DESTINATION_PATH
+    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
+    if [[ ! -d "$DESTINATION_PATH" ]];then
+        sudo mkdir -p "$DESTINATION_PATH"
+    fi
+    
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
     fi
@@ -419,10 +466,7 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
-
-    if [[ "$USE_CCACHE" == "True" ]];then
-        PATH=/usr/lib/ccache:$PATH
-    fi
+    
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
     fi
@@ -430,6 +474,12 @@ function main {
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
+    if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
+        pushd $BASE_DESTINATION_PATH
+        link_path="./latest"
+        sudo ln -snf "./$GIT_BRANCH-$(date +'%d%m%Y')" $link_path
+        popd
+    fi
 }
 
 main $@
