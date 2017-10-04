@@ -446,13 +446,15 @@ function main {
     if [[ "${THREAD_NUMBER:0:1}" == "x" ]];then
         THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x*})"
     fi
-        
+
+    INITIAL_BRANCH_NAME=$GIT_BRANCH
     if [[ "$GIT_BRANCH" == "" ]];then
         GIT_BRANCH="$DEFAULT_BRANCH"
     fi
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
-    DESTINATION_PATH="$DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
+    BASE_DESTINATION_PATH=$DESTINATION_PATH
+    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
     if [[ ! -d "$DESTINATION_PATH" ]];then
         sudo mkdir -p "$DESTINATION_PATH"
     fi
@@ -472,6 +474,12 @@ function main {
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
+    if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
+        pushd $BASE_DESTINATION_PATH
+        link_path="./latest"
+        sudo ln -snf "./$GIT_BRANCH-$(date +'%d%m%Y')" $link_path
+        popd
+    fi
 }
 
 main $@
