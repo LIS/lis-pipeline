@@ -110,8 +110,8 @@ function get_sources_git (){
     pushd "$source"
     git reset --hard > /dev/null
     git fetch > /dev/null
-    git pull
     git checkout "$git_branch" > /dev/null
+    git pull > /dev/null
     popd
     popd
     echo "$source"
