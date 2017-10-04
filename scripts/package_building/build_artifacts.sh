@@ -448,9 +448,9 @@ function main {
     fi
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
-    DESTINATION_PATH="$DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"    
+    DESTINATION_PATH="$DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
     if [[ ! -d "$DESTINATION_PATH" ]];then
-        sudo mkdir -p "$DESTINATION_PATH/$os_PACKAGE"
+        sudo mkdir -p "$DESTINATION_PATH"
     fi
     
     if [[ "$CLEAN_ENV" == "True" ]];then
@@ -460,8 +460,6 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
-    
-    DESTINATION_PATH="${DESTINATION_PATH}/${os_PACKAGE}"
     
     if [[ "$INSTALL_DEPS" == "True" ]];then
         install_deps_"$os_FAMILY"
