@@ -223,7 +223,13 @@ function prepare_daemons_rhel (){
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
-    kernel_version="${kernel_version%-*}"
+    release="${kernel_version##*-}"
+    if [[ "$release" != "$kernel_version" ]];then
+        kernel_version="${kernel_version%-*}"
+        kernel_version="${kernel_version#*-}"
+    else
+        release=""
+    fi
     # Copy daemons sources
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
@@ -236,10 +242,16 @@ function prepare_daemons_rhel (){
     pushd "${base_dir}/daemons/rpmbuild"
     if [[ -e "${dep_path}/lis-daemon.spec" ]];then
         cp "${dep_path}/lis-daemon.spec" "./SPECS"
+        sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/lis-daemon.spec"
+        if [[ "$release" != "" ]];then
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/lis_daemon.spec"
+        fi  
         spec="lis-daemon.spec"
     else
         sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
-        sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
+        if [[ "$release" != "" ]];then
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/hyperv-daemons.spec"
+        fi
         sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
