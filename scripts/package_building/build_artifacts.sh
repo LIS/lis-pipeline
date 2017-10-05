@@ -183,7 +183,6 @@ function prepare_daemons_debian (){
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
-    kernel_version="${kernel_version%-*}"
     # Copy daemons sources
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
@@ -204,6 +203,7 @@ function prepare_daemons_debian (){
     else
         cp "${dep_path}/14/"* "./debian"
     fi
+    sed -i -e "s/Standards-Version:.*/Standards-Version: $kernel_version/g" "./debian/control"
     popd
 }
 
@@ -266,7 +266,7 @@ function build_debian (){
         popd
     else
         pushd "${base_dir}/daemons/hyperv-daemons"
-        debuild -us -uc
+        echo "y" | debuild -us -uc
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
