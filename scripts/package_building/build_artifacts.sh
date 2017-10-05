@@ -466,10 +466,8 @@ function main {
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
     BASE_DESTINATION_PATH=$DESTINATION_PATH
-    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
-    if [[ ! -d "$DESTINATION_PATH" ]];then
-        sudo mkdir -p "$DESTINATION_PATH"
-    fi
+    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"
+    DESTINATION_PATH="$(check_destination_dir $DESTINATION_PATH $os_PACKAGE)"
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
