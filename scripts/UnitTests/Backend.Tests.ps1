@@ -5,7 +5,7 @@ $parentPath = Split-Path -Parent $here
 Describe "Test Hyper-V Backend instance" {
     Mock Write-Warning -Verifiable {return}
     $backendFactory = [BackendFactory]::new()
-    $hypervBackend = $backendFactory.GetBackend("HypervBackend", @(1))
+    $hypervBackend = $backendFactory.GetBackend("HypervBackend", @(""))
     $vmName = "fake_vm_name"
     It "Should create a valid instance wrapper" {
         $hypervInstance = $hypervBackend.GetInstanceWrapper($vmName)
