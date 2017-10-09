@@ -1,7 +1,7 @@
 
-%global hv_kvp_daemon hv_kvp_daemon
-%global hv_vss_daemon hv_vss_daemon
-%global hv_fcopy_daemon hv_fcopy_daemon
+%global hv_kvp_daemon hypervkvpd
+%global hv_vss_daemon hypervvssd
+%global hv_fcopy_daemon hypervfcopyd
 
 # nodebuginfo
 # norootforbuild
@@ -17,19 +17,18 @@ Summary:		Microsoft hyper-v daemons
 Version:		1
 Release:		0.29%{?snapver}%{?dist}
 Source0:		hv_kvp_daemon.c	
-Source1:		hv_kvp_daemon.service	
-Source2:		70-hv_kvp.rules	
+Source1:		hypervkvpd.service	
+Source2:		hypervkvp.rules	
 Source3:		hv_get_dhcp_info.sh	
 Source4:		hv_get_dns_info.sh	
 Source5:		hv_set_ifconfig.sh	
-Source6:		hv_kvp_daemon.service	
-Source7:		hv_vss_daemon.c	
-Source8:		70-hv_vss.rules	
-Source9:		hv_vss_daemon.service	
-Source10:		hv_fcopy_daemon.c	
-Source11:		70-hv_fcopy.rules	
-Source12:		hv_fcopy_daemon.service
-Source13:		Makefile	
+Source6:		hv_vss_daemon.c	
+Source7:		hypervvss.rules	
+Source8:		hypervvssd.service	
+Source9:		hv_fcopy_daemon.c	
+Source10:		hypervfcopy.rules	
+Source11:		hypervfcopyd.service
+Source12:		Makefile	
 BuildRoot:		%{_tmppath}/%{name}-%{version}-build
 Requires:		kernel >= 3.10.0-123
 BuildRequires:		systemd, kernel-headers
@@ -47,15 +46,15 @@ cp -pvL %{SOURCE0} hv_kvp_daemon.c
 cp -pvL %{SOURCE3} hv_get_dhcp_info.sh
 cp -pvL %{SOURCE4} hv_get_dns_info.sh
 cp -pvL %{SOURCE5} hv_set_ifconfig.sh
-cp -pvL %{SOURCE1} hv_kvp_daemon.service
+cp -pvL %{SOURCE1} %{hv_kvp_daemon}.service
 
-cp -pvL %{SOURCE7} hv_vss_daemon.c
-cp -pvL %{SOURCE9} hv_vss_daemon.service
+cp -pvL %{SOURCE6} hv_vss_daemon.c
+cp -pvL %{SOURCE8} %{hv_vss_daemon}.service
 
-cp -pvL %{SOURCE10} hv_fcopy_daemon.c
-cp -pvL %{SOURCE12} hv_fcopy_daemon.service
+cp -pvL %{SOURCE9} hv_fcopy_daemon.c
+cp -pvL %{SOURCE10} %{hv_fcopy_daemon}.service
 
-cp -pvL %{SOURCE13} Makefile
+cp -pvL %{SOURCE12} Makefile
 
 %build
 make clean
@@ -64,21 +63,21 @@ make
 %install
 
 mkdir -p %{buildroot}%{_sbindir}
-install -p -m 0755 %{hv_kvp_daemon} %{buildroot}%{_sbindir}
-install -p -m 0755 %{hv_vss_daemon} %{buildroot}%{_sbindir}
-install -p -m 0755 %{hv_fcopy_daemon} %{buildroot}%{_sbindir}
+install -p -m 0755 hv_kvp_daemon %{buildroot}%{_sbindir}/%{hv_kvp_daemon}
+install -p -m 0755 hv_vss_daemon %{buildroot}%{_sbindir}/%{hv_vss_daemon}
+install -p -m 0755 hv_fcopy_daemon %{buildroot}%{_sbindir}/%{hv_fcopy_daemon}
 
 # Systemd unit file
 mkdir -p %{buildroot}%{_unitdir}
 install -p -m 0644 %{SOURCE1} %{buildroot}%{_unitdir}
-install -p -m 0644 %{SOURCE9} %{buildroot}%{_unitdir}
-install -p -m 0644 %{SOURCE12} %{buildroot}%{_unitdir}
+install -p -m 0644 %{SOURCE8} %{buildroot}%{_unitdir}
+install -p -m 0644 %{SOURCE11} %{buildroot}%{_unitdir}
 
 # Udev rules
 mkdir -p %{buildroot}%{_udevrulesdir}
 install -p -m 0644 %{SOURCE2} %{buildroot}%{_udevrulesdir}/%{udev_prefix}-70-hv_kvp.rules
-install -p -m 0644 %{SOURCE8} %{buildroot}%{_udevrulesdir}/%{udev_prefix}-70-hv_vss.rules
-install -p -m 0644 %{SOURCE11} %{buildroot}%{_udevrulesdir}/%{udev_prefix}-70-hv_fcopy.rules
+install -p -m 0644 %{SOURCE7} %{buildroot}%{_udevrulesdir}/%{udev_prefix}-70-hv_vss.rules
+install -p -m 0644 %{SOURCE10} %{buildroot}%{_udevrulesdir}/%{udev_prefix}-70-hv_fcopy.rules
 
 # Shell scripts for the KVP daemon
 mkdir -p %{buildroot}%{_libexecdir}/%{hv_kvp_daemon}
@@ -93,37 +92,37 @@ mkdir -p %{buildroot}%{_sharedstatedir}/hyperv
 if [ $1 -eq 0 ]; then # package is being erased, not upgraded
     echo "Removing Package.."
     echo "Stopping KVP Daemon...."
-    systemctl stop hv_kvp_daemon
+    systemctl stop hypervkvpd
     echo "Stopping FCOPY Daemon...."
-    systemctl stop hv_fcopy_daemon
+    systemctl stop hypervfcopyd
     echo "Stopping VSS Daemon...."
-    systemctl stop hv_vss_daemon
+    systemctl stop hypervvssd
     rm -rf %{_sharedstatedir}/hyperv || :
 fi
 
 %post
 if [ $1 > 1 ] ; then
     # Upgrade
-    systemctl --no-reload disable hv_kvp_daemon.service  >/dev/null 2>&1 || :
-    systemctl --no-reload disable hv_vss_daemon.service  >/dev/null 2>&1 || :
-    systemctl --no-reload disable hv_fcopy_daemon.service  >/dev/null 2>&1 || :
+    systemctl --no-reload disable hypervkvpd.service  >/dev/null 2>&1 || :
+    systemctl --no-reload disable hypervvssd.service  >/dev/null 2>&1 || :
+    systemctl --no-reload disable hypervfcopyd.service  >/dev/null 2>&1 || :
 fi
 
 %postun 
 %systemd_postun hypervkvpd.service
-%systemd_postun hypervkvpd.service
-%systemd_postun hypervkvpd.service
+%systemd_postun hypervvssd.service
+%systemd_postun hypervfcopyd.service
 
 %files
 %{_sbindir}/%{hv_kvp_daemon}
-%{_unitdir}/hv_kvp_daemon.service
+%{_unitdir}/hypervkvpd.service
 %{_udevrulesdir}/%{udev_prefix}-70-hv_kvp.rules
 %dir %{_libexecdir}/%{hv_kvp_daemon}
 %{_libexecdir}/%{hv_kvp_daemon}/*
 %dir %{_sharedstatedir}/hyperv
 %{_sbindir}/%{hv_vss_daemon}
-%{_unitdir}/hv_vss_daemon.service
+%{_unitdir}/hypervvssd.service
 %{_udevrulesdir}/%{udev_prefix}-70-hv_vss.rules
 %{_sbindir}/%{hv_fcopy_daemon}
-%{_unitdir}/hv_fcopy_daemon.service
+%{_unitdir}/hypervfcopyd.service
 %{_udevrulesdir}/%{udev_prefix}-70-hv_fcopy.rules
