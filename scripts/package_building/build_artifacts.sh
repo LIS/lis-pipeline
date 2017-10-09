@@ -433,6 +433,10 @@ function main {
         esac
     done
     
+    if [[ "$INSTALL_DEPS" == "True" ]];then
+        install_deps_"$os_FAMILY"
+    fi
+    
     if [[ ! "$DOWNLOAD_METHOD" ]];then
         printf "No download method was specified.Exiting."
         exit 1
@@ -470,10 +474,7 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
-    
-    if [[ "$INSTALL_DEPS" == "True" ]];then
-        install_deps_"$os_FAMILY"
-    fi
+
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
