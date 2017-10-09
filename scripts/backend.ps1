@@ -719,10 +719,22 @@ class HypervBackend : Backend {
 
     [Instance] GetInstanceWrapper ($InstanceName) {
         write-verbose ("Initializing $InstanceName on backend " + $this.Name)
-        $instance = [HypervInstance]::new($this, $InstanceName)
+        $instance = [HypervInstance]::new($this, $InstanceName, $null)
         if (!$instance) {
             throw "Failed to initialize instance $InstanceName"
         }
+        $scriptBlock = {
+            param($InstanceName)
+            $hardDiskDrive = Get-VMHardDiskDrive -VMName $InstanceName -ErrorAction SilentlyContinue
+            if ($hardDiskDrive) {
+                return $hardDiskDrive.Path
+            }
+        }
+        $params = @{
+            "ScriptBlock"=$scriptBlock;
+            "ArgumentList"=@($InstanceName);
+        }
+        $instance.VHDPath = $this.RunHypervCommand($params)
         return $instance
     }
 
