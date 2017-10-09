@@ -2,8 +2,11 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $parentPath = Split-Path -Parent $here
 . "$parentPath\Backend.ps1"
 
+function Get-VMHardDiskDrive {}
+
 Describe "Test Hyper-V Backend instance" {
     Mock Write-Warning -Verifiable {return}
+    Mock Get-VMHardDiskDrive -Verifiable {return}
     $backendFactory = [BackendFactory]::new()
     $hypervBackend = $backendFactory.GetBackend("HypervBackend", @(""))
     $vmName = "fake_vm_name"
