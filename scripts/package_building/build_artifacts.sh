@@ -335,10 +335,14 @@ function build_daemons (){
 }
 
 function get_job_number (){
-    muliplier="$1"
+    #
+    # Multiply current number of threads with a number
+    # Usage:
+    #   ./build_artifacts.sh --thread_number x10
+    #
+    multi="$1"
     cores="$(cat /proc/cpuinfo | grep -c processor)"
-    
-    result="$(expr $cpu*$nr | bc)"
+    result="$(expr $cores*$multi | bc)"
     echo ${result%.*}
 }
 
