@@ -335,10 +335,14 @@ function build_daemons (){
 }
 
 function get_job_number (){
-    muliplier="$1"
+    #
+    # Multiply current number of threads with a number
+    # Usage:
+    #   ./build_artifacts.sh --thread_number x10
+    #
+    multi="$1"
     cores="$(cat /proc/cpuinfo | grep -c processor)"
-    
-    result="$(expr $cpu*$nr | bc)"
+    result="$(expr $cores*$multi | bc)"
     echo ${result%.*}
 }
 
@@ -429,6 +433,10 @@ function main {
         esac
     done
     
+    if [[ "$INSTALL_DEPS" == "True" ]];then
+        install_deps_"$os_FAMILY"
+    fi
+    
     if [[ ! "$DOWNLOAD_METHOD" ]];then
         printf "No download method was specified.Exiting."
         exit 1
@@ -466,10 +474,7 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
-    
-    if [[ "$INSTALL_DEPS" == "True" ]];then
-        install_deps_"$os_FAMILY"
-    fi
+
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
