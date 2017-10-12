@@ -1,0 +1,11 @@
+Source: hyperv-tools
+Maintainer: test <test@mail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: kernel_ver
+Section: tools
+
+Package: hyperv-tools  
+Priority: extra  
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}  
+Description: Installs lsvmbus
