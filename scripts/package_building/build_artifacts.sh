@@ -244,7 +244,7 @@ function prepare_daemons_rhel (){
         cp "${dep_path}/lis-daemon.spec" "./SPECS"
         sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/lis-daemon.spec"
         if [[ "$release" != "" ]];then
-            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/lis_daemon.spec"
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/lis-daemon.spec"
         fi  
         spec="lis-daemon.spec"
     else
