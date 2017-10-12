@@ -183,7 +183,6 @@ function prepare_daemons_debian (){
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
-    kernel_version="${kernel_version%-*}"
     # Copy daemons sources
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
@@ -204,6 +203,7 @@ function prepare_daemons_debian (){
     else
         cp "${dep_path}/14/"* "./debian"
     fi
+    sed -i -e "s/Standards-Version:.*/Standards-Version: $kernel_version/g" "./debian/control"
     popd
 }
 
@@ -223,7 +223,13 @@ function prepare_daemons_rhel (){
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
-    kernel_version="${kernel_version%-*}"
+    release="${kernel_version##*-}"
+    if [[ "$release" != "$kernel_version" ]];then
+        kernel_version="${kernel_version%-*}"
+        kernel_version="${kernel_version#*-}"
+    else
+        release=""
+    fi
     # Copy daemons sources
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
@@ -236,10 +242,16 @@ function prepare_daemons_rhel (){
     pushd "${base_dir}/daemons/rpmbuild"
     if [[ -e "${dep_path}/lis-daemon.spec" ]];then
         cp "${dep_path}/lis-daemon.spec" "./SPECS"
+        sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/lis-daemon.spec"
+        if [[ "$release" != "" ]];then
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/lis_daemon.spec"
+        fi  
         spec="lis-daemon.spec"
     else
         sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/hyperv-daemons.spec"
-        sed -i -e "s/Release:.*/Release:  %{?dist}/g" "SPECS/hyperv-daemons.spec"
+        if [[ "$release" != "" ]];then
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/hyperv-daemons.spec"
+        fi
         sed -i '/Patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/%patch/d' "SPECS/hyperv-daemons.spec"
         sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
@@ -266,7 +278,7 @@ function build_debian (){
         popd
     else
         pushd "${base_dir}/daemons/hyperv-daemons"
-        debuild -us -uc
+        echo "y" | debuild -us -uc
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
@@ -462,10 +474,8 @@ function main {
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
     BASE_DESTINATION_PATH=$DESTINATION_PATH
-    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')/${os_PACKAGE}"
-    if [[ ! -d "$DESTINATION_PATH" ]];then
-        sudo mkdir -p "$DESTINATION_PATH"
-    fi
+    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"
+    DESTINATION_PATH="$(check_destination_dir $DESTINATION_PATH $os_PACKAGE)"
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"

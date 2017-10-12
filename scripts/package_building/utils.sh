@@ -183,3 +183,20 @@ copy_artifacts() {
         sudo cp "$artifacts_folder"/*.deb "$destination_path"
     fi
 }
+
+check_destination_dir() {
+    dest_folder=$1
+    os_package=$2
+    
+    if [[ ! -d "$dest_folder" ]] || [[ ! -d "${dest_folder}/$os_package" ]];then
+        sudo mkdir -p "${dest_folder}/$os_package"
+        echo "${dest_folder}/$os_package"
+    else
+        index=1
+        while [[ -d "${dest_folder}-$index" ]] && [[ -d "${dest_folder}-${index}/$os_package" ]];do
+            let index=index+1
+        done
+        sudo mkdir -p "${dest_folder}-$index/$os_package"
+        echo "${dest_folder}-$index/$os_package"
+    fi
+}
