@@ -144,8 +144,8 @@ function prepare_kernel_debian (){
     source="$1"
     
     pushd "$source"  
-    if [[ -e "$AZURE_CONFIG" ]];then
-        cp "$AZURE_CONFIG" .config
+    if [[ -e "$KERNEL_CONFIG" ]];then
+        cp "$KERNEL_CONFIG" .config
     else
         make olddefconfig
     fi
@@ -163,8 +163,8 @@ function prepare_kernel_rhel (){
     if [[ -e "tools/hv/lis-daemon.spec" ]];then
         mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
     fi
-    if [[ -e "$AZURE_CONFIG" ]];then
-        cp "$AZURE_CONFIG" .config
+    if [[ -e "$KERNEL_CONFIG" ]];then
+        cp "$KERNEL_CONFIG" .config
     else
         make olddefconfig
     fi
@@ -396,7 +396,7 @@ function main {
     THREAD_NUMBER="2"
     INSTALL_DEPS="True"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
-    AZURE_CONFIG="./Microsoft/config-azure"
+    KERNEL_CONFIG="./Microsoft/config-azure"
     DEFAULT_BRANCH="stable"
     
     while true;do
@@ -439,6 +439,9 @@ function main {
                 shift 2;;
             --install_deps)
                 INSTALL_DEPS="$2"
+                shift 2;;
+            --kernel_config)
+                KERNEL_CONFIG="$2"
                 shift 2;;
             --) shift; break ;;
             *) break ;;
