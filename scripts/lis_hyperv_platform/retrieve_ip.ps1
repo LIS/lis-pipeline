@@ -1,5 +1,5 @@
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$scriptPathBackend = (get-item $scriptPath ).parent.FullName
+$scriptPathBackend = (Get-Item $scriptPath ).parent.FullName
 . "$scriptPathBackend\backend.ps1"
  
 function Get-IP {

@@ -91,7 +91,7 @@ class HypervInstance : Instance {
         $this.Backend.AttachVMDvdDrive($this.Name, $DvdDrive)
     }
 
-    [Array] GetVMDisk () {
+    [Object] GetVMDisk () {
         return $this.Backend.GetVMDisk($this.Name) 
     }
 
@@ -199,6 +199,8 @@ class AzureBackend : Backend {
     [string] $useInitialPW = "yes"
 
     AzureBackend ($Params) : base ($Params) {
+         Write-Verbose "Starting the backend"
+         Write-Verbose "Backend CP 2"
     }
 
     [Instance] GetInstanceWrapper ($InstanceName) {
@@ -683,7 +685,7 @@ class HypervBackend : Backend {
             -ArgumentList $global:username, $securePassword
     }
 
-    [string] RunHypervCommand ($params) {
+    [String] RunHypervCommand ($params) {
         if ($this.Credentials) {
             $params += (@{"Credential"=$this.Credentials})
         }
@@ -737,7 +739,7 @@ class HypervBackend : Backend {
             "ScriptBlock"=$scriptBlock;
             "ArgumentList"=@($InstanceName);
         }
-        $instance.VHDPath = $this.RunHypervCommand($params)
+        $instance.VHDPath = [String]$this.RunHypervCommand($params)
         return $instance
     }
 
@@ -838,9 +840,19 @@ class HypervBackend : Backend {
 
     [String] GetPublicIP ($InstanceName) {
         # NOTE(papagalu):LIS drivers, LIS KVP daemon should be installed on the VM
-        $scriptBlock = {
+	$scriptBlock = {
             param($InstanceName)
-            (Get-VMNetworkAdapter -VMName $InstanceName).IPaddresses[0]
+            $ips = (Get-VMNetworkAdapter -VMName $InstanceName).IPaddresses
+            foreach ($ip in $ips) {
+                try {
+                    $castIp = [ipaddress]$ip
+                    if ($castIp -and ($castIp.AddressFamily -eq "InterNetwork") -and (!$castIp.$ip1.IsIPv6LinkLocal)) {
+                        return $ip
+                    }
+                } catch {
+                }
+            }
+            return $null
         }
 
         $params = @{
@@ -871,15 +883,20 @@ class HypervBackend : Backend {
         return $session
     }
 
-    [Array] GetVMDisk ($InstanceName) {
+    [Object] GetVMDisk ($InstanceName) {
         $scriptBlock = {
             param($InstanceName)
             try {
-                $hdd = (Get-VMHardDiskDrive -VMName $InstanceName).Path
-                return $hdd
+                $disks = (Get-VMHardDiskDrive -VMName $InstanceName).Path
+                foreach ($disk in $disks) {
+                    if ($disk -like "*deploy*") {
+                        $vmDisk = $disk
+                    }
+                }
             } catch {
                 return $null
             }
+            return $vmDisk
         }
         $params = @{
             "ScriptBlock"=$scriptBlock;

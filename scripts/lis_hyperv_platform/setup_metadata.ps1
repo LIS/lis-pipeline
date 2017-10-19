@@ -11,7 +11,7 @@ param(
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\config_drive.ps1"
 
-$scriptPath1 = (get-item $scriptPath ).parent.FullName
+$scriptPath1 = (Get-Item $scriptPath ).parent.FullName
 . "$scriptPath1\common_functions.ps1"
 
 $ErrorActionPreference = "Stop"

@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\retrieve_ip.ps1"
 
-$scriptPath1 = (get-item $scriptPath ).parent.FullName
+$scriptPath1 = (Get-Item $scriptPath ).parent.FullName
 . "$scriptPath1\common_functions.ps1"
 
 # constants
@@ -29,9 +29,8 @@ function Prepare-LocalEnv {
         [String] $JobId
     )
 
-    $mountPoint = "H:\"
+    $mountPoint = "H:"
     $localPartition = "C:\"
-    $vmDisk = "ubuntu-cloud.vhdx"
     $lavaDisk = "lava-guest.vhdx"
 
     $path = "/var/lib/lava/dispatcher/tmp/$JobId"
@@ -40,23 +39,24 @@ function Prepare-LocalEnv {
 
     $SharedStoragePath = $SharedStoragePath.Replace("\\", "\")
 
-    net use H: $SharedStoragePath /persistent:NO 2>&1 | Out-Null
+    net use $mountPoint $SharedStoragePath /persistent:NO 2>&1 | Out-Null
     if ($LastExitCode) {
-        throw
+        Write-Host $Error[0]
+        throw "Failed to mount $SharedStoragePath to $mountPoint"
     }
 
     Assert-PathExists $remotePath
 
-    New-Item -Path $localPath -ItemType "directory" | Out-Null
+    New-Item -Path $localPath -ItemType Directory | Out-Null
     Copy-Item -Path "$remotePath/*" -Destination $localPath -Force -Recurse
 
-    $localVHDPath = (Get-ChildItem -Filter $vmDisk -Path $localPath -Recurse).FullName
+    $localVHDPath = (Get-ChildItem -Filter "*.vhdx" -Path "$localPath\deploy*" -Recurse).FullName
     Assert-PathExists $localVHDPath
 
     $lavaToolDisk = (Get-ChildItem -Filter $LAVA_TOOL_DISK -Path $localPath -Recurse).FullName
     Assert-PathExists $lavaToolDisk
 
-    $remoteVHDPath = (Get-ChildItem -Filter $vmDisk -Path $remotePath -Recurse).FullName
+    $remoteVHDPath = (Get-ChildItem -Filter "*.vhdx" -Path "$remotePath\deploy*" -Recurse).FullName
     $remotePath = Split-Path -Parent $remoteVHDPath
 
     return @($localVHDPath, $lavaToolDisk, $remotePath)
@@ -95,7 +95,7 @@ function Main {
 
     $ip = Get-IP $InstanceName $VMCheckTimeout
          
-    Write-Host "Copying id_rsa from $scriptPath\$InstanceName-id-rsa to $remoteJobFolder\id_rsa"
+    Write-Host "Copying id_rsa from $jobPath\$InstanceName-id-rsa to $remoteJobFolder\id_rsa"
     Copy-Item "$jobPath\$InstanceName-id-rsa" "$remoteJobFolder\id_rsa"
 
 }

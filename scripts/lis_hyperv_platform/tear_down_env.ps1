@@ -9,24 +9,13 @@ $scriptPath1 = (get-item $scriptPath ).parent.FullName
 . "$scriptPath1\common_functions.ps1"
 
 function Main {
-    $vmDisk = "ubuntu-cloud.vhdx"
-
     $backend = [HypervBackend]::new(@("localhost"))
     $instance = [HypervInstance]::new($backend, $InstanceName, $VHDPath)
 
-    $vhdPaths = $instance.GetVMDisk()
-    if (!$vhdPaths) {
+    $vhdPath = $instance.GetVMDisk()
+    if (!$vhdPath) {
         Write-Host "Instance $InstanceName doesn't exist."
         exit 0
-    }
-
-    $vhdPaths = $vhdPaths.Split(" ")
-    foreach ($path in $vhdPaths) {
-        Write-Host $path
-        if ($path -like "*$vmDisk") {
-            $vhdPath = $path
-            break
-        }
     }
 
     $instance.Cleanup()
