@@ -10,7 +10,9 @@ param(
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\config_drive.ps1"
-. "$scriptPath\asserts.ps1"
+
+$scriptPath1 = (get-item $scriptPath ).parent.FullName
+. "$scriptPath1\common_functions.ps1"
 
 $ErrorActionPreference = "Stop"
 
@@ -77,7 +79,7 @@ function Main {
     Write-Host "Finished Creating Configdrive"
 
     Remove-Item -Force -Recurse -Path "$scriptPath/ConfigDrive-tmp"
-    Remove-Item -Force "$UserdataPath"
+    Remove-Item -Force $UserdataPath
 }
 
 Main

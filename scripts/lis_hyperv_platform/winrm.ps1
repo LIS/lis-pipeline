@@ -1,5 +1,5 @@
 param(
-    [String] $SharedStoragePath = "\\10.7.13.118\lava",
+    [String] $SharedStoragePath = "\\ip\lava",
     [String] $JobId = "64",
     [String] $ConfigDrivePath = "C:\path\to\configdrive\",
     [String] $UserdataPath = "C:\path\to\userdata.sh",

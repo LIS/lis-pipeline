@@ -13,12 +13,15 @@ $ErrorActionPreference = "Stop"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\retrieve_ip.ps1"
-. "$scriptPath\asserts.ps1"
+
+$scriptPath1 = (get-item $scriptPath ).parent.FullName
+. "$scriptPath1\common_functions.ps1"
 
 # constants
 $KERNEL_ARTIFACTS_URL = @("{0}/hyperv-daemons_{1}_amd64.deb",
                          "{0}/linux-headers-{1}_{1}-10.00.Custom_amd64.deb",
                          "{0}/linux-image-{1}_{1}-10.00.Custom_amd64.deb")
+$LAVA_TOOL_DISK = "lava-guest.vhdx"
 
 function Prepare-LocalEnv {
     param(
@@ -26,9 +29,14 @@ function Prepare-LocalEnv {
         [String] $JobId
     )
 
+    $mountPoint = "H:\"
+    $localPartition = "C:\"
+    $vmDisk = "ubuntu-cloud.vhdx"
+    $lavaDisk = "lava-guest.vhdx"
+
     $path = "/var/lib/lava/dispatcher/tmp/$JobId"
-    $remotePath = "H:\$JobId"
-    $localPath = "C:$path"
+    $remotePath = "$mountPoint\$JobId"
+    $localPath = "$localPartition\$path"
 
     $SharedStoragePath = $SharedStoragePath.Replace("\\", "\")
 
@@ -42,13 +50,13 @@ function Prepare-LocalEnv {
     New-Item -Path $localPath -ItemType "directory" | Out-Null
     Copy-Item -Path "$remotePath/*" -Destination $localPath -Force -Recurse
 
-    $localVHDPath = (Get-ChildItem -Filter "ubuntu-cloud.vhdx" -Path $localPath -Recurse ).FullName
+    $localVHDPath = (Get-ChildItem -Filter $vmDisk -Path $localPath -Recurse).FullName
     Assert-PathExists $localVHDPath
 
-    $lavaToolDisk = (Get-ChildItem -Filter "lava-guest.vhdx" -Path $localPath -Recurse ).FullName
+    $lavaToolDisk = (Get-ChildItem -Filter $LAVA_TOOL_DISK -Path $localPath -Recurse).FullName
     Assert-PathExists $lavaToolDisk
 
-    $remoteVHDPath = (Get-ChildItem -Filter "ubuntu-cloud.vhdx" -Path $remotePath -Recurse ).FullName
+    $remoteVHDPath = (Get-ChildItem -Filter $vmDisk -Path $remotePath -Recurse).FullName
     $remotePath = Split-Path -Parent $remoteVHDPath
 
     return @($localVHDPath, $lavaToolDisk, $remotePath)
@@ -81,7 +89,8 @@ function Main {
     Write-Host "Starting Setup-Env script"
     & "$scriptPath\setup_env.ps1" $jobPath $localVHDPath $UserdataPath $expandedURL $InstanceName $MkIsoFS $lavaToolDisk
     if ($LastExitCode) {
-        throw $Error[0]
+        Write-Host $Error[0]
+        throw "Setup-Env script failed."
     }
 
     $ip = Get-IP $InstanceName $VMCheckTimeout

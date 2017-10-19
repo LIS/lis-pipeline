@@ -2,6 +2,7 @@
 ##### For 2008 R2, run the .ps1 from: https://download.microsoft.com/download/6/F/5/6F5FF66C-6775-42B0-86C4-47D41F2DA187/Win7AndW2K8R2-KB3191566-x64.zip
 
 $ErrorActionPreference = "Stop"
+. "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)\common_functions.ps1"
 
 class Instance {
     [Backend] $Backend
@@ -201,7 +202,7 @@ class AzureBackend : Backend {
     }
 
     [Instance] GetInstanceWrapper ($InstanceName) {
-        write-verbose  "Checkpoint 1"
+write-verbose  "Checkpoint 1"
         $this.suffix = $this.suffix -replace "_","-"
         login_azure $this.ResourceGroupName $this.StorageAccountName $this.Location
         write-verbose  "Checkpoint 2"
@@ -646,7 +647,7 @@ class AzureBackend : Backend {
     }
 
     [Object] GetPSSession ($InstanceName) {
-        return ([Backend]$this).GetPSSession()
+        return ([Backend]$this).GetPSSession($InstanceName)
     }
 
     [Object] GetVM($instanceName) {
@@ -873,22 +874,24 @@ class HypervBackend : Backend {
     [Array] GetVMDisk ($InstanceName) {
         $scriptBlock = {
             param($InstanceName)
-            $hdd = @()
-            $hdd += (Get-VMHardDiskDrive -VMName $InstanceName).Path
-            return $hdd
+            try {
+                $hdd = (Get-VMHardDiskDrive -VMName $InstanceName).Path
+                return $hdd
+            } catch {
+                return $null
+            }
         }
         $params = @{
             "ScriptBlock"=$scriptBlock;
             "ArgumentList"=@($InstanceName);
         }
-        $hdd = $this.RunHypervCommand($params)
-        return $hdd
+        return $this.RunHypervCommand($params)
     }
 
     [void] AddVMDisk ($InstanceName, $VMDisk) {
         $scriptBlock = {
             param($InstanceName, $VMDisk)
-            Add-VMHardDiskDrive -ControllerType IDE -controllerNumber 1 `
+            Add-VMHardDiskDrive -ControllerType IDE -ControllerNumber 1 `
                                 -Path $VMDisk -VMName $InstanceName
         }
         $params = @{

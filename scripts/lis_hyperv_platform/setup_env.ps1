@@ -13,10 +13,10 @@ param (
 
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-. "$scriptPath\asserts.ps1"
 
-$scriptPath1 = (get-item $scriptPath ).parent.FullName
+$scriptPath1 = (get-item $scriptPath).parent.FullName
 . "$scriptPath1\backend.ps1"
+. "$scriptPath1\common_functions.ps1"
 
 function Main {
     Assert-PathExists $JobPath

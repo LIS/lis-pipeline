@@ -3,20 +3,27 @@ param(
 )
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-. "$scriptPath\asserts.ps1"
 
 $scriptPath1 = (get-item $scriptPath ).parent.FullName
 . "$scriptPath1\backend.ps1"
+. "$scriptPath1\common_functions.ps1"
 
 function Main {
+    $vmDisk = "ubuntu-cloud.vhdx"
+
     $backend = [HypervBackend]::new(@("localhost"))
     $instance = [HypervInstance]::new($backend, $InstanceName, $VHDPath)
 
     $vhdPaths = $instance.GetVMDisk()
+    if (!$vhdPaths) {
+        Write-Host "Instance $InstanceName doesn't exist."
+        exit 0
+    }
+
     $vhdPaths = $vhdPaths.Split(" ")
     foreach ($path in $vhdPaths) {
         Write-Host $path
-        if ($path -like "*ubuntu-cloud.vhdx") {
+        if ($path -like "*$vmDisk") {
             $vhdPath = $path
             break
         }
