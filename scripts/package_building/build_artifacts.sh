@@ -40,9 +40,13 @@ function prepare_env_debian (){
     build_state="$2"
     
     pushd "$base_dir"
+    
     if [[ $build_state == "daemons" ]];then
         rm -rf ./${build_state}
         mkdir -p ./${build_state}/hyperv-daemons/debian
+    elif [[ $build_state == "tools" ]];then
+        rm -rf ./${build_state}
+        mkdir -p ./${build_state}/hyperv-tools/debian
     else
         mkdir -p ./${build_state}
     fi  
@@ -64,6 +68,8 @@ function prepare_env_rhel (){
 EOF
 
     if [[ $build_state == "daemons" ]];then
+        rm -rf ./${build_state}
+    elif [[ $build_state == "tools" ]];then
         rm -rf ./${build_state}
     fi
     mkdir -p ./${build_state}
@@ -260,6 +266,65 @@ function prepare_daemons_rhel (){
     popd
 }
 
+function prepare_tools_debian (){
+    #
+    # Copy tools sources and dependency files
+    #
+    base_dir="$1"
+    source="$2"
+    dep_path="$3"
+    debian_version="$4"
+    
+    pushd "$source"
+    # Get kernel version
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    # Copy sources
+    if [[ ! -d "tools/hv" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else 
+        cp ./tools/hv/lsvmbus "${base_dir}/tools/hyperv-tools"
+    fi
+    popd
+    pushd "${base_dir}/tools/hyperv-tools"
+    dch --create --distribution unstable --package "hyperv-tools" \
+        --newversion "$kernel_version" "tools"
+    cp "${dep_path}/tools/"* "./debian"
+    popd
+}
+
+function prepare_tools_rhel (){
+    #
+    # Copy tools sources and dependency files
+    #
+    base_dir="$1"
+    source="$2"
+    dep_path="$3"
+    
+    mkdir -p "${base_dir}/tools/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
+    pushd "$source"
+    # Get kernel version
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    # Copy daemons sources
+    if [[ ! -d "tools/hv" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else 
+        cp -f ./tools/hv/lsvmbus "${base_dir}/tools/rpmbuild/SOURCES"
+    fi
+    popd
+    pushd "${base_dir}/tools/rpmbuild"
+    if [[ -e "${dep_path}/tools/lis-tools.spec" ]];then
+        cp "${dep_path}/tools/lis-tools.spec" "./SPECS"
+        spec="lis-tools.spec"
+    else
+        exit 1
+    fi
+    popd
+}
+
 function build_debian (){
     #
     # Building the kernel or daemons for deb based OSs
@@ -276,9 +341,13 @@ function build_debian (){
         pushd "$source"
         fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
         popd
-    else
+    elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
         echo "y" | debuild -us -uc
+        popd
+    else
+        pushd "${base_dir}/tools/hyperv-tools"
+        debuild -us -uc
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
@@ -295,14 +364,20 @@ function build_rhel {
     destination_path="$5"
     spec="$6"
 
-    artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
     rm -f $artifacts_dir/*
     if [[ "$build_state" == "kernel" ]];then
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
         pushd "$source"
         make rpm -j"$thread_number"
         popd
-    else
+    elif [[ "$build_state" == "daemons" ]];then
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
         pushd "${base_dir}/daemons/rpmbuild"
+        rpmbuild -ba "SPECS/$spec"
+        popd
+    else
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/noarch/"
+        pushd "${base_dir}/tools/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
     fi
@@ -343,6 +418,22 @@ function build_daemons (){
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     prepare_daemons_"${os_family}" "$base_dir" "$source" "$dep_path" "$debian_version"
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
+}
+
+function build_tools (){
+    #
+    # Build the tools
+    #
+    base_dir="$1"
+    source_path="$2"
+    os_family="$3"
+    destination_path="$4"
+    dep_path="$5"
+    build_state="tools"
+    
+    prepare_env_"${os_family}" "$base_dir" "$build_state"
+    prepare_tools_"${os_family}" "$base_dir" "$source" "$dep_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
@@ -492,6 +583,8 @@ function main {
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
+    build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
+
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
         link_path="./latest"
