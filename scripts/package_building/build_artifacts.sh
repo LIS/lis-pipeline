@@ -364,6 +364,13 @@ function build_rhel {
     destination_path="$5"
     spec="$6"
 
+    if [[ "$build_state" == "kernel" ]];then
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+    elif [[ "$build_state" == "daemons" ]];then
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+    else
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/noarch/"
+    fi
     rm -f $artifacts_dir/*
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
