@@ -2,10 +2,7 @@
 ##### For 2008 R2, run the .ps1 from: https://download.microsoft.com/download/6/F/5/6F5FF66C-6775-42B0-86C4-47D41F2DA187/Win7AndW2K8R2-KB3191566-x64.zip
 
 $ErrorActionPreference = "Stop"
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$env:scriptPath = $scriptPath
-. "$scriptPath\common_functions.ps1"
-
+. "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)\common_functions.ps1"
 
 class Instance {
     [Backend] $Backend
@@ -92,6 +89,14 @@ class HypervInstance : Instance {
 
     [void] AttachVMDvdDrive ($DvdDrive) {
         $this.Backend.AttachVMDvdDrive($this.Name, $DvdDrive)
+    }
+
+    [Object] GetVMDisk () {
+        return $this.Backend.GetVMDisk($this.Name) 
+    }
+
+    [void] AddVMDisk ($VMDisk) {
+        $this.Backend.AddVMDisk($this.Name, $VMDisk)
     }
 }
 
@@ -194,8 +199,8 @@ class AzureBackend : Backend {
     [string] $useInitialPW = "yes"
 
     AzureBackend ($Params) : base ($Params) {
-        Write-Verbose "Starting the backend"
-        write-Verbose "Backend CP 2"
+         Write-Verbose "Starting the backend"
+         Write-Verbose "Backend CP 2"
     }
 
     [Instance] GetInstanceWrapper ($InstanceName) {
@@ -680,7 +685,7 @@ class HypervBackend : Backend {
             -ArgumentList $global:username, $securePassword
     }
 
-    [string] RunHypervCommand ($params) {
+    [String] RunHypervCommand ($params) {
         if ($this.Credentials) {
             $params += (@{"Credential"=$this.Credentials})
         }
@@ -734,7 +739,7 @@ class HypervBackend : Backend {
             "ScriptBlock"=$scriptBlock;
             "ArgumentList"=@($InstanceName);
         }
-        $instance.VHDPath = $this.RunHypervCommand($params)
+        $instance.VHDPath = [String]$this.RunHypervCommand($params)
         return $instance
     }
 
@@ -835,9 +840,19 @@ class HypervBackend : Backend {
 
     [String] GetPublicIP ($InstanceName) {
         # NOTE(papagalu):LIS drivers, LIS KVP daemon should be installed on the VM
-        $scriptBlock = {
+	$scriptBlock = {
             param($InstanceName)
-            (Get-VMNetworkAdapter -VMName $InstanceName).IPaddresses[0]
+            $ips = (Get-VMNetworkAdapter -VMName $InstanceName).IPaddresses
+            foreach ($ip in $ips) {
+                try {
+                    $castIp = [ipaddress]$ip
+                    if ($castIp -and ($castIp.AddressFamily -eq "InterNetwork") -and (!$castIp.$ip1.IsIPv6LinkLocal)) {
+                        return $ip
+                    }
+                } catch {
+                }
+            }
+            return $null
         }
 
         $params = @{
@@ -866,6 +881,41 @@ class HypervBackend : Backend {
         $ip = $this.GetPublicIP($InstanceName)
         $session = New-PSSession -ComputerName $ip -Credential $this.Credentials
         return $session
+    }
+
+    [Object] GetVMDisk ($InstanceName) {
+        $scriptBlock = {
+            param($InstanceName)
+            try {
+                $disks = (Get-VMHardDiskDrive -VMName $InstanceName).Path
+                foreach ($disk in $disks) {
+                    if ($disk -like "*deploy*") {
+                        $vmDisk = $disk
+                    }
+                }
+            } catch {
+                return $null
+            }
+            return $vmDisk
+        }
+        $params = @{
+            "ScriptBlock"=$scriptBlock;
+            "ArgumentList"=@($InstanceName);
+        }
+        return $this.RunHypervCommand($params)
+    }
+
+    [void] AddVMDisk ($InstanceName, $VMDisk) {
+        $scriptBlock = {
+            param($InstanceName, $VMDisk)
+            Add-VMHardDiskDrive -ControllerType IDE -ControllerNumber 1 `
+                                -Path $VMDisk -VMName $InstanceName
+        }
+        $params = @{
+            "ScriptBlock"=$scriptBlock;
+            "ArgumentList"=@($InstanceName, $VMDisk);
+        }
+        $this.RunHypervCommand($params)
     }
 }
 

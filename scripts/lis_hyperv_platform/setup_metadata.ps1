@@ -11,6 +11,11 @@ param(
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\config_drive.ps1"
 
+$scriptPath1 = (Get-Item $scriptPath ).parent.FullName
+. "$scriptPath1\common_functions.ps1"
+
+$ErrorActionPreference = "Stop"
+
 function Make-ISO {
     param(
         [String] $MkIsoFSPath,
@@ -18,8 +23,8 @@ function Make-ISO {
         [String] $OutputPath
     )
     try {
-        & $MkisofsPath -V config-2 -r -R -J -l -L -o  $OutputPath $TargetPath 2>&1 | Out-Null
-        if ($LastExitCode -ne 0) {
+        & $MkIsoFSPath -o $OutputPath -ldots -allow-lowercase -allow-multidot -quiet -J -r -V "config-2" $TargetPath
+        if ($LastExitCode) {
             throw
         }
     } catch {
@@ -47,9 +52,16 @@ function Preserve-Item {
 
 
 function Main {
+    Assert-PathExists $JobPath
+    Assert-PathExists $UserdataPath
+    foreach ($url in $KernelUrl) {
+        Assert-URLExists $url
+    }
+    
     $UserdataPath = Preserve-Item $UserdataPath
     Update-URL $UserdataPath $KernelURL
 
+    Write-Host "Generating SSH keys."
     & 'ssh-keygen.exe' -t rsa -f "$JobPath\$InstanceName-id-rsa" -q -N "''" -C "debian"
     if ($LastExitCode -ne 0) {
         throw
@@ -67,7 +79,7 @@ function Main {
     Write-Host "Finished Creating Configdrive"
 
     Remove-Item -Force -Recurse -Path "$scriptPath/ConfigDrive-tmp"
-    Remove-Item -Force "$UserdataPath"
+    Remove-Item -Force $UserdataPath
 }
 
 Main

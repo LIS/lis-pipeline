@@ -1,4 +1,4 @@
-﻿function login_azure {
+function login_azure {
     param (
         [string] $rg = "", 
         [string] $sa = "", 
@@ -503,3 +503,32 @@ Function CopyVHDToAnotherStorageAccount {
     }
     return $retValue
 }
+
+function Assert-PathExists {
+    param(
+        [String] $Path
+    )
+    if (!(Test-Path $Path)) {
+       throw "Path $Path not found."
+    }
+
+}
+
+function Assert-URLExists {
+    param(
+        [String] $URL
+    )
+
+    Write-Host "Checking Kernel URL"
+    $httpRequest = [System.Net.WebRequest]::Create($URL)
+    $httpResponse = $httpRequest.GetResponse()
+    $httpStatus = [int]$httpResponse.StatusCode
+
+    if ($httpStatus -ne 200) {
+        Write-Host "URL $URL cannot be reached."
+        throw "URL $URL cannot be reached."
+    }
+
+    $httpResponse.Close()
+}
+
