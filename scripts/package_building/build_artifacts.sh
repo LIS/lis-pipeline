@@ -334,12 +334,16 @@ function build_debian (){
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
+    source_package="$6"
 
     artifacts_dir="${base_dir}/${build_state}/"
     rm -f $artifacts_dir/*.deb
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
         fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
+        if [[ "$source_package" == "True" ]];then
+            fakeroot make-kpkg --initrd kernel_source -j"$thread_number"
+        fi
         popd
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
