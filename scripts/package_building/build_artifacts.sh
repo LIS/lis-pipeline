@@ -334,16 +334,12 @@ function build_debian (){
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
-    source_package="$6"
 
     artifacts_dir="${base_dir}/${build_state}/"
     rm -f $artifacts_dir/*.deb
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
-        if [[ "$source_package" == "True" ]];then
-            fakeroot make-kpkg --initrd kernel_source -j"$thread_number"
-        fi
+        fakeroot make-kpkg --initrd kernel_image kernel_headers kernel_source -j"$thread_number"
         popd
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
@@ -366,7 +362,6 @@ function build_rhel {
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
-    source_package="$6"
 
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
@@ -384,9 +379,7 @@ function build_rhel {
         pushd "$source"
         make rpm -j"$thread_number"
         popd
-        if [[ "$source_package" == "True" ]];then
-            copy_artifacts "$source_package_dir" "$destination_path"
-        fi
+        copy_artifacts "$source_package_dir" "$destination_path"
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
@@ -505,7 +498,6 @@ function main {
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     KERNEL_CONFIG="./Microsoft/config-azure"
     DEFAULT_BRANCH="stable"
-    SOURCE_PACKAGE="False"
     
     while true;do
         case "$1" in
@@ -550,9 +542,6 @@ function main {
                 shift 2;;
             --kernel_config)
                 KERNEL_CONFIG="$2"
-                shift 2;;
-            --source_package)
-                SOURCE_PACKAGE="$2"
                 shift 2;;
             --) shift; break ;;
             *) break ;;
@@ -600,7 +589,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$SOURCE_PACKAGE"
+        "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
