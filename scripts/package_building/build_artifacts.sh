@@ -339,7 +339,7 @@ function build_debian (){
     rm -f $artifacts_dir/*.deb
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        fakeroot make-kpkg --initrd kernel_image kernel_headers -j"$thread_number"
+        fakeroot make-kpkg --initrd kernel_image kernel_headers kernel_source -j"$thread_number"
         popd
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
@@ -362,7 +362,6 @@ function build_rhel {
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
-    spec="$6"
 
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
@@ -371,19 +370,21 @@ function build_rhel {
     else
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/noarch/"
     fi
+    source_package_dir="${base_dir}/${build_state}/rpmbuild/SRPMS/"
+    
     rm -f $artifacts_dir/*
+    
     if [[ "$build_state" == "kernel" ]];then
-        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+        rm -f $source_package_dir/*
         pushd "$source"
         make rpm -j"$thread_number"
         popd
+        copy_artifacts "$source_package_dir" "$destination_path"
     elif [[ "$build_state" == "daemons" ]];then
-        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
         pushd "${base_dir}/daemons/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
     else
-        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/noarch/"
         pushd "${base_dir}/tools/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
@@ -403,11 +404,12 @@ function build_kernel (){
     thread_number="$6"
     build_state="kernel"
     git_branch="$7"
+    source_package="$8"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
     prepare_kernel_"${os_family}" "$source"
-    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path"
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$source_package"
 }
 
 function build_daemons (){
