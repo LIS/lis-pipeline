@@ -41,11 +41,12 @@ function prepare_env_debian (){
     
     pushd "$base_dir"
     
-    if [[ $build_state == "daemons" ]];then
+    if [[ "$build_state" != "kernel" ]] && [[ -d "$build_state" ]];then
         rm -rf ./${build_state}
+    fi
+    if [[ $build_state == "daemons" ]];then
         mkdir -p ./${build_state}/hyperv-daemons/debian
     elif [[ $build_state == "tools" ]];then
-        rm -rf ./${build_state}
         mkdir -p ./${build_state}/hyperv-tools/debian
     else
         mkdir -p ./${build_state}
@@ -66,10 +67,7 @@ function prepare_env_rhel (){
 %_topdir ${base_dir}/${build_state}/rpmbuild
 %_tmppath ${base_dir}/${build_state}/rpmbuild/tmp
 EOF
-
-    if [[ $build_state == "daemons" ]];then
-        rm -rf ./${build_state}
-    elif [[ $build_state == "tools" ]];then
+    if [[ "$build_state" != "kernel" ]] && [[ -d "$build_state" ]];then
         rm -rf ./${build_state}
     fi
     mkdir -p ./${build_state}
@@ -336,7 +334,11 @@ function build_debian (){
     destination_path="$5"
 
     artifacts_dir="${base_dir}/${build_state}/"
-    rm -f $artifacts_dir/*.deb
+    if [[ -d "$artifacts_dir" ]];then
+        rm -f $artifacts_dir/*.deb
+    else
+        exit 1
+    fi
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
         fakeroot make-kpkg --initrd kernel_image kernel_headers kernel_source -j"$thread_number"
@@ -372,10 +374,18 @@ function build_rhel {
     fi
     source_package_dir="${base_dir}/${build_state}/rpmbuild/SRPMS/"
     
-    rm -f $artifacts_dir/*
+    if [[ -d "$artifacts_dir" ]];then
+        rm -f $artifacts_dir/*
+    else
+        exit 1
+    fi
     
     if [[ "$build_state" == "kernel" ]];then
-        rm -f $source_package_dir/*
+        if [[ -d "$source_package_dir" ]];then
+            rm -f $source_package_dir/*
+        else
+            exit 1
+        fi
         pushd "$source"
         make rpm -j"$thread_number"
         popd
@@ -464,7 +474,9 @@ function clean_env_debian (){
     #
     base_dir="$1"
     
-    rm -rf "${BASE_DIR}/"*
+    if [[ -d "$BASE_DIR" ]];then
+        rm -rf "${BASE_DIR}/"*
+    fi
 }
 
 function clean_env_rhel (){
@@ -473,8 +485,13 @@ function clean_env_rhel (){
     #
     base_dir="$1"
     
-    rm -rf "${BASE_DIR}/"*
-    rm -r "$HOME/.rpmmacros"
+    if [[ -d "$BASE_DIR" ]];then
+        rm -rf "${BASE_DIR}/"*
+    fi
+    
+    if [[ -a "$HOME/.rpmmacros" ]];then
+        rm -f "$HOME/.rpmmacros"
+    fi
 }
 
 function main {
