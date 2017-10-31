@@ -376,15 +376,11 @@ function build_rhel {
     
     if [[ -d "$artifacts_dir" ]];then
         rm -f $artifacts_dir/*
-    else
-        exit 1
     fi
     
     if [[ "$build_state" == "kernel" ]];then
         if [[ -d "$source_package_dir" ]];then
             rm -f $source_package_dir/*
-        else
-            exit 1
         fi
         pushd "$source"
         make rpm -j"$thread_number"
