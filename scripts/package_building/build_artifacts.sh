@@ -341,7 +341,7 @@ function build_debian (){
     fi
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        fakeroot make-kpkg --initrd kernel_image kernel_headers kernel_source -j"$thread_number"
+        fakeroot make-kpkg --initrd -j"$thread_number" kernel_image kernel_headers kernel_source kernel_debug
         popd
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
