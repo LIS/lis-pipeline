@@ -26,7 +26,7 @@ function install_deps_debian {
     # Installing packages required for the build process.
     #
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
-    devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
+    devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison asciidoc)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
     
     if [[ "$USE_CCACHE" == "True" ]];then
@@ -50,8 +50,10 @@ function prepare_env_debian (){
         mkdir -p ./${build_state}/hyperv-daemons/debian
     elif [[ $build_state == "tools" ]];then
         mkdir -p ./${build_state}/hyperv-tools/debian
-    else
+    elif [[ $build_state == "kernel" ]];then 
         mkdir -p ./${build_state}
+    elif [[ $build_state == "perf" ]];then
+        mkdir ./${build_state}
     fi  
     popd
 }
@@ -365,6 +367,40 @@ function prepare_perf_rhel (){
     popd
 }
 
+function prepare_perf_debian (){
+    #
+    # Copy tools sources and dependency files
+    #
+    base_dir="$1"
+    source="$2"
+    dep_path="$3"
+    
+    pushd "$source"
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    pack_folder="${base_dir}/perf/linux-perf_${kernel_version}"    
+    if [[ -d "$pack_folder" ]];then
+        rm -rf "$pack_folder"
+    fi
+    mkdir "$pack_folder"
+    if [[ ! -d "tools/perf" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else 
+        pushd "${source}/tools/perf"
+        make DESTDIR="$pack_folder" install install-doc
+        pushd "$pack_folder"
+        mkdir "./usr"
+        mv ./bin ./lib64 ./libexec ./share ./usr
+        popd
+        popd
+    fi
+    popd
+    mkdir "${pack_folder}/DEBIAN"
+    cp "${dep_path}/perf/"* "${pack_folder}/DEBIAN/"
+    sed -i -e "s/Version:.*/Version:  $kernel_version/g" "${pack_folder}/DEBIAN/control"
+}
+
 function build_debian (){
     #
     # Building the kernel or daemons for deb based OSs
@@ -389,9 +425,13 @@ function build_debian (){
         pushd "${base_dir}/daemons/hyperv-daemons"
         echo "y" | debuild -us -uc
         popd
-    else
+    elif [[ "$build_state" == "tools" ]];then
         pushd "${base_dir}/tools/hyperv-tools"
         debuild -us -uc
+        popd
+    elif [[ "$build_state" == "perf" ]];then
+        pushd "${base_dir}/perf/"
+        dpkg-deb --build linux-perf_${kernel_version}
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"

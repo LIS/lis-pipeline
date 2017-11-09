@@ -1,0 +1,7 @@
+Package: linux-perf
+Version: 1.0-1
+Section: base
+Priority: optional
+Architecture: amd64
+Maintainer: Mantainer <you@email.com>
+Description: Perf tool for the linux kernel.
