@@ -9,7 +9,9 @@ function install_deps_rhel {
     # Installing packages required for the build process.
     #
     rpm_packages=(rpm-build rpmdevtools yum-utils ncurses-devel hmaccalc zlib-devel \ 
-    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot crudini)
+    binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot crudini \
+    asciidoc audit-devel binutils-devel xmlto bison flex gtk2-devel libdw-devel libelf-devel \
+    xz-devel libnuma-devel newt-devel openssl-devel xmlto zlib-devel)
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
@@ -24,7 +26,7 @@ function install_deps_debian {
     # Installing packages required for the build process.
     #
     deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
-    devscripts build-essential lintian debhelper git wget bc fakeroot crudini)
+    devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison asciidoc)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
     
     if [[ "$USE_CCACHE" == "True" ]];then
@@ -48,8 +50,10 @@ function prepare_env_debian (){
         mkdir -p ./${build_state}/hyperv-daemons/debian
     elif [[ $build_state == "tools" ]];then
         mkdir -p ./${build_state}/hyperv-tools/debian
-    else
+    elif [[ $build_state == "kernel" ]];then 
         mkdir -p ./${build_state}
+    elif [[ $build_state == "perf" ]];then
+        mkdir ./${build_state}
     fi  
     popd
 }
@@ -323,6 +327,90 @@ function prepare_tools_rhel (){
     popd
 }
 
+function prepare_perf_rhel (){
+    #
+    # Copy tools sources and dependency files
+    #
+    base_dir="$1"
+    source="$2"
+    dep_path="$3"
+    
+    mkdir -p "${base_dir}/perf/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
+    pushd "$source"
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    release="${kernel_version##*-}"
+    if [[ "$release" != "$kernel_version" ]];then
+        kernel_version="${kernel_version%-*}"
+        kernel_version="${kernel_version#*-}"
+    else
+        release=""
+    fi
+    if [[ ! -d "tools/perf" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else 
+        cp -fr ./tools "${base_dir}/perf/rpmbuild/SOURCES"
+    fi
+    popd
+    pushd "${base_dir}/perf/rpmbuild"
+    if [[ -e "${dep_path}/perf/lis-perf.spec" ]];then
+        cp "${dep_path}/perf/lis-perf.spec" "./SPECS"
+        sed -i -e "s/Version:.*/Version:  $kernel_version/g" "SPECS/lis-perf.spec"
+        if [[ "$release" != "" ]];then
+            sed -i -e "s/Release:.*/Release:  $release/g" "SPECS/lis-perf.spec"
+        fi
+        spec="lis-perf.spec"
+    else
+        exit 1
+    fi
+    popd
+}
+
+function prepare_perf_debian (){
+    #
+    # Copy tools sources and dependency files
+    #
+    base_dir="$1"
+    source="$2"
+    dep_path="$3"
+    
+    pushd "$source"
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    pack_folder="${base_dir}/perf/linux-perf_${kernel_version}"    
+    if [[ -d "$pack_folder" ]];then
+        rm -rf "$pack_folder"
+    fi
+    mkdir "$pack_folder"
+    if [[ ! -d "tools/perf" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else 
+        pushd "${source}/tools/perf"
+        make DESTDIR="$pack_folder" install install-doc
+        pushd "$pack_folder"
+        mkdir "./usr"
+        dirs=(bin lib64 libexec)
+        for dir in ${dirs[@]};do
+            for file in $(ls ./$dir);do
+                mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
+            done
+        done
+        dir="share/man/man[1-10]"
+        for file in $(ls ./$dir);do
+            rename "s/$file/perf_${kernel_version%.*}-${file#*perf-}/" ./$dir/$file
+        done
+        mv ./bin ./lib64 ./libexec ./share ./usr
+        popd
+        popd
+    fi
+    popd
+    mkdir "${pack_folder}/DEBIAN"
+    cp "${dep_path}/perf/"* "${pack_folder}/DEBIAN/"
+    sed -i -e "s/Version:.*/Version:  $kernel_version/g" "${pack_folder}/DEBIAN/control"
+}
+
 function build_debian (){
     #
     # Building the kernel or daemons for deb based OSs
@@ -347,9 +435,13 @@ function build_debian (){
         pushd "${base_dir}/daemons/hyperv-daemons"
         echo "y" | debuild -us -uc
         popd
-    else
+    elif [[ "$build_state" == "tools" ]];then
         pushd "${base_dir}/tools/hyperv-tools"
         debuild -us -uc
+        popd
+    elif [[ "$build_state" == "perf" ]];then
+        pushd "${base_dir}/perf/"
+        dpkg-deb --build linux-perf_${kernel_version}
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
@@ -368,6 +460,8 @@ function build_rhel {
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
     elif [[ "$build_state" == "daemons" ]];then
+        artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
+    elif [[ "$build_state" == "perf" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
     else
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/noarch/"
@@ -390,8 +484,12 @@ function build_rhel {
         pushd "${base_dir}/daemons/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
-    else
+    elif [[ "$build_state" == "tools" ]];then
         pushd "${base_dir}/tools/rpmbuild"
+        rpmbuild -ba "SPECS/$spec"
+        popd
+    elif [[ "$build_state" == "perf" ]];then
+        pushd "${base_dir}/perf/rpmbuild"
         rpmbuild -ba "SPECS/$spec"
         popd
     fi
@@ -452,6 +550,22 @@ function build_tools (){
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
+function build_perf (){
+    #
+    # Build perf package
+    #
+    base_dir="$1"
+    source_path="$2"
+    os_family="$3"
+    destination_path="$4"
+    dep_path="$5"
+    build_state="perf"
+    
+    prepare_env_"${os_family}" "$base_dir" "$build_state"
+    prepare_perf_"${os_family}" "$base_dir" "$source" "$dep_path"
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
+}
+    
 function get_job_number (){
     #
     # Multiply current number of threads with a number
@@ -606,6 +720,7 @@ function main {
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
+    build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
 
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
