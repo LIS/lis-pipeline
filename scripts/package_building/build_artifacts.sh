@@ -394,12 +394,12 @@ function prepare_perf_debian (){
         dirs=(bin lib64 libexec)
         for dir in ${dirs[@]};do
             for file in $(ls ./$dir);do
-                mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
+                mv "./$dir/$file" "./$dir/${file}_${kernel_version}"
             done
         done
         dir="share/man/man[1-10]"
         for file in $(ls ./$dir);do
-            rename "s/$file/perf_${kernel_version%.*}-${file#*perf-}/" ./$dir/$file
+            rename "s/$file/perf_${kernel_version}-${file#*perf-}/" ./$dir/$file
         done
         mv ./bin ./lib64 ./libexec ./share ./usr
         popd
