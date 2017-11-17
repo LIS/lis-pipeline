@@ -25,7 +25,7 @@ function install_deps_debian {
     #
     # Installing packages required for the build process.
     #
-    deb_packages=(libncurses5-dev xz-utils libssl-dev bc ccache kernel-package \
+    deb_packages=(libncurses5-dev xz-utils libssl-dev libelf-dev bc ccache kernel-package \
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison asciidoc)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
     
