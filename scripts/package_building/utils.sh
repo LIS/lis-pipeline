@@ -123,6 +123,18 @@ function get_os_version {
 os_PACKAGE=$os_package os_PACKAGE_MANAGER=$os_package_manager os_CODENAME=$os_codename"
 }
 
+split_string() {
+    string="$1"
+    del="$2"
+
+    while test "${string#*$del}" != "$string" ; do
+        split_str="${split_str} ${string%%$del*}"
+        string="${string#*$del}"
+    done
+    split_str="${split_str# *} ${string}"
+    echo "$split_str"
+}
+
 exec_with_retry2 () {
     MAX_RETRIES=$1
     INTERVAL=$2
@@ -239,7 +251,7 @@ get_latest_stable_branch() {
     git_dir="$1"
     
     branches="$(get_stable_branches $git_dir)"
-    echo "${branches##*.}"
+    echo "${branches##*,}"
 }
 
 get_latest_unstable_branch() {
