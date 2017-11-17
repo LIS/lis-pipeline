@@ -215,3 +215,48 @@ get_destination_path() {
 
     echo "$destination_path"
 }
+
+get_stable_branches() {
+    git_dir="$1"
+
+    pushd "$git_dir"
+    branches="$(git branch --all)"
+    for branch in $branches;do
+        if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" != "${branch%*.y}" ]];then
+            branch="${branch#remotes/*}"
+            small_branch="${branch#origin/*}"
+            tag="$(git rev-parse $branch)"
+            tag="${tag:0:7}"
+
+            result="${result},${small_branch}#${tag}"
+        fi
+    done
+    popd
+    echo "${result#,*}"
+}
+
+get_latest_stable_branch() {
+    git_dir="$1"
+    
+    branches="$(get_stable_branches $git_dir)"
+    echo "${branches##*.}"
+}
+
+get_latest_unstable_branch() {
+    git_dir="$1"
+
+    pushd "$git_dir"
+    branches="$(git branch --all)"
+    for branch in $branches;do
+        if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" == "${branch%*.y}" ]];then
+            branch="${branch#remotes/*}"
+            small_branch="${branch#origin/*}"
+            tag="$(git rev-parse $branch)"
+            tag="${tag:0:7}"
+
+            result="${small_branch}#${tag}"
+        fi
+    done
+    popd
+    echo "${result}"
+}
