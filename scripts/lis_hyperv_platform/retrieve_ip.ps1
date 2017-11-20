@@ -3,6 +3,11 @@ $scriptPathBackend = (Get-Item $scriptPath ).parent.FullName
 . "$scriptPathBackend\backend.ps1"
  
 function Get-IP {
+    param(
+        [String] $InstanceName,
+        [Int]    $VMCheckTimeout
+    )
+
     $backend = [HypervBackend]::new(@("localhost"))
     $instance = [HypervInstance]::new($backend, $InstanceName, "")
 
@@ -19,6 +24,6 @@ function Get-IP {
     if (($VMCheckTimeout -eq 0) -or !$ip) {
         throw "Failed to get an IP."
     }
-    Write-Host "IP for the instance is: >>>> $ip <<<<"
+
     return $ip
 }

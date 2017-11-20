@@ -697,7 +697,7 @@ class HypervBackend : Backend {
     }
 
     [void] CreateInstance ($InstanceName, $VHDPath) {
-        write-verbose ("Creating $InstanceName on backend " + $this.Name)
+        write-Host ("Creating $InstanceName on backend " + $this.Name)
         $scriptBlock = {
             param($InstanceName, $VHDPath)
 
@@ -712,7 +712,7 @@ class HypervBackend : Backend {
                          -DynamicMemoryEnabled $false
             Enable-VMIntegrationService -VMName $InstanceName `
                                         -Name "*"
-            write-verbose "VM $InstanceName has been created."
+            write-host "VM $InstanceName has been created."
 
         }
         $params = @{

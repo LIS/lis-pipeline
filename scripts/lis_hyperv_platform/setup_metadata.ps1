@@ -1,11 +1,12 @@
 param(
-    [String] $JobPath = 'C:\var\lava\tmp\1',
-    [String] $UserdataPath = "C:\path\to\userdata.sh",
-    [String[]] $KernelURL = @(
-        "http://URL/TO/linux-headers.deb",
-        "http://URL/TO/linux-image.deb",
-        "http://URL/TO/hyperv-daemons.deb"),
-    [String] $MkIsoFS = "C:\path\to\mkisofs.exe"
+    [parameter(Mandatory=$true)]
+    [String] $JobPath,
+    [parameter(Mandatory=$true)]
+    [String] $KernelPath,
+    [parameter(Mandatory=$true)]
+    [String] $IdRSAPub,
+    [parameter(Mandatory=$true)]
+    [String] $VHDType
 )
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -18,11 +19,11 @@ $ErrorActionPreference = "Stop"
 
 function Make-ISO {
     param(
-        [String] $MkIsoFSPath,
         [String] $TargetPath,
         [String] $OutputPath
     )
     try {
+        $MkIsoFSPath = Resolve-Path "C:\bin\mkisofs.exe"
         & $MkIsoFSPath -o $OutputPath -ldots -allow-lowercase -allow-multidot -quiet -J -r -V "config-2" $TargetPath
         if ($LastExitCode) {
             throw
@@ -32,54 +33,38 @@ function Make-ISO {
     }
 }
 
-function Update-URL {
-    param(
-        [String] $UserdataPath,
-        [String] $URL
-    )
-        (Get-Content $UserdataPath).replace("MagicURL", $URL) `
-            | Set-Content $UserdataPath
-}
-
-function Preserve-Item {
-    param (
-        [String] $Path
-    )
-
-    Copy-Item -Path $Path -Destination "$Path-tmp"
-    return "$Path-tmp"
-}
-
-
 function Main {
     Assert-PathExists $JobPath
-    Assert-PathExists $UserdataPath
-    foreach ($url in $KernelUrl) {
-        Assert-URLExists $url
-    }
-    
-    $UserdataPath = Preserve-Item $UserdataPath
-    Update-URL $UserdataPath $KernelURL
+    Assert-PathExists $KernelPath
 
-    Write-Host "Generating SSH keys."
-    & 'ssh-keygen.exe' -t rsa -f "$JobPath\$InstanceName-id-rsa" -q -N "''" -C "debian"
-    if ($LastExitCode -ne 0) {
-        throw
-    }
-
-    Write-Host "Creating Configdrive"
+    Write-Host "Creating config drive..."
     $configDrive = [ConfigDrive]::new("configdrive")
     $configDrive.GetProperties("")
     $configDrive.ChangeProperty("hostname", "pipeline")
-    $configDrive.ChangeSSHKey("$JobPath\$InstanceName-id-rsa.pub")
-    $configDrive.ChangeUserData("$UserdataPath")
-    $configDrive.SaveToNewConfigDrive("$ScriptPath/ConfigDrive-tmp")
+    $configDrive.ChangeSSHKey($IdRSAPub)
+    switch ($VHDType) {
+        "ubuntu" {
+                $configDrive.ChangeUserData("$scriptPath\install_kernel_deb.sh")
+                $kernelFolder = "deb"
+            }
+        "centos" {
+                $configDrive.ChangeUserData("$scriptPath\install_kernel_rhel.sh")
+                $kernelFolder = "rpm"
+            }
+    }
+    $tmpConfigDrive = Join-Path $JobPath "ConfigDrive-tmp"
+    $finalConfigDrive = Join-Path $JobPath "configdrive.iso"
+    $configDrive.SaveToNewConfigDrive($tmpConfigDrive)
 
-    Make-ISO $MkIsoFS "$scriptPath/ConfigDrive-tmp" "$JobPath\configdrive.iso"
+    Assert-PathExists $tmpConfigDrive
+    Write-Host "Copying kernel artifacts to config drive folder..."
+    Copy-Item -Recurse "$KernelPath\$kernelFolder*" $tmpConfigDrive -Force
+
+    Make-ISO -TargetPath $tmpConfigDrive -OutputPath $finalConfigDrive
     Write-Host "Finished Creating Configdrive"
-
-    Remove-Item -Force -Recurse -Path "$scriptPath/ConfigDrive-tmp"
-    Remove-Item -Force $UserdataPath
+    if (Test-Path $tmpConfigDrive) {
+        Remove-Item -Force -Recurse -Path $tmpConfigDrive
+    }
 }
 
 Main

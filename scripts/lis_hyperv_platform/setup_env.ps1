@@ -1,16 +1,17 @@
 param (
-    [String] $JobPath = "C:\path\to\job",
-    [String] $VHDPath = "C:\path\to\example.vhdx",
-    [String] $UserdataPath = "C:\path\to\userdata.sh",
-    [String[]] $KernelURL = @(
-        "http://URL/TO/linux-headers.deb",
-        "http://URL/TO/linux-image.deb",
-        "http://URL/TO/hyperv-daemons.deb"),
-    [String] $InstanceName = "Instance1",
-    [String] $MkIsoFS = "C:\path\to\mkisofs.exe",
-    [String] $LavaToolsDisk = "C:\path\to\tools"
+    [parameter(Mandatory=$true)]
+    [String] $JobPath,
+    [parameter(Mandatory=$true)]
+    [String] $VHDPath,
+    [parameter(Mandatory=$true)]
+    [String] $KernelPath,
+    [parameter(Mandatory=$true)]
+    [String] $InstanceName,
+    [parameter(Mandatory=$true)]
+    [String] $IdRSAPub,
+    [parameter(Mandatory=$true)]
+    [String] $VHDType
 )
-
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
@@ -20,19 +21,24 @@ $scriptPath1 = (Get-Item $scriptPath).parent.FullName
 
 function Main {
     Assert-PathExists $JobPath
-    
+    Assert-PathExists $VHDPath
+    Assert-PathExists $KernelPath
+
+    Resize-VHD -Path $VHDPath -SizeBytes 30GB
+
     $backend = [HypervBackend]::new(@("localhost"))
     $instance = [HypervInstance]::new($backend, $InstanceName, $VHDPath)
 
     Write-Host "Starting Setup-Metadata script."
-    & "$scriptPath/setup_metadata.ps1" $JobPath $UserdataPath $KernelURL $MkIsoFS
+    & "$scriptPath/setup_metadata.ps1" -JobPath $JobPath `
+                                       -KernelPath $KernelPath `
+                                       -IdRSAPub $IdRSAPub -VHDType $VHDType
     if ($LastExitCode -ne 0) {
         throw $Error[0]
     }
 
     $instance.CreateInstance()
     $instance.AttachVMDvdDrive("$JobPath/configdrive.iso")
-    $instance.AddVMDisk($LavaToolsDisk)
     $instance.StartInstance()
 }
 
