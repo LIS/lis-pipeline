@@ -490,7 +490,7 @@ function build_rhel {
         popd
     elif [[ "$build_state" == "perf" ]];then
         pushd "${base_dir}/perf/rpmbuild"
-        rpmbuild -ba "SPECS/$spec"
+        sudo HOME=$HOME rpmbuild -ba "SPECS/$spec"
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
@@ -504,7 +504,7 @@ function build_kernel (){
     source_path="$2"
     os_family="$3"
     download_method="$4"
-    destination_path="$5"
+    base_dest_path="$5"
     thread_number="$6"
     build_state="kernel"
     git_branch="$7"
@@ -512,6 +512,7 @@ function build_kernel (){
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$source_package"
 }
@@ -704,8 +705,6 @@ function main {
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
     BASE_DESTINATION_PATH=$DESTINATION_PATH
-    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"
-    DESTINATION_PATH="$(check_destination_dir $DESTINATION_PATH $os_PACKAGE)"
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
@@ -715,7 +714,7 @@ function main {
         mkdir -p "$BASE_DIR"
     fi
 
-    build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DESTINATION_PATH" \
+    build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
