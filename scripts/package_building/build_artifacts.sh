@@ -490,7 +490,7 @@ function build_rhel {
         popd
     elif [[ "$build_state" == "perf" ]];then
         pushd "${base_dir}/perf/rpmbuild"
-        rpmbuild -ba "SPECS/$spec"
+        sudo HOME=$HOME rpmbuild -ba "SPECS/$spec"
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
