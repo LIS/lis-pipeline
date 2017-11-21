@@ -123,6 +123,18 @@ function get_os_version {
 os_PACKAGE=$os_package os_PACKAGE_MANAGER=$os_package_manager os_CODENAME=$os_codename"
 }
 
+split_string() {
+    string="$1"
+    del="$2"
+
+    while test "${string#*$del}" != "$string" ; do
+        split_str="${split_str} ${string%%$del*}"
+        string="${string#*$del}"
+    done
+    split_str="${split_str# *} ${string}"
+    echo "$split_str"
+}
+
 exec_with_retry2 () {
     MAX_RETRIES=$1
     INTERVAL=$2
@@ -199,4 +211,64 @@ check_destination_dir() {
         sudo mkdir -p "${dest_folder}-$index/$os_package"
         echo "${dest_folder}-$index/$os_package"
     fi
+}
+
+get_destination_path() {
+    source_path="$1"
+    base_dest_path="$2"
+    os_package="$3"
+
+    pushd "$source_path"
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    popd
+    destination_path="$base_dest_path/msft-${kernel_version}-$(date +'%d%m%Y')"
+    destination_path="$(check_destination_dir $destination_path $os_package)"
+
+    echo "$destination_path"
+}
+
+get_stable_branches() {
+    git_dir="$1"
+
+    pushd "$git_dir"
+    branches="$(git branch --all)"
+    for branch in $branches;do
+        if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" != "${branch%*.y}" ]];then
+            branch="${branch#remotes/*}"
+            small_branch="${branch#origin/*}"
+            tag="$(git rev-parse $branch)"
+            tag="${tag:0:7}"
+
+            result="${result},${small_branch}#${tag}"
+        fi
+    done
+    popd
+    echo "${result#,*}"
+}
+
+get_latest_stable_branch() {
+    git_dir="$1"
+    
+    branches="$(get_stable_branches $git_dir)"
+    echo "${branches##*,}"
+}
+
+get_latest_unstable_branch() {
+    git_dir="$1"
+
+    pushd "$git_dir"
+    branches="$(git branch --all)"
+    for branch in $branches;do
+        if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" == "${branch%*.y}" ]];then
+            branch="${branch#remotes/*}"
+            small_branch="${branch#origin/*}"
+            tag="$(git rev-parse $branch)"
+            tag="${tag:0:7}"
+
+            result="${small_branch}#${tag}"
+        fi
+    done
+    popd
+    echo "${result}"
 }
