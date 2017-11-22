@@ -72,7 +72,7 @@ function prepare_env_rhel (){
 %_tmppath ${base_dir}/${build_state}/rpmbuild/tmp
 EOF
     if [[ "$build_state" != "kernel" ]] && [[ -d "$build_state" ]];then
-        rm -rf ./${build_state}
+        sudo rm -rf ./${build_state}
     fi
     mkdir -p ./${build_state}
     popd
