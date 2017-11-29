@@ -514,7 +514,7 @@ function build_kernel (){
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
     prepare_kernel_"${os_family}" "$source"
-    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$source_package"
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
 }
 
 function build_daemons (){
