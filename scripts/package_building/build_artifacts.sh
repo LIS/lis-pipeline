@@ -515,6 +515,16 @@ function build_kernel (){
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
+
+    echo "Updating the kernel build information for later usage."
+    KERNEL_VERSION_FILE='./kernel_versions.ini'
+    echo "Changing directory to the kernel sources..."
+    pushd $source
+    KERNEL_VERSION=$(make kernelversion)
+    KERNEL_TAG=$(git log -1 --pretty=format:"%h")
+    popd
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT version $KERNEL_VERSION
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT git_tag $KERNEL_TAG
 }
 
 function build_daemons (){
@@ -705,6 +715,10 @@ function main {
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
     BASE_DESTINATION_PATH=$DESTINATION_PATH
+    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"
+    DESTINATION_PATH="$(check_destination_dir $DESTINATION_PATH $os_PACKAGE)"
+    DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
+    DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
     
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
@@ -724,9 +738,13 @@ function main {
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
         link_path="./latest"
-        sudo ln -snf "./$GIT_BRANCH-$(date +'%d%m%Y')" $link_path
+        sudo ln -snf "./$DESTINATION_FOLDER" $link_path
         popd
     fi
+    KERNEL_VERSION_FILE='./kernel_versions.ini'
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT branch $GIT_BRANCH
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT branch_label $INITIAL_BRANCH_NAME
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT folder $DESTINATION_FOLDER
 }
 
 main $@

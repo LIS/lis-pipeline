@@ -1,103 +1,131 @@
 param(
-    [String] $SharedStoragePath = "\\shared\storage\path",
-    [String] $JobId = "64",
-    [String] $UserdataPath = "C:\path\to\userdata.sh",
-    [String] $KernelURL = "kernel_url",
-    [String] $MkIsoFS = "C:\path\to\mkisofs.exe",
-    [String] $InstanceName = "Instance1",
-    [String] $KernelVersion = "4.13.2",
-    [Int] $VMCheckTimeout = 200
+    [parameter(Mandatory=$true)]
+    [String] $SharedStoragePath,
+    [parameter(Mandatory=$true)]
+    [String] $ShareUser,
+    [parameter(Mandatory=$true)]
+    [String] $SharePassword,
+    [parameter(Mandatory=$true)]
+    [String] $JobId,
+    [parameter(Mandatory=$true)]
+    [String] $InstanceName,
+    [parameter(Mandatory=$true)]
+    [String] $VHDType,
+    [parameter(Mandatory=$true)]
+    [String] $IdRSAPub,
+    [parameter(Mandatory=$true)]
+    [String] $XmlTest,
+    [Int]    $VMCheckTimeout = 300,
+    [String] $WorkingDirectory = ".",
+    [String] $QemuPath = "C:\bin\qemu-img.exe",
+    [String] $UbuntuImageURL = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
+    [String] $CentosImageURL = "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
+    [String] $KernelVersionPath = "scripts\package_building\kernel_versions.ini"
 )
 
 $ErrorActionPreference = "Stop"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\retrieve_ip.ps1"
+$scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
+. "$scriptPathParent\common_functions.ps1"
+Import-Module "$scriptPath\ini.psm1"
 
-$scriptPath1 = (Get-Item $scriptPath ).parent.FullName
-. "$scriptPath1\common_functions.ps1"
-
-# constants
-$KERNEL_ARTIFACTS_URL = @("{0}/hyperv-daemons_{1}_amd64.deb",
-                         "{0}/linux-headers-{1}_{1}-10.00.Custom_amd64.deb",
-                         "{0}/linux-image-{1}_{1}-10.00.Custom_amd64.deb")
-$LAVA_TOOL_DISK = "lava-guest.vhdx"
-
-function Prepare-LocalEnv {
+function Mount-Share {
     param(
         [String] $SharedStoragePath,
-        [String] $JobId
+        [String] $ShareUser,
+        [String] $SharePassword
     )
 
-    $mountPoint = "H:"
-    $localPartition = "C:\"
-    $lavaDisk = "lava-guest.vhdx"
-
-    $path = "/var/lib/lava/dispatcher/tmp/$JobId"
-    $remotePath = "$mountPoint\$JobId"
-    $localPath = "$localPartition\$path"
-
-    $SharedStoragePath = $SharedStoragePath.Replace("\\", "\")
-
-    net use $mountPoint $SharedStoragePath /persistent:NO 2>&1 | Out-Null
-    if ($LastExitCode) {
+    $mountPoint = $null
+    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
+    if ($smbMapping) {
+        return $smbMapping.LocalPath
+    }
+    for ([byte]$c = [char]'G'; $c -le [char]'Z'; $c++) {
+        $mountPoint = [char]$c + ":"
+        try {
+            net.exe use $mountPoint $SharedStoragePath /u:"AZURE\$ShareUser" "$SharePassword" | Out-Null
+            if ($LASTEXITCODE) {
+                Write-Host "Failed to mount share $SharedStoragePath to $mountPoint."
+            }
+            return $mountPoint
+        } catch {
+            if ($LASTEXITCODE) {
+                Write-Host "Failed to mount share $SharedStoragePath to $mountPoint."
+            }
+        }
+    }
+    if (!$mountPoint) {
         Write-Host $Error[0]
         throw "Failed to mount $SharedStoragePath to $mountPoint"
     }
-
-    Assert-PathExists $remotePath
-
-    New-Item -Path $localPath -ItemType Directory | Out-Null
-    Copy-Item -Path "$remotePath/*" -Destination $localPath -Force -Recurse
-
-    $localVHDPath = (Get-ChildItem -Filter "*.vhdx" -Path "$localPath\deploy*" -Recurse).FullName
-    Assert-PathExists $localVHDPath
-
-    $lavaToolDisk = (Get-ChildItem -Filter $LAVA_TOOL_DISK -Path $localPath -Recurse).FullName
-    Assert-PathExists $lavaToolDisk
-
-    $remoteVHDPath = (Get-ChildItem -Filter "*.vhdx" -Path "$remotePath\deploy*" -Recurse).FullName
-    $remotePath = Split-Path -Parent $remoteVHDPath
-
-    return @($localVHDPath, $lavaToolDisk, $remotePath)
 }
 
-function Expand-URL {
+function Get-VHD {
     param(
-        [String] $KernelUrl,
-        [String] $KernelVersion
+        [String] $VHDType,
+        [String] $JobPath
     )
 
-    $kernelURLExpanded = @()
-    foreach ($url in $KERNEL_ARTIFACTS_URL) {
-        $kernelURLExpanded += $url -f @($KernelURL, $KernelVersion)
+    switch ($VHDType) {
+        "ubuntu" {$downloadURL = $UbuntuImageURL}
+        "centos" {$downloadURL = $CentosImageURL}
     }
 
-    return $kernelURLExpanded
+    $vhdPath = Join-Path $JobPath "image.vhdx"
+    $fileType = [System.IO.Path]::GetExtension($downloadURL)
+    $downloadedImage = Join-Path $JobPath "image$fileType"
+    Write-Host "Downloading image file from $downloadURL to $downloadedImage..."
+    (New-Object System.Net.WebClient).DownloadFile($downloadURL, $downloadedImage)
+
+    $QemuPath = Resolve-Path $QemuPath
+    Write-Host "Converting image file from $downloadedImage to $vhdPath..."
+    & $QemuPath convert $downloadedImage -O vhdx $vhdPath
+    if ($LASTEXITCODE) {
+        throw "Qemu failed to convert $downloadedImage to $vhdPath."
+    }
+    return $vhdPath
 }
 
 function Main {
-    Write-Host "Starting the Main script"
-    $localEnvConfig = Prepare-LocalEnv $SharedStoragePath $JobId
-    $localVHDPath = $localEnvConfig[0]
-    $lavaToolDisk = $localEnvConfig[1]
-    $remoteJobFolder = $localEnvConfig[2]
+    Write-Host "Mounting the kernel share..."
+    $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
+    $kernelPath = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
+    if (!$kernelPath) {
+        throw "Kernel folder cannot be empty."
+    }
+    Write-Host "Using kernel folder name: $kernelPath."
+    $mountPoint = Mount-Share -SharedStoragePath $SharedStoragePath `
+                              -ShareUser $ShareUser -SharePassword $SharePassword
+    $kernelPath = Join-Path $mountPoint $KernelPath
+    Assert-PathExists $kernelPath
 
-    $expandedURL = Expand-URL $KernelURL $KernelVersion
-    $jobPath = Split-Path -Parent $localVHDPath
+    if (!(Test-Path $WorkingDirectory)) {
+        New-Item -Path $jobPath -Type Directory -Force | Out-Null
+    }
+    $WorkingDirectory = Resolve-Path $WorkingDirectory
+    $jobPath = Join-Path $WorkingDirectory $JobId
+    New-Item -Path $jobPath -Type "Directory" -Force | Out-Null
 
-    Write-Host "Starting Setup-Env script"
-    & "$scriptPath\setup_env.ps1" $jobPath $localVHDPath $UserdataPath $expandedURL $InstanceName $MkIsoFS $lavaToolDisk
+    $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath
+
+    Write-Host "Creating the VM required for LISA to run..."
+    & (Join-Path "$scriptPath" "setup_env.ps1") -JobPath $jobPath -VHDPath $vhdPath `
+        -KernelPath $kernelPath -InstanceName $InstanceName -IdRSAPub $IdRSAPub `
+        -VHDType $VHDType
     if ($LastExitCode) {
         Write-Host $Error[0]
-        throw "Setup-Env script failed."
+        throw "Creating the LISA VM failed."
     }
 
+    Write-Host "Retrieving IP for VM $InstanceName..."
     $ip = Get-IP $InstanceName $VMCheckTimeout
-         
-    Write-Host "Copying id_rsa from $jobPath\$InstanceName-id-rsa to $remoteJobFolder\id_rsa"
-    Copy-Item "$jobPath\$InstanceName-id-rsa" "$remoteJobFolder\id_rsa"
+    Start-Sleep 20
 
+    Write-Host "Starting LISA run..."
+    & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
 }
 
 Main
