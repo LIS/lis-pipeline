@@ -1,4 +1,5 @@
 #!/bin/bash
+set -xe
 
 install_deps(){
     apt-get -y install samba cifs-utils openssh-server
@@ -30,9 +31,13 @@ main(){
     mount_share "$USERNAME" "$PASSWORD" "$SAMBA_PATH"
     if [[ -d "$KERNEL_PATH" ]];then
         install_kernel "$KERNEL_PATH"
+        sleep 5
+        reboot &
+        exit 0
+    else
+        echo "Kernel folder ${KERNEL_PATH} does not exist"
+        exit 1
     fi
-    sleep 5 && reboot &
-    exit 0
 }
 
 main $@

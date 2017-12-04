@@ -48,13 +48,13 @@ function Mount-Share {
         try {
             net.exe use $mountPoint $SharedStoragePath /u:"AZURE\$ShareUser" "$SharePassword" | Out-Null
             if ($LASTEXITCODE) {
-                Write-Host "Failed to mount share $SharedStoragePath to $mountPoint."
+                throw "Failed to mount share $SharedStoragePath to $mountPoint."
+            } else {
+                Write-Host "Successfully monted SMB share on $mountPoint"
+                return $mountPoint
             }
-            return $mountPoint
         } catch {
-            if ($LASTEXITCODE) {
-                Write-Host "Failed to mount share $SharedStoragePath to $mountPoint."
-            }
+            Write-Host $_
         }
     }
     if (!$mountPoint) {
@@ -90,15 +90,16 @@ function Get-VHD {
 }
 
 function Main {
+    $jobPath = Join-Path $WorkingDirectory $JobId
     Write-Host "Mounting the kernel share..."
+    $mountPoint = Mount-Share -SharedStoragePath $SharedStoragePath `
+                              -ShareUser $ShareUser -SharePassword $SharePassword
     $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
     $kernelPath = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
     if (!$kernelPath) {
         throw "Kernel folder cannot be empty."
     }
     Write-Host "Using kernel folder name: $kernelPath."
-    $mountPoint = Mount-Share -SharedStoragePath $SharedStoragePath `
-                              -ShareUser $ShareUser -SharePassword $SharePassword
     $kernelPath = Join-Path $mountPoint $KernelPath
     Assert-PathExists $kernelPath
 
@@ -106,7 +107,6 @@ function Main {
         New-Item -Path $jobPath -Type Directory -Force | Out-Null
     }
     $WorkingDirectory = Resolve-Path $WorkingDirectory
-    $jobPath = Join-Path $WorkingDirectory $JobId
     New-Item -Path $jobPath -Type "Directory" -Force | Out-Null
 
     $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath

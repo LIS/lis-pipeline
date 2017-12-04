@@ -188,11 +188,11 @@ copy_artifacts() {
     
     rpm_exists="$(ls $artifacts_folder/*.rpm || true)"
     if [[ "$rpm_exists" != "" ]];then
-        sudo cp "$artifacts_folder"/*.rpm "$destination_path"
+        cp "$artifacts_folder"/*.rpm "$destination_path"
     fi
     deb_exists="$(ls $artifacts_folder/*.deb || true)"
     if [[ "$deb_exists" != "" ]];then
-        sudo cp "$artifacts_folder"/*.deb "$destination_path"
+        cp "$artifacts_folder"/*.deb "$destination_path"
     fi
 }
 
@@ -201,14 +201,14 @@ check_destination_dir() {
     os_package=$2
     
     if [[ ! -d "$dest_folder" ]] || [[ ! -d "${dest_folder}/$os_package" ]];then
-        sudo mkdir -p "${dest_folder}/$os_package"
+        mkdir -p "${dest_folder}/$os_package"
         echo "${dest_folder}/$os_package"
     else
         index=1
         while [[ -d "${dest_folder}-$index" ]] && [[ -d "${dest_folder}-${index}/$os_package" ]];do
             let index=index+1
         done
-        sudo mkdir -p "${dest_folder}-$index/$os_package"
+        mkdir -p "${dest_folder}-$index/$os_package"
         echo "${dest_folder}-$index/$os_package"
     fi
 }

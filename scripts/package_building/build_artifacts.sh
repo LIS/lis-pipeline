@@ -4,6 +4,8 @@ set -xe
 
 . utils.sh
 
+KERNEL_VERSION_FILE='./kernel_versions.ini'
+
 function install_deps_rhel {
     #
     # Installing packages required for the build process.
@@ -516,8 +518,9 @@ function build_kernel (){
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
 
+    DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
+    DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
     echo "Updating the kernel build information for later usage."
-    KERNEL_VERSION_FILE='./kernel_versions.ini'
     echo "Changing directory to the kernel sources..."
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
@@ -525,6 +528,7 @@ function build_kernel (){
     popd
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT version $KERNEL_VERSION
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT git_tag $KERNEL_TAG
+    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT folder $DESTINATION_FOLDER
 }
 
 function build_daemons (){
@@ -715,11 +719,6 @@ function main {
     GIT_BRANCH="$(get_branch_from_ini "$GIT_BRANCH" "$INI_FILE")"
 
     BASE_DESTINATION_PATH=$DESTINATION_PATH
-    DESTINATION_PATH="$BASE_DESTINATION_PATH/$GIT_BRANCH-$(date +'%d%m%Y')"
-    DESTINATION_PATH="$(check_destination_dir $DESTINATION_PATH $os_PACKAGE)"
-    DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
-    DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
-    
     if [[ "$CLEAN_ENV" == "True" ]];then
         clean_env_"$os_FAMILY" "$BASE_DIR" "$os_PACKAGE"
     fi
@@ -738,13 +737,11 @@ function main {
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
         link_path="./latest"
-        sudo ln -snf "./$DESTINATION_FOLDER" $link_path
+        ln -snf "./$GIT_BRANCH-$(date +'%d%m%Y')" $link_path
         popd
     fi
-    KERNEL_VERSION_FILE='./kernel_versions.ini'
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT branch $GIT_BRANCH
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT branch_label $INITIAL_BRANCH_NAME
-    crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT folder $DESTINATION_FOLDER
 }
 
 main $@
