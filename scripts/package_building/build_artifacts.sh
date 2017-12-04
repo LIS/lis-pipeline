@@ -109,13 +109,18 @@ function get_sources_git (){
     base_dir="$1"
     source_path="$2"
     git_branch="$3"
+    clone_depth="$4"
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
+    git_params="$source_path"
+    if [[ "$clone_depth" != "" ]];then
+        git_params="$git_params --depth $clone_depth"
+    fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
-        git clone "$source_path" > /dev/null
+        git clone "$git_params" > /dev/null
     fi
     pushd "$source"
     git reset --hard > /dev/null
@@ -510,11 +515,12 @@ function build_kernel (){
     thread_number="$6"
     build_state="kernel"
     git_branch="$7"
-    source_package="$8"
+    build_date="$8"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
+    GIT_TAG="$(get_git_tag $source)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
 
@@ -685,6 +691,9 @@ function main {
             --kernel_config)
                 KERNEL_CONFIG="$2"
                 shift 2;;
+            --clone_depth)
+                CLONE_DEPTH="$2"
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -728,7 +737,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
