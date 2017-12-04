@@ -109,13 +109,17 @@ function get_sources_git (){
     base_dir="$1"
     source_path="$2"
     git_branch="$3"
+    clone_depth="$4"
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
+    if [[ "$clone_depth" != "" ]];then
+        depth="--depth $clone_depth"
+    fi  
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
-        git clone "$source_path" > /dev/null
+        git clone "$source_path" "$depth" > /dev/null
     fi
     pushd "$source"
     git reset --hard > /dev/null
@@ -511,9 +515,10 @@ function build_kernel (){
     build_state="kernel"
     git_branch="$7"
     source_package="$8"
+    clone_depth="$9"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
+    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
@@ -685,6 +690,9 @@ function main {
             --kernel_config)
                 KERNEL_CONFIG="$2"
                 shift 2;;
+            --clone_depth)
+                CLONE_DEPTH="$2"
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -728,7 +736,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$CLONE_DEPTH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
