@@ -54,7 +54,7 @@ function Main {
         if ($LastExitCode){
             throw "Failed to download Putty binaries"
         }
-        Expand-Archive .\PuttyBinaries.zip -DestinationPath ".\lis-test\WS2012R2\lisa\bin"
+        Expand-Archive ".\PuttyBinaries.zip" ".\lis-test\WS2012R2\lisa\bin"
     }
     
     ($KeyName, $XmlName) = Get-Dependencies $KeyPath $XmlTest
