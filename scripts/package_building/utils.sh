@@ -217,12 +217,13 @@ get_destination_path() {
     source_path="$1"
     base_dest_path="$2"
     os_package="$3"
+    git_tag="$4"
 
     pushd "$source_path"
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
     popd
-    destination_path="$base_dest_path/msft-${kernel_version}-$(date +'%d%m%Y')"
+    destination_path="$base_dest_path/msft-${kernel_version}-${git_tag}-$(date +'%d%m%Y')"
     destination_path="$(check_destination_dir $destination_path $os_package)"
 
     echo "$destination_path"
