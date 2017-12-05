@@ -514,7 +514,8 @@ function build_kernel (){
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
+    GIT_TAG="$(get_git_tag $source)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
 
@@ -640,6 +641,7 @@ function main {
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     KERNEL_CONFIG="./Microsoft/config-azure"
     DEFAULT_BRANCH="stable"
+    GIT_TAG=""
     
     while true;do
         case "$1" in

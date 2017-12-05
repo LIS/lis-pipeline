@@ -217,16 +217,32 @@ get_destination_path() {
     source_path="$1"
     base_dest_path="$2"
     os_package="$3"
+    git_tag="$4"
 
     pushd "$source_path"
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
     popd
-    destination_path="$base_dest_path/msft-${kernel_version}-$(date +'%d%m%Y')"
+    destination_path="$base_dest_path/msft-${kernel_version}-${git_tag}-$(date +'%d%m%Y')"
     destination_path="$(check_destination_dir $destination_path $os_package)"
 
     echo "$destination_path"
 }
+
+get_git_tag(){
+    source_path="$1"
+    branch="$2"
+
+    if [[ "$branch" == "" ]];then
+        branch="HEAD"
+    fi
+    pushd "$source_path"
+    git_tag="$(git rev-parse $branch)"
+    git_tag="${git_tag:0:7}"
+    popd
+    echo "$git_tag"
+}
+
 
 get_stable_branches() {
     git_dir="$1"
@@ -237,8 +253,7 @@ get_stable_branches() {
         if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" != "${branch%*.y}" ]];then
             branch="${branch#remotes/*}"
             small_branch="${branch#origin/*}"
-            tag="$(git rev-parse $branch)"
-            tag="${tag:0:7}"
+            tag="$(get_git_tag $git_dir $branch)"
 
             result="${result},${small_branch}#${tag}"
         fi
@@ -263,8 +278,7 @@ get_latest_unstable_branch() {
         if [[ "$branch" != "${branch#remotes/*}" ]] && [[ "$branch" == "${branch%*.y}" ]];then
             branch="${branch#remotes/*}"
             small_branch="${branch#origin/*}"
-            tag="$(git rev-parse $branch)"
-            tag="${tag:0:7}"
+            tag="$(get_git_tag $git_dir $branch)"
 
             result="${small_branch}#${tag}"
         fi
