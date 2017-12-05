@@ -122,6 +122,8 @@ function get_sources_git (){
     git fetch > /dev/null
     git checkout "$git_branch" > /dev/null
     git pull > /dev/null
+    GIT_TAG="$(git rev-parse HEAD)"
+    GIT_TAG="${GIT_TAG:0:7}"
     popd
     popd
     echo "$source"
@@ -514,7 +516,7 @@ function build_kernel (){
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
 
@@ -640,6 +642,7 @@ function main {
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     KERNEL_CONFIG="./Microsoft/config-azure"
     DEFAULT_BRANCH="stable"
+    GIT_TAG=""
     
     while true;do
         case "$1" in
