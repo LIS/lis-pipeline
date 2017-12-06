@@ -109,13 +109,18 @@ function get_sources_git (){
     base_dir="$1"
     source_path="$2"
     git_branch="$3"
+    clone_depth="$4"
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
+    git_params="$source_path"
+    if [[ "$clone_depth" != "" ]];then
+        git_params="$git_params --depth $clone_depth"
+    fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
-        git clone "$source_path" > /dev/null
+        git clone "$git_params" > /dev/null
     fi
     pushd "$source"
     git reset --hard > /dev/null
@@ -688,6 +693,9 @@ function main {
                 shift 2;;
             --kernel_config)
                 KERNEL_CONFIG="$2"
+                shift 2;;
+            --clone_depth)
+                CLONE_DEPTH="$2"
                 shift 2;;
             --) shift; break ;;
             *) break ;;
