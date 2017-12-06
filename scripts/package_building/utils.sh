@@ -218,12 +218,13 @@ get_destination_path() {
     base_dest_path="$2"
     os_package="$3"
     git_tag="$4"
+    build_date="$5"
 
     pushd "$source_path"
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
     popd
-    destination_path="$base_dest_path/msft-${kernel_version}-${git_tag}-$(date +'%d%m%Y')"
+    destination_path="$base_dest_path/msft-${kernel_version}-${git_tag}-${build_date}"
     destination_path="$(check_destination_dir $destination_path $os_package)"
 
     echo "$destination_path"
@@ -240,7 +241,7 @@ get_git_tag(){
     git_tag="$(git rev-parse $branch)"
     git_tag="${git_tag:0:7}"
     popd
-    echo "$git_tag"
+    echo "$(echo "$git_tag" | sed 's/ //g')"
 }
 
 
