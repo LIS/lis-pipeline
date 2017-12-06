@@ -422,6 +422,7 @@ function build_debian (){
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
+    build_date="$6"
 
     artifacts_dir="${base_dir}/${build_state}/"
     if [[ -d "$artifacts_dir" ]];then
@@ -431,7 +432,7 @@ function build_debian (){
     fi
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        make-kpkg --rootcmd fakeroot --initrd -j"$thread_number" kernel_image kernel_headers kernel_source kernel_debug
+        make-kpkg --rootcmd fakeroot --initrd  --revision "$build_date" -j"$thread_number" kernel_image kernel_headers kernel_source kernel_debug
         popd
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
@@ -510,13 +511,14 @@ function build_kernel (){
     thread_number="$6"
     build_state="kernel"
     git_branch="$7"
-    source_package="$8"
+    build_date="$8"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE)"
+    GIT_TAG="$(get_git_tag $source)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date)"
     prepare_kernel_"${os_family}" "$source"
-    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$source_package"
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$build_date"
 
     DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
     DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
@@ -640,6 +642,8 @@ function main {
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     KERNEL_CONFIG="./Microsoft/config-azure"
     DEFAULT_BRANCH="stable"
+    GIT_TAG=""
+    BUILD_DATE="$(date +'%d%m%Y')"
     
     while true;do
         case "$1" in
@@ -728,7 +732,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
@@ -737,7 +741,7 @@ function main {
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
         link_path="./latest"
-        ln -snf "./$GIT_BRANCH-$(date +'%d%m%Y')" $link_path
+        ln -snf "./$GIT_BRANCH-$BUILD_DATE" $link_path
         popd
     fi
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT branch $GIT_BRANCH
