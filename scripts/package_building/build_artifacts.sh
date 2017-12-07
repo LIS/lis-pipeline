@@ -231,7 +231,7 @@ function prepare_daemons_rhel (){
     dep_path="$3"
     
     pushd "${base_dir}/daemons"
-    yumdownloader --source hyperv-daemons
+    sudo yumdownloader --source hyperv-daemons
     rpm -ivh *.rpm
     rm -f *.rpm
     popd
