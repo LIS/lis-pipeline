@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -xe
+
 function split_string() {
     string="$1"
     del="$2"
@@ -65,6 +67,7 @@ function main(){
     TEMPLATE_FOLDER="$WORKSPACE/scripts/azure_templates"
     BASE_DIR="$(pwd)"
     OS_TYPE=""
+    INSTALL_DEPS="n"
 
     while true;do
         case "$1" in
@@ -108,10 +111,10 @@ function main(){
     fi
 
     echo "Azure image type used: $OS_TYPE"
-    pushd "./$TEMPLATE_FOLDER"
-    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE"
+    pushd "$TEMPLATE_FOLDER"
+    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR"
     popd
-    pushd "./BASE_DIR"
+    pushd "$BASE_DIR"
     create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER"
     popd
 }
