@@ -211,7 +211,7 @@ function prepare_daemons_debian (){
     dch --create --distribution unstable --package "hyperv-daemons" \
         --newversion "$kernel_version" "jenkins"
     for i in *.sh;do
-        mv "$i" "${i%.*}"
+        cp "$i" "${i%.*}"
     done
     if [ "$debian_version" -ge 15 ];then
         cp "${dep_path}/16/"* "./debian"
