@@ -2,6 +2,8 @@
 
 set -xe
 
+RESOURCE_GROUP="kernel-validation"
+
 validate_azure_vm_boot() {
     BASEDIR=$1
     BUILD_NAME=$2
@@ -18,10 +20,9 @@ validate_azure_vm_boot() {
     DESIRED_KERNEL_TAG=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT git_tag)
     
     pushd "$BASEDIR"
-    bash create_azure_vm.sh --build_number "$BUILD_NAME$BUILD_NUMBER" --clone_repo y \
+    bash create_azure_vm.sh --build_number "$BUILD_NAME$BUILD_NUMBER" \
                             --vm_params "username=$USERNAME,password=$PASSWORD,samba_path=$SMB_SHARE_URL/temp-kernel-artifacts,kernel_path=$KERNEL_FOLDER" \
-                            --deploy_data azure_kernel_validation --resource_group kernel-validation \
-                            --os_type $OS_TYPE
+                            --resource_group $RESOURCE_GROUP --os_type $OS_TYPE
     popd
     
     INTERVAL=5

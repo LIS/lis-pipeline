@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -xe
+
 function split_string() {
     string="$1"
     del="$2"
@@ -14,14 +16,23 @@ function split_string() {
 
 function parse_vm_params() {
     params="$1"
+    base_dir="$2"
+    os_type="$3"
     vm_params=""
-
+    params_file=""
+    
     params="$(split_string $params ,)"
+    
+    if [[ "$os_type" == "ubuntu" ]];then
+        params_file="${base_dir}/install_kernel_${os_type}.sh"
+    else
+        params_file="./azuredeploy.parameters.json"
+    fi
 
     for param in $params;do
         value="${param#*=}"
         param="${param%%=*}"
-        sed -i -e "s#<$param>#$value#g" ../../install_kernel.sh
+        sed -i -e "s#<$param>#$value#g" "$params_file"
     done
 }
 
@@ -40,67 +51,79 @@ function azure_login(){
 function change_vm_params(){
     params="$1"
     build_number="$2"
+    os_type="$3"
+    base_dir="$4"
     
-    parse_vm_params $params
+    parse_vm_params "$params" "$base_dir" "$os_type"
     
-    git reset --hard HEAD
     sed -i -e "s/%number%/$build_number/g" ./azuredeploy.parameters.json
-    sed -i -e "s/%params%/$(cat ../../install_kernel.sh | base64 -w 0)/g" ./azuredeploy.parameters.json
+    sed -i -e "s/%params%/$(cat ${base_dir}/install_kernel_${os_type}.sh | base64 -w 0)/g" ./azuredeploy.parameters.json
 }
 
 function create_vm(){
     deploy_data="$1"
     resource_group="$2"
+    build_number="$3"
 
     chmod +x ./az-group-deploy.sh
-    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l northeurope
+    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l northeurope -n "$build_number"
 }
 
 function main(){
-    CLONE_REPO="n"
-    DEPLOY_DATA="azure_kernel_validation"
     RESOURCE_GROUP=""
     VM_PARAMS=""
+    TEMPLATE_FOLDER="$WORKSPACE/scripts/azure_templates"
+    BASE_DIR="$(pwd)"
+    OS_TYPE=""
+    INSTALL_DEPS="n"
 
     while true;do
         case "$1" in
-            --clone_repo)
-                CLONE_REPO="$2"
+            --install_deps)
+                INSTALL_DEPS="$2"
                 shift 2;;
             --vm_params)
                 VM_PARAMS="$2"
                 shift 2;;
-            --deploy_data)
-                DEPLOY_DATA="$2"
-                shift 2;;
             --resource_group)
                 RESOURCE_GROUP="$2"
                 shift 2;;
-            --build_number)
-                BUILD_NUMBER="$2"
-                shift 2;;
             --os_type)
                 OS_TYPE="$2"
+                shift 2;;
+            --build_number)
+                BUILD_NUMBER="$2"
                 shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
     done
-
-    #install_deps
-    #azure_login
-    if [[ "$CLONE_REPO" == "y" ]];then
-        if [[ -d "./azure-quickstart-templates" ]];then
-            rm -rf "./azure-quickstart-templates"
-        fi
-        git clone https://github.com/mbivolan/azure-quickstart-templates.git
+    
+    if [[ "$INSTALL_DEPS" == "y" ]];then
+        install_deps
     fi
+    if [[ "$OS_TYPE" != "" ]];then
+        if [[ -d "${TEMPLATE_FOLDER}/${OS_TYPE}_deploy" ]];then
+            if [[ -d "${TEMPLATE_FOLDER}/temp" ]];then
+                rm -rf "${TEMPLATE_FOLDER}/temp"
+            fi
+            mkdir "${TEMPLATE_FOLDER}/temp"
+            cp "${TEMPLATE_FOLDER}/${OS_TYPE}_deploy/"* "${TEMPLATE_FOLDER}/temp"
+            TEMPLATE_FOLDER="${TEMPLATE_FOLDER}/temp"
+        else
+            echo "Cannot find templates for os type: $OS_TYPE"
+            exit 1
+        fi
+    else
+        exit 1
+    fi
+
     echo "Azure image type used: $OS_TYPE"
-    pushd "./azure-quickstart-templates"
-    pushd "./$DEPLOY_DATA"
-    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER"
+    pushd "$TEMPLATE_FOLDER"
+    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR"
     popd
-    create_vm "$DEPLOY_DATA" "$RESOURCE_GROUP"
+    pushd "$BASE_DIR"
+    create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER"
     popd
 }
 
