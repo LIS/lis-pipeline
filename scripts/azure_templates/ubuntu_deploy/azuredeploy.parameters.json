@@ -1,0 +1,24 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "newStorageAccountName": {
+      "value": "kernelstorageacc"
+    },
+    "adminUsername": {
+      "value": "ubuntu"
+    },
+    "sshKeyData": {
+      "value":"ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAvbl1pSH8VSY5xssTKOYT5+Zon6TwoYAyB9qe1BMdBqu5xzYRMUtBja7d7qhN4ZSJdyJXqfAuSytDHI6uQ6bHvzy7ET0xWxyyaHkeM2pFPpbCBnagajFeMbunl/jcTrXRrDWrx+dxVzqoJts8h9Oa1+1fxMW1lxiOQw2nD0tuyCQFShtwGxYltNDrrJJVS2q/eqqQRSQFYjEVTnWAMdMK6zD+EP/0xB8BP7zDil1jFta7ZxQmviFvRq8w8+lGjN1bTICE7liJ3FGg7sZeROsgufyv/0wYTlRC7QcZnZJDbrAVcYrpRfAkPxIDYy8zWlw0Wn8vXWrTp4zYQ0m0SQVvrQ=="
+    },
+    "dnsNameForPublicIP": {
+      "value": "%number%-msft-kv"
+    },
+    "customData": {
+      "value": "%params%"
+    },
+    "buildNumber": {
+      "value": "%number%"
+    }
+  }
+}
