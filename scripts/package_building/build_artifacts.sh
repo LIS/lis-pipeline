@@ -517,11 +517,12 @@ function build_kernel (){
     build_state="kernel"
     git_branch="$7"
     build_date="$8"
+    folder_prefix="$9"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
     GIT_TAG="$(get_git_tag $source)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
     prepare_kernel_"${os_family}" "$source"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$build_date"
 
@@ -649,6 +650,7 @@ function main {
     DEFAULT_BRANCH="stable"
     GIT_TAG=""
     BUILD_DATE="$(date +'%d%m%Y')"
+    FOLDER_PREFIX="msft"
     
     while true;do
         case "$1" in
@@ -697,6 +699,9 @@ function main {
             --clone_depth)
                 CLONE_DEPTH="$2"
                 shift 2;;
+            --artifacts_folder_prefix)
+                FOLDER_PREFIX="$2"
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -740,7 +745,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
