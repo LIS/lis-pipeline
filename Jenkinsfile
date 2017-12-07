@@ -23,7 +23,7 @@ pipeline {
   }
   agent {
     node {
-      label 'master'
+      label 'meta_slave'
     }
   }
   stages {
@@ -109,7 +109,7 @@ pipeline {
     stage('Temporary Artifacts Publish') {
       agent {
         node {
-          label 'ubuntu_kernel_builder'
+          label 'meta_slave'
         }
       }
       steps {
@@ -139,7 +139,7 @@ pipeline {
     stage('Boot Validation') {
       agent {
         node {
-          label 'ubuntu_kernel_builder'
+          label 'meta_slave'
         }
       }
       steps {
@@ -179,7 +179,7 @@ pipeline {
     stage('Validated Artifacts Publish') {
       agent {
         node {
-          label 'ubuntu_kernel_builder'
+          label 'meta_slave'
         }
       }
       steps {
@@ -242,7 +242,7 @@ pipeline {
         stage('Azure') {
           agent {
             node {
-              label 'master'
+              label 'meta_slave'
             }
           }
           steps {
@@ -252,7 +252,7 @@ pipeline {
         stage('Performance On Hyper-V') {
           agent {
             node {
-              label 'master'
+              label 'meta_slave'
             }
           }
           steps {
