@@ -36,12 +36,6 @@
         "description": "SSH rsa public key file as a string."
       }
     },
-    "customData": {
-      "type": "string",
-      "metadata": {
-        "description": "Custom Data"
-      }
-    },
     "buildNumber": {
       "type": "string",
       "defaultValue": "default",
