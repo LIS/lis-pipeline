@@ -50,7 +50,6 @@ pipeline {
                         --thread_number ${THREAD_NUMBER} \\
                         --debian_os_version ${UBUNTU_VERSION} \\
                         --build_path ${BUILD_PATH} \\
-                        --kernel_config ${KERNEL_CONFIG} \\
                         --folder_prefix ${FOLDER_PREFIX} \\
                         --clean_env ${CLEAN_ENV} \\
                         --use_ccache ${USE_CCACHE} \\
@@ -87,7 +86,6 @@ pipeline {
                         --thread_number ${THREAD_NUMBER} \\
                         --debian_os_version ${UBUNTU_VERSION} \\
                         --build_path ${BUILD_PATH} \\
-                        --kernel_config ${KERNEL_CONFIG} \\
                         --folder_prefix ${FOLDER_PREFIX} \\
                         --clean_env ${CLEAN_ENV} \\
                         --use_ccache ${USE_CCACHE} \\
