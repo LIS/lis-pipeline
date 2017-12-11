@@ -1,1 +1,28 @@
-[placeholder for future pipeline work]
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+pipeline {
+  parameters {
+    string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '1000'))
+  }
+
+  agent {
+    node {
+      label 'meta_slave'
+    }
+  }
+  stages {
+     stage('Noop') {
+       steps {
+         sh 'echo "NOOP"'
+       }
+     }
+  }
+}
