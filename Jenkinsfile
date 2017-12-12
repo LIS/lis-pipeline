@@ -154,7 +154,8 @@ pipeline {
             bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
                 --build_name $BUILD_NAME --build_number $BUILD_NUMBER \
                 --smb_share_username $USERNAME --smb_share_password $PASSWORD \
-                --smb_share_url $SMB_SHARE_URL
+                --smb_share_url $SMB_SHARE_URL --vm_user_name $OS_TYPE \
+                --os_type $OS_TYPE
             '''
         }
         
