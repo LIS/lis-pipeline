@@ -239,16 +239,26 @@ pipeline {
             }
           }
         }
-        stage('Azure') {
+        stage('Azure-Functional') {
           agent {
             node {
-              label 'meta_slave'
+              label 'ostcjenkins-azure'
             }
           }
           steps {
-            echo "NOOP Azure test."
+            build job: 'AzureValidationJob', parameters: [string(name: 'SubscriptionName', value: 'Linux Integration Services Dev & Test'), string(name: 'SubscriptionID', value: ''), string(name: 'Location', value: 'East US'), string(name: 'StorageAccountName', value: 'ExistingStorage_Standard_LRS'), string(name: 'ExecutionMode', value: 'Azure Resource Manager'), string(name: 'ARMVMImage', value: 'Canonical UbuntuServer 16.04-LTS latest'), string(name: 'OverrideVMSize', value: ''), string(name: 'TestCycle', value: 'GPU-BASIC'), string(name: 'ShortDistroName', value: 'PPU1604'), string(name: 'OsVHD', value: ''), string(name: 'imageType', value: 'Standard'), string(name: 'customKernel', value: 'https://konkasoftpackages.blob.core.windows.net/testpackages/bluestone/latest/kernel-bluestone.deb'), string(name: 'customLIS', value: ''), string(name: 'customLISBranch', value: ''), booleanParam(name: 'EnableSRIOV', value: false), booleanParam(name: 'ForceDeleteResources', value: true), booleanParam(name: 'keepReproInact', value: false), booleanParam(name: 'EconomyMode', value: false), string(name: 'LinuxUsername', value: 'pipeline'), string(name: 'LinuxPassword', value: 'pipeline'), string(name: 'GitRepo', value: 'iamshital'), string(name: 'GitBranch', value: 'master'), string(name: 'EmailTo', value: 'v-shisav@microsoft.com'), string(name: 'DBServer', value: ''), string(name: 'DBName', value: ''), string(name: 'DBTable', value: ''), string(name: 'DBUsername', value: ''), string(name: 'DBPassword', value: ''), string(name: 'testTag', value: ''), string(name: 'ARM_ClientID', value: ''), string(name: 'Subscription_TenantID', value: ''), password(description: '', name: 'ARM_SecretKey', value: '']
           }
         }
+        stage('Azure-Performance') {
+          agent {
+            node {
+              label 'ostcjenkins-azure'
+            }
+          }
+          steps {
+            build job: 'AzureValidationJob', parameters: [string(name: 'SubscriptionName', value: 'Linux Integration Services Dev & Test'), string(name: 'SubscriptionID', value: ''), string(name: 'Location', value: 'West US 2'), string(name: 'StorageAccountName', value: 'ExistingStorage_Standard_LRS'), string(name: 'ExecutionMode', value: 'Azure Resource Manager'), string(name: 'ARMVMImage', value: 'Canonical UbuntuServer 16.04-LTS latest'), string(name: 'OverrideVMSize', value: 'Standard_D15_v2'), string(name: 'TestCycle', value: 'PERF-LAGSCOPE'), string(name: 'ShortDistroName', value: 'PPU1604'), string(name: 'OsVHD', value: ''), string(name: 'imageType', value: 'Standard'), string(name: 'customKernel', value: 'https://konkasoftpackages.blob.core.windows.net/testpackages/bluestone/latest/kernel-bluestone.deb'), string(name: 'customLIS', value: ''), string(name: 'customLISBranch', value: ''), booleanParam(name: 'EnableSRIOV', value: true), booleanParam(name: 'ForceDeleteResources', value: true), booleanParam(name: 'keepReproInact', value: false), booleanParam(name: 'EconomyMode', value: false), string(name: 'LinuxUsername', value: 'pipeline'), string(name: 'LinuxPassword', value: 'pipeline'), string(name: 'GitRepo', value: 'iamshital'), string(name: 'GitBranch', value: 'master'), string(name: 'EmailTo', value: 'v-shisav@microsoft.com'), string(name: 'DBServer', value: ''), string(name: 'DBName', value: ''), string(name: 'DBTable', value: ''), string(name: 'DBUsername', value: ''), string(name: 'DBPassword', value: ''), string(name: 'testTag', value: ''), string(name: 'ARM_ClientID', value: ''), string(name: 'Subscription_TenantID', value: ''), password(description: '', name: 'ARM_SecretKey', value: '']
+          }
+        }		
         stage('Performance On Hyper-V') {
           agent {
             node {
