@@ -14,9 +14,6 @@
     "dnsNameForPublicIP": {
       "value": "%number%-msft-kv"
     },
-    "customData": {
-      "value": "%params%"
-    },
     "buildNumber": {
       "value": "%number%"
     }

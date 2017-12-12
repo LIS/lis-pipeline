@@ -23,11 +23,7 @@ function parse_vm_params() {
     
     params="$(split_string $params ,)"
     
-    if [[ "$os_type" == "ubuntu" ]];then
-        params_file="${base_dir}/install_kernel_${os_type}.sh"
-    else
-        params_file="./azuredeploy.parameters.json"
-    fi
+    params_file="./azuredeploy.parameters.json"
 
     for param in $params;do
         value="${param#*=}"
@@ -57,7 +53,6 @@ function change_vm_params(){
     parse_vm_params "$params" "$base_dir" "$os_type"
     
     sed -i -e "s/%number%/$build_number/g" ./azuredeploy.parameters.json
-    sed -i -e "s/%params%/$(cat ${base_dir}/install_kernel_${os_type}.sh | base64 -w 0)/g" ./azuredeploy.parameters.json
 }
 
 function create_vm(){

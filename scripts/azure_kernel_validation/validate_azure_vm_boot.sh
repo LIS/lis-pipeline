@@ -4,6 +4,18 @@ set -xe
 
 RESOURCE_GROUP="kernel-validation"
 
+run_remote_script() {
+    script_path="$1"
+    private_key_path="$2"
+    username="$3"
+    vm_ip="$4"
+    script_params="$5"
+    script_name="${script_path##*/}"
+
+    scp -i "$private_key_path" -r -o StrictHostKeyChecking=no "$script_path" "$username@$vm_ip:~"
+    ssh -i "$private_key_path" -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$username@$vm_ip" 'sudo bash ~/'"$script_name"' "'"$script_params"'"'
+}
+
 validate_azure_vm_boot() {
     BASEDIR=$1
     BUILD_NAME=$2
@@ -13,11 +25,19 @@ validate_azure_vm_boot() {
     SMB_SHARE_URL=$6
     PRIVATE_KEY_PATH=$7
     VM_USER_NAME=$8
-
+    OS_TYPE=$9
+    VM_USER_NAME=$OS_TYPE
+    
     KERNEL_VERSION_FILE="./kernel_version${BUILD_NUMBER}/scripts/package_building/kernel_versions.ini"
     KERNEL_FOLDER=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT folder)
     DESIRED_KERNEL_VERSION=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT version)
     DESIRED_KERNEL_TAG=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT git_tag)
+    
+    if [[ "$OS_TYPE" == "ubuntu" ]];then
+        artifacts_folder="deb"
+    elif [[ "$OS_TYPE" == "centos" ]];then
+        artifacts_folder="rpm"
+    fi
 
     pushd "$BASEDIR"
     bash create_azure_vm.sh --build_number "$BUILD_NAME$BUILD_NUMBER" \
@@ -42,23 +62,20 @@ validate_azure_vm_boot() {
             sleep $INTERVAL
         fi
     done
-    
     if [ $COUNTER -eq $AZURE_MAX_RETRIES ]; then
         echo "Failed to get public ip. Exiting..."
         exit 2
     fi
 
     MOUNT_POINT="/tmp/${BUILD_NUMBER}"
-    DESTINATION_FOLDER=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT folder)
     mkdir -p $MOUNT_POINT
     sudo mount -t cifs "${SMB_SHARE_URL}/temp-kernel-artifacts" $MOUNT_POINT \
                -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
-    scp -i $PRIVATE_KEY_PATH -r -o StrictHostKeyChecking=no "${MOUNT_POINT}/${KERNEL_FOLDER}/rpm" "$VM_USER_NAME@$public_ip:/tmp/"
-    ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo rpm -ivh /tmp/rpm/kernel-*.rpm --nodeps --force'
-    ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo sed -i s%GRUB_DEFAULT=.*%GRUB_DEFAULT=0% /etc/default/grub && sudo /sbin/grub2-mkconfig -o /boot/grub2/grub.cfg'
+    scp -i $PRIVATE_KEY_PATH -r -o StrictHostKeyChecking=no "${MOUNT_POINT}/${KERNEL_FOLDER}/${artifacts_folder}" "$VM_USER_NAME@$public_ip:/tmp/"
+    run_remote_script "$BASEDIR/prepare_test_vm.sh" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$public_ip" \
+                "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts kernel --vm_username $VM_USER_NAME"
     ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo reboot' || true
     sudo umount $MOUNT_POINT
-
     sleep 10
 
     INTERVAL=5
@@ -69,7 +86,7 @@ validate_azure_vm_boot() {
             echo "Kernel ${KERNEL_NAME} matched."
             exit 0
         else
-            echo "Kernel $KERNEL_NAME does not match with desired Kernel tag: $DESIRED_KERNEL_TAG"
+            echo "Kernel ${KERNEL_NAME} does not match with desired Kernel tag: ${DESIRED_KERNEL_TAG}"
         fi
         let COUNTER=COUNTER+1
     
@@ -102,18 +119,18 @@ main() {
             --smb_share_url)
                 SMB_SHARE_URL="$2" 
                 shift 2;;
-            --private_key_path)
-                PRIVATE_KEY_PATH="$2"
-                shift 2;;
             --vm_user_name)
                 VM_USER_NAME="$2"
+                shift 2;;
+            --os_type)
+                OS_TYPE="$2"
                 shift 2;;
             *) break ;;
         esac
     done
 
     validate_azure_vm_boot $BASEDIR $BUILD_NAME $BUILD_NUMBER $USERNAME \
-        $PASSWORD $SMB_SHARE_URL $PRIVATE_KEY_PATH $VM_USER_NAME
+        $PASSWORD $SMB_SHARE_URL $PRIVATE_KEY_PATH $VM_USER_NAME $OS_TYPE
 }
 main $@
 
