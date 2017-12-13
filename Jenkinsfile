@@ -1,6 +1,7 @@
 #!/usr/bin/env groovy
 
 def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
@@ -37,7 +38,8 @@ pipeline {
                 }
               }
               steps {
-                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL')]) {
+                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
+                                                  variable: 'KERNEL_GIT_URL')]) {
                   sh '''#!/bin/bash
                     set -xe
                     echo "Building artifacts..."
@@ -58,7 +60,8 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ('scripts/package_building/' + "${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}" + '/msft*/deb/**'), name: "${env.KERNEL_ARTIFACTS_PATH}"
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
@@ -97,7 +100,8 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ('scripts/package_building/' + "${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}" + '/msft*/rpm/**'), name: "${env.KERNEL_ARTIFACTS_PATH}"
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
@@ -116,8 +120,9 @@ pipeline {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
             withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                               usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                               ]) {
+                               usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                passwordVariable: 'PASSWORD',
+                                                usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
                     MOUNT_POINT="/tmp/${BUILD_NUMBER}"
@@ -143,9 +148,9 @@ pipeline {
       }
       steps {
         withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                                                 string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                                 usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                                 ]) {
+                                   string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                   usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                   ]) {
           dir('kernel_version' + env.BUILD_NUMBER) {
             unstash 'kernel_version_ini'
             sh 'cat scripts/package_building/kernel_versions.ini'
@@ -217,14 +222,25 @@ pipeline {
           steps {
             withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                        string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                       usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                     ]) {
+                                       usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                        passwordVariable: 'PASSWORD',
+                                                        usernameVariable: 'USERNAME')]) {
                 echo 'Running LISA...'
                 dir('kernel_version' + env.BUILD_NUMBER) {
                     unstash 'kernel_version_ini'
                     PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
                 }
-                PowerShellWrapper('& ".\\scripts\\lis_hyperv_platform\\main.ps1" -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini" -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels" -ShareUser $env:USERNAME -SharePassword $env:PASSWORD -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}" -XmlTest KvpTests.xml -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace" -IdRSAPub "C:\\bin\\id_rsa.pub"')
+                PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini"
+                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                        -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
+                        -IdRSAPub "C:\\bin\\id_rsa.pub"
+                        -XmlTest KvpTests.xml
+                  ''')
                 echo 'Finished running LISA.'
               }
             }
@@ -235,7 +251,9 @@ pipeline {
             }
             success {
               echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('& ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"')
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                ''')
             }
           }
         }
