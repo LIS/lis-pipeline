@@ -1,6 +1,7 @@
 #!/usr/bin/env groovy
 
 def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
@@ -10,6 +11,8 @@ pipeline {
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
     string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+           description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
     KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
@@ -30,6 +33,7 @@ pipeline {
           stage('Build Ubuntu') {
               when {
                 expression { params.OS_TYPE == 'ubuntu' }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -37,7 +41,8 @@ pipeline {
                 }
               }
               steps {
-                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL')]) {
+                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
+                                                  variable: 'KERNEL_GIT_URL')]) {
                   sh '''#!/bin/bash
                     set -xe
                     echo "Building artifacts..."
@@ -58,7 +63,8 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ('scripts/package_building/' + "${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}" + '/msft*/deb/**'), name: "${env.KERNEL_ARTIFACTS_PATH}"
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
@@ -69,6 +75,7 @@ pipeline {
           stage('Build CentOS') {
               when {
                 expression { params.OS_TYPE == 'centos' }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -97,7 +104,8 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ('scripts/package_building/' + "${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}" + '/msft*/rpm/**'), name: "${env.KERNEL_ARTIFACTS_PATH}"
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
@@ -106,6 +114,9 @@ pipeline {
               }
     }
     stage('Temporary Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -116,8 +127,9 @@ pipeline {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
             withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                               usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                               ]) {
+                               usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                passwordVariable: 'PASSWORD',
+                                                usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
                     MOUNT_POINT="/tmp/${BUILD_NUMBER}"
@@ -136,6 +148,9 @@ pipeline {
       }
     }
     stage('Boot Validation') {
+      when {
+        expression { params.ENABLED_STAGES.contains('boot_test') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -143,9 +158,9 @@ pipeline {
       }
       steps {
         withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                                                 string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                                 usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                                 ]) {
+                                   string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                   usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                   ]) {
           dir('kernel_version' + env.BUILD_NUMBER) {
             unstash 'kernel_version_ini'
             sh 'cat scripts/package_building/kernel_versions.ini'
@@ -177,6 +192,9 @@ pipeline {
       }
     }
     stage('Validated Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -207,8 +225,14 @@ pipeline {
       }
     }
     stage('Functional Tests') {
+     when {
+      expression { params.ENABLED_STAGES.contains('validation') }
+     }
      parallel {
       stage('LISA') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+          }
           agent {
             node {
               label 'hyper-v'
@@ -217,14 +241,25 @@ pipeline {
           steps {
             withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                        string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                       usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                     ]) {
+                                       usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                        passwordVariable: 'PASSWORD',
+                                                        usernameVariable: 'USERNAME')]) {
                 echo 'Running LISA...'
                 dir('kernel_version' + env.BUILD_NUMBER) {
                     unstash 'kernel_version_ini'
                     PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
                 }
-                PowerShellWrapper('& ".\\scripts\\lis_hyperv_platform\\main.ps1" -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini" -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels" -ShareUser $env:USERNAME -SharePassword $env:PASSWORD -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}" -XmlTest KvpTests.xml -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace" -IdRSAPub "C:\\bin\\id_rsa.pub"')
+                PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini"
+                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                        -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
+                        -IdRSAPub "C:\\bin\\id_rsa.pub"
+                        -XmlTest KvpTests.xml
+                  ''')
                 echo 'Finished running LISA.'
               }
             }
@@ -235,11 +270,16 @@ pipeline {
             }
             success {
               echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('& ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"')
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                ''')
             }
           }
         }
         stage('Azure-Functional') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+          }
           agent {
             node {
               label 'ostcjenkins-azure'
@@ -250,6 +290,9 @@ pipeline {
           }
         }
         stage('Azure-Performance') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_performance_azure') }
+          }		
           agent {
             node {
               label 'ostcjenkins-azure'
@@ -260,6 +303,9 @@ pipeline {
           }
         }		
         stage('Performance On Hyper-V') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+          }
           agent {
             node {
               label 'meta_slave'
