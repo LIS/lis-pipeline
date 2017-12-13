@@ -41,7 +41,7 @@ function Mount-Share {
     $mountPoint = $null
     $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
     if ($smbMapping) {
-        if ($$smbMapping.LocalPath -is [array]){
+        if ($smbMapping.LocalPath -is [array]){
             return $smbMapping.LocalPath[0]
         } else {
             return $smbMapping.LocalPath
