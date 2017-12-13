@@ -11,6 +11,8 @@ pipeline {
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
     string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+           description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
     KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
@@ -31,6 +33,7 @@ pipeline {
           stage('Build Ubuntu') {
               when {
                 expression { params.OS_TYPE == 'ubuntu' }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -72,6 +75,7 @@ pipeline {
           stage('Build CentOS') {
               when {
                 expression { params.OS_TYPE == 'centos' }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -110,6 +114,9 @@ pipeline {
               }
     }
     stage('Temporary Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -141,6 +148,9 @@ pipeline {
       }
     }
     stage('Boot Validation') {
+      when {
+        expression { params.ENABLED_STAGES.contains('boot_test') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -182,6 +192,9 @@ pipeline {
       }
     }
     stage('Validated Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+      }
       agent {
         node {
           label 'meta_slave'
@@ -212,8 +225,14 @@ pipeline {
       }
     }
     stage('Functional Tests') {
+     when {
+      expression { params.ENABLED_STAGES.contains('validation') }
+     }
      parallel {
       stage('LISA') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+          }
           agent {
             node {
               label 'hyper-v'
@@ -258,6 +277,9 @@ pipeline {
           }
         }
         stage('Azure') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+          }
           agent {
             node {
               label 'meta_slave'
@@ -268,6 +290,9 @@ pipeline {
           }
         }
         stage('Performance On Hyper-V') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+          }
           agent {
             node {
               label 'meta_slave'
