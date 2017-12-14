@@ -127,7 +127,8 @@ function Main {
     Write-Host "Retrieving IP for VM $InstanceName..."
     $ip = Get-IP $InstanceName $VMCheckTimeout
     Start-Sleep 20
-
+    Stop-VM $InstanceName -Force
+    Start-Sleep 20
     Write-Host "Starting LISA run..."
     & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
 }
