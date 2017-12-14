@@ -24,6 +24,9 @@ pipeline {
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'kernel'
   }
+  options {
+    timestamps()
+  }
   agent {
     node {
       label 'meta_slave'
@@ -225,55 +228,55 @@ pipeline {
       }
     }
     stage('Functional Tests') {
-     when {
-      expression { params.ENABLED_STAGES.contains('validation') }
-     }
-     parallel {
-      stage('LISA') {
-          when {
-            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
-          }
-          agent {
-            node {
-              label 'hyper-v'
-            }
-          }
-          steps {
-            withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                                       string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                       usernamePassword(credentialsId: 'smb_share_user_pass',
-                                                        passwordVariable: 'PASSWORD',
-                                                        usernameVariable: 'USERNAME')]) {
-                echo 'Running LISA...'
-                dir('kernel_version' + env.BUILD_NUMBER) {
-                    unstash 'kernel_version_ini'
-                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
-                }
-                PowerShellWrapper('''
-                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
-                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini"
-                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
-                        -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
-                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}"
-                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
-                        -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
-                        -IdRSAPub "C:\\bin\\id_rsa.pub"
-                        -XmlTest KvpTests.xml
-                  ''')
-                echo 'Finished running LISA.'
+      when {
+        expression { params.ENABLED_STAGES.contains('validation') }
+      }
+      parallel {
+          stage('LISA') {
+              when {
+                expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
               }
-            }
-          post {
-            always {
-              archiveArtifacts 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
-              junit 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml'
-            }
-            success {
-              echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('''
-                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
-                ''')
-            }
+              agent {
+                node {
+                  label 'hyper-v'
+                }
+              }
+              steps {
+                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
+                                           string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                            passwordVariable: 'PASSWORD',
+                                                            usernameVariable: 'USERNAME')]) {
+                    echo 'Running LISA...'
+                    dir('kernel_version' + env.BUILD_NUMBER) {
+                        unstash 'kernel_version_ini'
+                        PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+                    }
+                    PowerShellWrapper('''
+                        & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                            -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini"
+                            -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                            -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
+                            -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                            -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                            -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
+                            -IdRSAPub "C:\\bin\\id_rsa.pub"
+                            -XmlTest KvpTests.xml
+                      ''')
+                    echo 'Finished running LISA.'
+                  }
+                }
+              post {
+                always {
+                  archiveArtifacts 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
+                  junit 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml'
+                }
+                success {
+                  echo 'Cleaning up LISA environment...'
+                  PowerShellWrapper('''
+                      & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                    ''')
+                }
           }
         }
         stage('Azure') {
