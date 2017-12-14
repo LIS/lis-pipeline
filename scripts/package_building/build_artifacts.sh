@@ -125,7 +125,10 @@ function get_sources_git (){
     pushd "$source"
     git reset --hard > /dev/null
     git fetch > /dev/null
-    git checkout "$git_branch" > /dev/null
+    # Note(avladu): the checkout to master is needed to
+    # get from a detached HEAD state
+    git checkout master > /dev/null
+    git checkout -f "$git_branch" > /dev/null
     git pull > /dev/null
     popd
     popd
