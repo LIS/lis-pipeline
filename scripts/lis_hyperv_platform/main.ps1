@@ -15,7 +15,7 @@ param(
     [String] $IdRSAPub,
     [parameter(Mandatory=$true)]
     [String] $XmlTest,
-    [Int]    $VMCheckTimeout = 300,
+    [Int]    $VMCheckTimeout = 500,
     [String] $WorkingDirectory = ".",
     [String] $QemuPath = "C:\bin\qemu-img.exe",
     [String] $UbuntuImageURL = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
@@ -93,6 +93,47 @@ function Get-VHD {
     return $vhdPath
 }
 
+function Wait-VMReady {
+    param (
+        [String] $InstanceName,
+        [int] $VMCheckTimeout
+    )
+
+    while ($VMCheckTimeout -gt 0) {
+        $vmState = $(Get-VM $InstanceName).State
+        if ($vmState -ne "Off") {
+            Write-Host "Waiting for VM $InstanceName to shut down..."
+            Start-Sleep 5
+        } else {
+            break
+        }
+        $VMCheckTimeout = $VMCheckTimeout - 5
+    }
+    if (($VMCheckTimeout -eq 0) -or ($vmState -ne "Off")) {
+        throw "VM failed to stop"
+    }
+    Start-VM $InstanceName
+    Write-Host "Retrieving IP for VM $InstanceName..."
+    $ip = Get-IP $InstanceName $VMCheckTimeout
+
+    return $ip
+}
+
+function Get-Lisa {
+    $puttyBinaries = "https://the.earth.li/~sgtatham/putty/0.70/w32/putty.zip"
+    if ( Test-Path .\lis-test ) {
+        rm -Recurse -Force .\lis-test
+    }
+    git clone https://github.com/LIS/lis-test.git
+    Invoke-WebRequest -Uri $puttyBinaries -OutFile "PuttyBinaries.zip"
+    if ($LastExitCode) {
+        throw "Failed to download Putty binaries"
+    }
+    Expand-Archive ".\PuttyBinaries.zip" ".\lis-test\WS2012R2\lisa\bin"
+
+    return ".\lis-test\WS2012R2\lisa\ssh\demo_id_rsa"
+}
+
 function Main {
     $jobPath = Join-Path $WorkingDirectory $JobId
     Write-Host "Mounting the kernel share..."
@@ -100,7 +141,8 @@ function Main {
                               -ShareUser $ShareUser -SharePassword $SharePassword
     $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
     $kernelPath = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
-    if (!$kernelPath) {
+    $kernelTag = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "git_tag"
+    if (!$kernelPath -or !$kernelTag) {
         throw "Kernel folder cannot be empty."
     }
     Write-Host "Using kernel folder name: $kernelPath."
@@ -124,11 +166,16 @@ function Main {
         throw "Creating the LISA VM failed."
     }
 
-    Write-Host "Retrieving IP for VM $InstanceName..."
-    $ip = Get-IP $InstanceName $VMCheckTimeout
-    Start-Sleep 20
-    Stop-VM $InstanceName -Force
-    Start-Sleep 20
+    $idRSAPriv = Get-Lisa
+    $ip = Wait-VMReady $InstanceName $VMCheckTimeout
+    $kernelRevision = & ssh.exe -i $idRSAPriv -o StrictHostKeyChecking=no `
+                                -o ConnectTimeout=10 "root@$ip" "uname -r"
+    if ($kernelRevision -like "*$kernelTag*") {
+        Write-Host "Kernel $kernelRevision matched"
+    } else {
+        throw "Could not find the kernel: $kernelTag"
+    }
+
     Write-Host "Starting LISA run..."
     & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
 }

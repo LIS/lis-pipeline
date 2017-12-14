@@ -17,7 +17,7 @@ main() {
     install_kernel
     cp -rf /home/ubuntu/.ssh/authorized_keys /
     sed -i 's%#AuthorizedKeysFile.*%AuthorizedKeysFile /authorized_keys%' /etc/ssh/sshd_config
-    reboot
+    shutdown -h now
 }
 
 main
