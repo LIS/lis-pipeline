@@ -3,8 +3,7 @@ param(
     [string] $VMName = "kernel-validation",
     [string] $KeyPath = "C:\Path\To\Key",
     [string] $XmlTest = "TestName",
-    [string] $ResultsPath = "C:\Path\To\Results",
-    [bool] $GetDeps = 1
+    [string] $ResultsPath = "C:\Path\To\Results"
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,18 +44,6 @@ function Edit-XmlTest {
 
 function Main {
     pushd "$WorkDir"
-    if ($GetDeps) {
-        if ( Test-Path .\lis-test){
-            rm -Recurse -Force .\lis-test
-        }
-        git clone https://github.com/mbivolan/lis-test.git
-        Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/0.70/w32/putty.zip" -OutFile "PuttyBinaries.zip"
-        if ($LastExitCode){
-            throw "Failed to download Putty binaries"
-        }
-        Expand-Archive ".\PuttyBinaries.zip" ".\lis-test\WS2012R2\lisa\bin"
-    }
-    
     ($KeyName, $XmlName) = Get-Dependencies $KeyPath $XmlTest
     Edit-XmlTest $VMName $XmlName $KeyName 
     pushd ".\lis-test\WS2012R2\lisa\"
