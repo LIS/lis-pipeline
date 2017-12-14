@@ -16,7 +16,12 @@ function get_branches() {
         fi
     else
         exit 1
-    fi  
+    fi
+
+    pushd "$git_dir"
+    git fetch
+    popd
+
     if [[ -d "$git_dir" ]];then
         SOURCE_STABLE="$(get_stable_branches $git_dir)"
         SOURCE_LAST_STABLE="$(get_latest_stable_branch $git_dir)"
