@@ -233,14 +233,14 @@ get_destination_path() {
 
 get_git_tag(){
     source_path="$1"
-    branch="$2"
+    number="$2"
+    branch="$3"
 
     if [[ "$branch" == "" ]];then
         branch="HEAD"
     fi
     pushd "$source_path"
-    git_tag="$(git rev-parse $branch)"
-    git_tag="${git_tag:0:7}"
+    git_tag="$(git rev-parse --short=$number $branch)"
     popd
     echo "$(echo "$git_tag" | sed 's/ //g')"
 }
@@ -277,3 +277,48 @@ get_latest_unstable_branch() {
     popd
     echo "${result}"
 }
+
+custom_mkdir () {
+    local destination; local dir;
+    destination="$1"
+    dir="$2"
+
+    new_dir="$destination/$dir"
+    if [[ ! -d "$new_dir" ]]; then
+        mkdir -p "$new_dir"
+    fi
+}
+
+update_changelog () {
+    local CHANGELOG_LOCATION; local TEXT; local KERNEL_VERSION;local COMMIT_MESSAGE
+    TEXT="linux-latest (kernel-version) test; urgency=medium\n\n  **Updated to kernel-version\n\n -- commit-message\n"
+    KERNEL_VERSION=$1
+    COMMIT_MESSAGE=$2
+    CHANGELOG_LOCATION=$3
+
+    TEXT=${TEXT/kernel-version/$KERNEL_VERSION}
+    TEXT=${TEXT/commit-message/$COMMIT_MESSAGE}
+    printf "$TEXT" > $CHANGELOG_LOCATION
+}
+
+build_metapackages () {
+    local KERNEL_VERSION; local GIT_COMMIT
+    KERNEL_VERSION=$1
+    DESTINATION_FOLDER=$2
+    DEBIAN_FOLDER=$3
+
+    custom_builddeb=$(dirname $(find $(pwd) -name "dh_builddeb"))
+    aux_PATH="$PATH"
+    export PATH="$custom_builddeb:$PATH"
+
+    custom_mkdir $DESTINATION_FOLDER "meta_packages"
+    DESTINATION_FOLDER="$DESTINATION_FOLDER/meta_packages"
+
+    pushd "$DEBIAN_FOLDER"
+    fakeroot debian/rules clean
+    fakeroot debian/rules META_DESTINATION=$DESTINATION_FOLDER binary-arch
+    popd
+
+    export PATH="$aux_PATH"
+}
+

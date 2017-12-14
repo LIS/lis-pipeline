@@ -80,6 +80,30 @@ EOF
     popd
 }
 
+function build_kernel_metapackages_deb () {
+    local source; local kernel_version; local kernel_git_commit; local artifacts_dir;
+    source="$1"
+    kernel_version="$2"
+    kernel_git_commit="$3"
+    artifacts_dir="$4"
+
+    pushd "$source"
+    commit_message=$(git log -1 --format="%aN <%aE>  %aD" $kernel_git_commit | head -1) 
+    popd
+
+    pushd "$artifacts_dir"
+    filename=$(find . -name "linux-image*" | head -1)
+    kernel_abi=$(basename $filename | gawk '{n=split($$0,v,"-"); print v[4];}')
+    popd
+
+    kernel_version="$kernel_version-$kernel_abi"
+    kernel_version="$kernel_version-g$kernel_git_commit"
+    changelog_loc=$(readlink -f $(find ./kernel_metapackages -name changelog))
+    debian_rules_loc=$(readlink -f $(find ./kernel_metapackages -name linux-latest))
+    update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
+    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc"
+}
+
 function get_sources_http (){
     #
     # Downloading kernel sources from http using wget
@@ -431,6 +455,8 @@ function build_debian (){
     thread_number="$4"
     destination_path="$5"
     build_date="$6"
+    kernel_version_local="$7"
+    kernel_git_commit="$8"
 
     artifacts_dir="${base_dir}/${build_state}/"
     if [[ -d "$artifacts_dir" ]];then
@@ -442,6 +468,7 @@ function build_debian (){
         pushd "$source"
         make-kpkg --rootcmd fakeroot --initrd  --revision "$build_date" -j"$thread_number" kernel_image kernel_headers kernel_source kernel_debug
         popd
+	build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
     elif [[ "$build_state" == "daemons" ]];then
         pushd "${base_dir}/daemons/hyperv-daemons"
         echo "y" | debuild -us -uc
@@ -524,19 +551,20 @@ function build_kernel (){
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
-    GIT_TAG="$(get_git_tag $source)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
-    prepare_kernel_"${os_family}" "$source"
-    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" "$build_date"
-
-    DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
-    DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
-    echo "Updating the kernel build information for later usage."
-    echo "Changing directory to the kernel sources..."
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
     KERNEL_TAG=$(git log -1 --pretty=format:"%h")
     popd
+    GIT_TAG="$(get_git_tag $source 7)"
+    GIT_TAG12="$(get_git_tag $source 12)"
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
+    prepare_kernel_"${os_family}" "$source" 
+    build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
+	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12"
+    DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
+    DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
+    echo "Updating the kernel build information for later usage."
+    echo "Changing directory to the kernel sources..."
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT version $KERNEL_VERSION
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT git_tag $KERNEL_TAG
     crudini --set $KERNEL_VERSION_FILE KERNEL_BUILT folder $DESTINATION_FOLDER
