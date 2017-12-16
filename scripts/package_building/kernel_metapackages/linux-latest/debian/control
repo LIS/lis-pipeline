@@ -1,0 +1,44 @@
+
+Source: linux-latest
+Section: devel
+Priority: optional
+Maintainer: lisdev@microsoft.com
+Standards-Version: 3.6.1
+Build-Depends: dpkg (>= 1.13.19), debhelper (>= 5), gawk
+
+Package: linux-image-azure
+Architecture: amd64
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-image-${kernel-abi-version}
+Description: Linux kernel image for Azure
+ This package will always depend on the latest Azure kernel image
+ available.
+
+#Package: linux-tools-azure
+#Architecture: amd64
+#Section: kernel
+#Priority: optional
+#Provides: linux-tools
+#Depends: ${misc:Depends}, linux-tools-${kernel-abi-version}
+#Description: Linux kernel tools
+# This package will always depend on the latest generic kernel tools
+# available.
+
+Package: linux-image-azure-dbg
+Architecture: amd64
+Section: kernel
+Priority: optional
+Depends: linux-image-${kernel-abi-version}-dbg, ${misc:Depends}
+Description: Debugging symbols for the linux-image-azure kernel.
+ This package depends on the detached debugging symbols for the latest
+ linux-image-azure kernel.
+
+Package: linux-headers-azure
+Architecture: amd64
+Section: kernel
+Priority: optional
+Depends: ${misc:Depends}, linux-headers-${kernel-abi-version}
+Description: Linux kernel headers
+ This package will always depend on the latest generic kernel headers
+ available.
