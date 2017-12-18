@@ -42,12 +42,34 @@ function Edit-XmlTest {
     popd
 }
 
+function Check-LisaExit {
+    param(
+        [int] $ExitCode
+    )
+
+    $icaPath = ".\TestResults\**\ica.log"
+    if ($ExitCode) {
+        if ( Test-Path $icaPath ){
+            $summaryLine = Select-String -Path $icaPath -Pattern "Test Results Summary"
+            if ( !$summaryLine ) {
+                throw "Lisa failed"
+            } else {
+                Write-Host "Lisa finished successfully and one of the tests failed"
+                exit 0
+            }
+        } else {
+            throw "Cannot find test log"
+        }
+    }
+}
+
 function Main {
     pushd "$WorkDir"
     ($KeyName, $XmlName) = Get-Dependencies $KeyPath $XmlTest
     Edit-XmlTest $VMName $XmlName $KeyName 
     pushd ".\lis-test\WS2012R2\lisa\"
     .\lisa.ps1 run xml\$XmlName -dbg 3
+    Check-LisaExit $LASTEXITCODE
     popd
     popd
 }
