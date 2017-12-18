@@ -67,7 +67,7 @@ function create_vm(){
 function main(){
     RESOURCE_GROUP=""
     VM_PARAMS=""
-    TEMPLATE_FOLDER="$WORKSPACE/scripts/azure_templates"
+    TEMPLATE_FOLDER="$WORKSPACE/scripts/azure_kernel_validation/azure_templates"
     BASE_DIR="$(pwd)"
     OS_TYPE=""
     INSTALL_DEPS="n"
