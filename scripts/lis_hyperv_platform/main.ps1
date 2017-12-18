@@ -168,12 +168,18 @@ function Main {
 
     $idRSAPriv = Get-Lisa
     $ip = Wait-VMReady $InstanceName $VMCheckTimeout
-    $kernelRevision = & ssh.exe -i $idRSAPriv -o StrictHostKeyChecking=no `
-                                -o ConnectTimeout=10 "root@$ip" "uname -r"
-    if ($kernelRevision -like "*$kernelTag*") {
-        Write-Host "Kernel $kernelRevision matched"
-    } else {
-        throw "Could not find the kernel: $kernelTag"
+
+    Execute-WithRetry {
+        $kernelRevision = & ssh.exe -i $idRSAPriv -o StrictHostKeyChecking=no `
+                                    -o ConnectTimeout=10 "root@$ip" "uname -r"
+        if ($LASTEXITCODE) {
+            throw "Ssh connection failed with error code: $LASTEXITCODE"
+        }
+        if ($kernelRevision -like "*$kernelTag*") {
+            Write-Host "Kernel $kernelRevision matched"
+        } else {
+            throw "Could not find the kernel: $kernelTag"
+        }
     }
 
     Write-Host "Starting LISA run..."

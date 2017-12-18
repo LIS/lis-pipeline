@@ -532,3 +532,34 @@ function Assert-URLExists {
     $httpResponse.Close()
 }
 
+function Execute-WithRetry {
+    param(
+        [Parameter(Mandatory=$true)]
+        $Command,
+        [int] $MaxRetryCount = 4,
+        [int] $RetryInterval = 4
+    )
+
+    $currErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    $retryCount = 0
+    while ($true) {
+        try {
+            $res = Invoke-Command -ScriptBlock $command
+            $ErrorActionPreference = $currErrorActionPreference
+            return $res
+        } catch [System.Exception] {
+            $retryCount++
+            if ($retryCount -ge $maxRetryCount) {
+                $ErrorActionPreference = $currErrorActionPreference
+                throw
+            } else {
+                if($_) {
+                Write-Warning $_
+                }
+                Start-Sleep $retryInterval
+            }
+        }
+    }
+}
