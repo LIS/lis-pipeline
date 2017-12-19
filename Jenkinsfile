@@ -176,6 +176,9 @@ pipeline {
         
       }
       post {
+        always {
+          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}-boot-diagnostics/*.log"
+        }
         failure {
           sh 'echo "Load failure test results."'
           nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
