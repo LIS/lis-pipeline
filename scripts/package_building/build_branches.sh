@@ -38,7 +38,7 @@ function amend_ini() {
     stable="$3"
     last_stable="$4"
     last_unstable="$5"
-    build_branches=$6
+    build_branches="$6"
     stable_branches=""
     
     for branch in "$stable";do
@@ -94,7 +94,7 @@ function main() {
         fi
     done
     if [[ ! -z $BUILD_BRANCHES ]]; then
-        amend_ini "$INI_PATH" "." "$SOURCE_STABLE" "$SOURCE_LAST_STABLE" "$SOURCE_LAST_UNSTABLE" $BUILD_BRANCHES
+        amend_ini "$INI_PATH" "." "$SOURCE_STABLE" "$SOURCE_LAST_STABLE" "$SOURCE_LAST_UNSTABLE" "${BUILD_BRANCHES[@]}"
     fi
     echo ${BUILD_BRANCHES[@]} > "./branches_to_build.ini"
 }
