@@ -5,8 +5,8 @@
     "newStorageAccountName": {
       "type": "string",
       "metadata": {
-        "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks will be placed."
-      }
+          "description": "Unique DNS Name for the Storage Account where the Virtual Machine's disks and boot logs will be placed."
+       }
     },
     "adminUsername": {
       "type": "string",
@@ -125,7 +125,7 @@
       }
     },
     {
-      "apiVersion": "2015-05-01-preview",
+      "apiVersion": "2015-06-15",
       "type": "Microsoft.Compute/virtualMachines",
       "name": "[variables('vmName')]",
       "location": "[resourceGroup().location]",
@@ -173,8 +173,14 @@
               "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
             }
           ]
+        },
+        "diagnosticsProfile": {
+            "bootDiagnostics": {
+                "enabled": true,
+                "storageUri": "[concat('http://', parameters('newStorageAccountName'), '.blob.core.windows.net')]"
+                }
+            }
         }
-      }
     }
   ]
 }
