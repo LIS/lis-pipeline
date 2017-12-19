@@ -26,6 +26,7 @@ validate_azure_vm_boot() {
     PRIVATE_KEY_PATH=$7
     VM_USER_NAME=$8
     OS_TYPE=$9
+    WORK_DIR="${10}"
     VM_USER_NAME=$OS_TYPE
     
     KERNEL_VERSION_FILE="./kernel_version${BUILD_NUMBER}/scripts/package_building/kernel_versions.ini"
@@ -84,6 +85,8 @@ validate_azure_vm_boot() {
         KERNEL_NAME=$(ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" uname -r || true)
         if [[ "$KERNEL_NAME" == *"$DESIRED_KERNEL_TAG"* ]]; then
             echo "Kernel ${KERNEL_NAME} matched."
+            bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${BUILD_NAME}${BUILD_NUMBER}-Kernel-Validation" \
+                --destination_path "${WORK_DIR}/${BUILD_NAME}${BUILD_NUMBER}-boot-diagnostics"
             exit 0
         else
             echo "Kernel ${KERNEL_NAME} does not match with desired Kernel tag: ${DESIRED_KERNEL_TAG}"
@@ -94,10 +97,14 @@ validate_azure_vm_boot() {
             sleep $INTERVAL
         fi
     done
+    bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${BUILD_NAME}${BUILD_NUMBER}-Kernel-Validation" \
+         --destination_path "${WORK_DIR}/${BUILD_NAME}${BUILD_NUMBER}-boot-diagnostics"
     exit 1
 }
 
 main() {
+
+    WORKDIR="$(pwd)"
     BASEDIR=$(dirname $0)
     PRIVATE_KEY_PATH="${HOME}/azure_priv_key.pem"
     VM_USER_NAME="ubuntu"
@@ -130,7 +137,9 @@ main() {
     done
 
     validate_azure_vm_boot $BASEDIR $BUILD_NAME $BUILD_NUMBER $USERNAME \
-        $PASSWORD $SMB_SHARE_URL $PRIVATE_KEY_PATH $VM_USER_NAME $OS_TYPE
+        $PASSWORD $SMB_SHARE_URL $PRIVATE_KEY_PATH $VM_USER_NAME $OS_TYPE \
+        $WORKDIR
+    
 }
 main $@
 
