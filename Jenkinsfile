@@ -24,6 +24,9 @@ pipeline {
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'kernel'
   }
+  options {
+    overrideIndexTriggers(false)
+  }
   agent {
     node {
       label 'meta_slave'
