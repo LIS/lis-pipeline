@@ -23,6 +23,7 @@ pipeline {
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'kernel'
+    FOLDER_PREFIX = 'msft'
   }
   options {
     overrideIndexTriggers(false)
@@ -135,16 +136,10 @@ pipeline {
                                                 usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
-                    MOUNT_POINT="/tmp/${BUILD_NUMBER}"
-                    mkdir -p $MOUNT_POINT
-                    sudo mount -t cifs "${SMB_SHARE_URL}/temp-kernel-artifacts" $MOUNT_POINT \
-                               -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
-
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
-                    relpath_kernel_artifacts=$(realpath "scripts/package_building/${JOB_KERNEL_ARTIFACTS_PATH}")
-                    sudo cp -rf "${relpath_kernel_artifacts}/msft"* $MOUNT_POINT
-
-                    sudo umount $MOUNT_POINT
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" --build_number $BUILD_NUMBER \\
+                        --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --artifacts_folder_prefix "${FOLDER_PREFIX}"
                 '''
             }
         }
@@ -215,16 +210,10 @@ pipeline {
                                ]) {
                 sh '''#!/bin/bash
                     set -xe
-                    MOUNT_POINT="/tmp/${BUILD_NUMBER}"
-                    mkdir -p $MOUNT_POINT
-                    sudo mount -t cifs "${SMB_SHARE_URL}/${KERNEL_GIT_BRANCH_LABEL}-kernels" $MOUNT_POINT \
-                               -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
-
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
-                    relpath_kernel_artifacts=$(realpath "scripts/package_building/${JOB_KERNEL_ARTIFACTS_PATH}")
-                    sudo cp -rf "${relpath_kernel_artifacts}/msft"* $MOUNT_POINT
-
-                    sudo umount $MOUNT_POINT
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" --build_number $BUILD_NUMBER \\
+                        --smb_url "${SMB_SHARE_URL}/${KERNEL_GIT_BRANCH_LABEL}-kernels" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --artifacts_folder_prefix "${FOLDER_PREFIX}"
                 '''
             }
         }
