@@ -30,24 +30,20 @@ function Get-Dependencies {
 
 function Edit-XmlTest {
     param(
-        [string] $vmName ,
-        [string] $xmlName ,
-        [string] $keyName
+        [string] $LisaTestXmlPath,
+        [string] $ParentVHDPath
     )
-    pushd ".\lis-test\WS2012R2\lisa\xml"
-    $xml = [xml](Get-Content $xmlName)
-    $xml.config.VMs.vm.vmName = $vmName
-    $xml.config.VMs.vm.sshKey = $keyName
-    $xml.Save("$pwd\$xmlName")
-    popd
+    $xml = [xml](Get-Content $LisaTestXmlPath)
+    $xml.config.VMs.vm[1].hardware.parentVhd = $ParentVHDPath
+    $xml.Save($LisaTestXmlPath)
 }
 
 function Main {
     pushd "$WorkDir"
-    ($KeyName, $XmlName) = Get-Dependencies $KeyPath $XmlTest
-    Edit-XmlTest $VMName $XmlName $KeyName 
+    $lisaTestXmlPath = "${env:Workspace}/scripts/lis_hyperv_platform/lisa_tests/minimal_lisa_test.xml"
+    Edit-XmlTest $lisaTestXmlPath $env:LISAParentVHDPath
     pushd ".\lis-test\WS2012R2\lisa\"
-    .\lisa.ps1 run xml\$XmlName -dbg 3
+    .\lisa.ps1 run $lisaTestXmlPath -dbg 3
     popd
     popd
 }

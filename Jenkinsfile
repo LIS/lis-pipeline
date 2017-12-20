@@ -236,6 +236,7 @@ pipeline {
           steps {
             withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                        string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                       string(credentialsId: 'LISAParentVHDPath', variable: 'LISAParentVHDPath'),
                                        usernamePassword(credentialsId: 'smb_share_user_pass',
                                                         passwordVariable: 'PASSWORD',
                                                         usernameVariable: 'USERNAME')]) {
@@ -265,9 +266,6 @@ pipeline {
             }
             success {
               echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('''
-                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
-                ''')
             }
           }
         }
