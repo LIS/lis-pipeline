@@ -151,7 +151,7 @@ function get_sources_git (){
     git fetch > /dev/null
     # Note(avladu): the checkout to master is needed to
     # get from a detached HEAD state
-    git checkout master > /dev/null
+    git checkout -f master > /dev/null
     git checkout -f "$git_branch" > /dev/null
     git pull > /dev/null
     popd
