@@ -38,6 +38,7 @@ function Main {
     }
 
     $instance.CreateInstance()
+    $instance.AddComPort($InstanceName)
     $instance.AttachVMDvdDrive("$JobPath/configdrive.iso")
     $instance.StartInstance()
 }
