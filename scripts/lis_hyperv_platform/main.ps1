@@ -29,6 +29,8 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\retrieve_ip.ps1"
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 . "$scriptPathParent\common_functions.ps1"
+. "$scriptPathParent\JobManager.ps1"
+
 Import-Module "$scriptPath\ini.psm1"
 
 function Mount-Share {
@@ -157,6 +159,15 @@ function Main {
 
     $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath
 
+    $bootLogPath = "$jobPath\COM.LOG"
+    $scriptBlock = {
+        param($InstanceName, $BootLogPath)
+        & icaserial.exe READ "\\localhost\pipe\$InstanceName" | Out-File $BootLogPath
+    }
+    $argumentList = @($InstanceName, $BootLogPath)
+    $JobManager = [PSJobManager]::new()
+    $JobManager.AddJob($InstanceName, $scriptBlock, $argumentList, $())
+
     Write-Host "Creating the VM required for LISA to run..."
     & (Join-Path "$scriptPath" "setup_env.ps1") -JobPath $jobPath -VHDPath $vhdPath `
         -KernelPath $kernelPath -InstanceName $InstanceName -IdRSAPub $IdRSAPub `
@@ -181,6 +192,8 @@ function Main {
             throw "Could not find the kernel: $kernelTag"
         }
     }
+
+    $JobManager.RemoveTopic($InstanceName)
 
     Write-Host "Starting LISA run..."
     & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest

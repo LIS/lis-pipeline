@@ -98,6 +98,10 @@ class HypervInstance : Instance {
     [void] AddVMDisk ($VMDisk) {
         $this.Backend.AddVMDisk($this.Name, $VMDisk)
     }
+
+    [void] AddComPort ($PipeName) {
+        $this.Backend.AddComPort($this.Name, $PipeName)
+    }
 }
 
 
@@ -914,6 +918,18 @@ class HypervBackend : Backend {
         $params = @{
             "ScriptBlock"=$scriptBlock;
             "ArgumentList"=@($InstanceName, $VMDisk);
+        }
+        $this.RunHypervCommand($params)
+    }
+
+    [void] AddComPort ($InstanceName, $PipeName) {
+        $scriptBlock = {
+            param($InstanceName, $PipeName)
+            Set-VMComPort -VMName $InstanceName -Number 1 -Path "\\.\pipe\$PipeName"
+        }
+        $params = @{
+            "ScriptBlock"=$scriptBlock;
+            "ArgumentList"=@($InstanceName, $PipeName);
         }
         $this.RunHypervCommand($params)
     }
