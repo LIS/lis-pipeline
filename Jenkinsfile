@@ -22,7 +22,7 @@ pipeline {
     CLEAN_ENV = 'False'
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
-    BUILD_NAME = 'kernel'
+    BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
   }
   options {
@@ -51,11 +51,10 @@ pipeline {
                     set -xe
                     echo "Building artifacts..."
                     pushd "$WORKSPACE/scripts/package_building"
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
                     bash build_artifacts.sh \\
                         --git_url ${KERNEL_GIT_URL} \\
                         --git_branch ${KERNEL_GIT_BRANCH} \\
-                        --destination_path ${JOB_KERNEL_ARTIFACTS_PATH} \\
+                        --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps True \\
                         --thread_number ${THREAD_NUMBER} \\
                         --debian_os_version ${UBUNTU_VERSION} \\
@@ -67,11 +66,11 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
-                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
@@ -92,11 +91,10 @@ pipeline {
                     set -xe
                     echo "Building artifacts..."
                     pushd "$WORKSPACE/scripts/package_building"
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
                     bash build_artifacts.sh \\
                         --git_url ${KERNEL_GIT_URL} \\
                         --git_branch ${KERNEL_GIT_BRANCH} \\
-                        --destination_path ${JOB_KERNEL_ARTIFACTS_PATH} \\
+                        --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps True \\
                         --thread_number ${THREAD_NUMBER} \\
                         --debian_os_version ${UBUNTU_VERSION} \\
@@ -108,11 +106,11 @@ pipeline {
                     '''
                 }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
-                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
@@ -127,7 +125,7 @@ pipeline {
         }
       }
       steps {
-        dir("${env.KERNEL_ARTIFACTS_PATH}" + env.BUILD_NUMBER) {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
             withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
@@ -136,7 +134,8 @@ pipeline {
                                                 usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
-                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" --build_number $BUILD_NUMBER \\
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
                         --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
                         --artifacts_folder_prefix "${FOLDER_PREFIX}"
@@ -159,13 +158,13 @@ pipeline {
                                    string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                    usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
                                    ]) {
-          dir('kernel_version' + env.BUILD_NUMBER) {
+          dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             unstash 'kernel_version_ini'
             sh 'cat scripts/package_building/kernel_versions.ini'
           }
           sh '''
             bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                --build_name $BUILD_NAME --build_number $BUILD_NUMBER \
+                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
                 --smb_share_username $USERNAME --smb_share_password $PASSWORD \
                 --smb_share_url $SMB_SHARE_URL --vm_user_name $OS_TYPE \
                 --os_type $OS_TYPE
@@ -175,7 +174,7 @@ pipeline {
       }
       post {
         always {
-          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}-boot-diagnostics/*.log"
+          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
         }
         failure {
           sh 'echo "Load failure test results."'
@@ -185,7 +184,7 @@ pipeline {
           echo "Cleaning Azure resources up..."
           sh '''#!/bin/bash
             pushd ./scripts/azure_kernel_validation
-            bash remove_azure_vm_resources.sh "$BUILD_NAME$BUILD_NUMBER"
+            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
             popd
             '''
           nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
@@ -202,7 +201,7 @@ pipeline {
         }
       }
       steps {
-        dir("${env.KERNEL_ARTIFACTS_PATH}" + env.BUILD_NUMBER) {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
             withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
                                string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
@@ -210,7 +209,8 @@ pipeline {
                                ]) {
                 sh '''#!/bin/bash
                     set -xe
-                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" --build_number $BUILD_NUMBER \\
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
                         --smb_url "${SMB_SHARE_URL}/${KERNEL_GIT_BRANCH_LABEL}-kernels" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
                         --artifacts_folder_prefix "${FOLDER_PREFIX}"
@@ -240,17 +240,17 @@ pipeline {
                                                         passwordVariable: 'PASSWORD',
                                                         usernameVariable: 'USERNAME')]) {
                 echo 'Running LISA...'
-                dir('kernel_version' + env.BUILD_NUMBER) {
+                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                     unstash 'kernel_version_ini'
                     PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
                 }
                 PowerShellWrapper('''
                     & ".\\scripts\\lis_hyperv_platform\\main.ps1"
-                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}\\scripts\\package_building\\kernel_versions.ini"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
                         -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
                         -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
-                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}"
-                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
                         -IdRSAPub "C:\\bin\\id_rsa.pub"
                         -XmlTest KvpTests.xml
@@ -266,7 +266,7 @@ pipeline {
             success {
               echo 'Cleaning up LISA environment...'
               PowerShellWrapper('''
-                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}"
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                 ''')
             }
           }
