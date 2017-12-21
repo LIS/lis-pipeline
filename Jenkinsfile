@@ -290,12 +290,17 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [string(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')
-				]) {
+			withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
 				git "https://github.com/iamshital/azure-linux-automation.git"
-                echo 'Running Azure Functional Tests...'
-                RunPowershellCommand('.\\RunAzureTests.ps1 -testLocation northeurope -DistroIdentifier sstest -testCycle PROVISION -OverrideVMSize Standard_D1_v2 -ARMImageName "Canonical UbuntuServer 16.04-LTS latest"')
-              }
+				RunPowershellCommand(".\\RunAzureTests.ps1" + 
+				" -testLocation 'westus'" +
+				" -DistroIdentifier 'U16MK'" +
+				" -testCycle 'PROVISION'" +
+				" -OverrideVMSize 'Standard_D1_v2'" +
+				" -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
+				" -StorageAccount 'ExistingStorage_Standard'"
+				)
+			}
           }
         }
         stage('Azure-Performance') {
@@ -308,12 +313,17 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [string(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')
-				]) {
+			withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
 				git "https://github.com/iamshital/azure-linux-automation.git"
-                echo 'Running Azure Performance Tests...'
-                RunPowershellCommand('.\\RunAzureTests.ps1 -testLocation northeurope -DistroIdentifier sstest -testCycle PERF-LAGSCOPE -OverrideVMSize Standard_D1_v2 -ARMImageName "Canonical UbuntuServer 16.04-LTS latest"')
-              }
+				RunPowershellCommand(".\\RunAzureTests.ps1" + 
+				" -testLocation 'westus'" +
+				" -DistroIdentifier 'U16MK'" +
+				" -testCycle 'PROVISION'" +
+				" -OverrideVMSize 'Standard_D1_v2'" +
+				" -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
+				" -StorageAccount 'ExistingStorage_Standard'"
+				)
+			}
           }
         }		
         stage('Performance On Hyper-V') {
