@@ -46,7 +46,7 @@ function azure_login(){
 
 function change_vm_params(){
     params="$1"
-    build_number="$2"
+    build_number=$(echo "$2" | tr "[:upper:]" "[:lower:]")
     os_type="$3"
     base_dir="$4"
     
