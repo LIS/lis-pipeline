@@ -38,8 +38,10 @@ prepare_vm_ubuntu() {
     pushd "$artifacts_path"
     if [[ "$target_artifacts" == "all" ]];then
         sudo dpkg -i *.deb
-    elif [[ "$target_artifacts" == "kernel" ]];then
-        sudo dpkg -i linux-headers* linux-image*
+    elif [[ "$target_artifacts" == "azure" ]];then
+        sudo DEBIAN_FRONTEND=noninteractive apt purge linux-cloud-tools-common
+        sudo DEBIAN_FRONTEND=noninteractive dpkg -i $(ls -I *dbg* | grep linux-image)
+        sudo DEBIAN_FRONTEND=noninteractive dpkg -i hyperv-daemons*
     fi
     popd
     
