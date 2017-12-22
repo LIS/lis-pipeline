@@ -192,8 +192,12 @@ function Main {
             throw "Could not find the kernel: $kernelTag"
         }
     }
-
     $JobManager.RemoveTopic($InstanceName)
+
+    Write-Host "Copying boot logs to workspace..."
+    $bootLogDirWorkspace = Join-Path (Join-Path $env:Workspace $JobId) "bootlogs"
+    New-Item -Force -Type Directory $bootLogDirWorkspace
+    Copy-Item -Force "${jobPath}\\COM.LOG" $bootLogDirWorkspace
 
     Write-Host "Starting LISA run..."
     & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
