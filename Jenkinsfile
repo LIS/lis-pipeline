@@ -292,6 +292,8 @@ pipeline {
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
               git "https://github.com/iamshital/azure-linux-automation.git"
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -testLocation 'westus'" +
@@ -316,6 +318,8 @@ pipeline {
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
               git "https://github.com/iamshital/azure-linux-automation.git"
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -testLocation 'westus'" +
