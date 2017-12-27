@@ -15,7 +15,7 @@ pipeline {
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
     string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
