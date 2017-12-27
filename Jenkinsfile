@@ -290,9 +290,12 @@ pipeline {
             }
           }
           steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()	
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:testKernel.deb'" +
@@ -316,9 +319,12 @@ pipeline {
             }
           }
           steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()	
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:testKernel.deb'" +
