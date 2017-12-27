@@ -286,21 +286,22 @@ pipeline {
           }
           agent {
             node {
-              label 'ostcjenkins-azure'
+              label 'azure'
             }
           }
           steps {
-			withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
-				git "https://github.com/iamshital/azure-linux-automation.git"
-				RunPowershellCommand(".\\RunAzureTests.ps1" + 
-				" -testLocation 'westus'" +
-				" -DistroIdentifier 'U16MK'" +
-				" -testCycle 'PROVISION'" +
-				" -OverrideVMSize 'Standard_D1_v2'" +
-				" -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
-				" -StorageAccount 'ExistingStorage_Standard'"
-				)
-			}
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
+              git "https://github.com/iamshital/azure-linux-automation.git"
+              RunPowershellCommand(".\\RunAzureTests.ps1" + 
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -testLocation 'westus'" +
+              " -DistroIdentifier 'U16MK'" +
+              " -testCycle 'PROVISION'" +
+              " -OverrideVMSize 'Standard_D1_v2'" +
+              " -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
+              " -StorageAccount 'ExistingStorage_Standard'"
+              )
+            }
           }
         }
         stage('Azure-Performance') {
@@ -309,21 +310,22 @@ pipeline {
           }		
           agent {
             node {
-              label 'ostcjenkins-azure'
+              label 'azure'
             }
           }
           steps {
-			withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
-				git "https://github.com/iamshital/azure-linux-automation.git"
-				RunPowershellCommand(".\\RunAzureTests.ps1" + 
-				" -testLocation 'westus'" +
-				" -DistroIdentifier 'U16MK'" +
-				" -testCycle 'PROVISION'" +
-				" -OverrideVMSize 'Standard_D1_v2'" +
-				" -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
-				" -StorageAccount 'ExistingStorage_Standard'"
-				)
-			}
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
+              git "https://github.com/iamshital/azure-linux-automation.git"
+              RunPowershellCommand(".\\RunAzureTests.ps1" + 
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -testLocation 'westus'" +
+              " -DistroIdentifier 'U16MK'" +
+              " -testCycle 'PROVISION'" +
+              " -OverrideVMSize 'Standard_D1_v2'" +
+              " -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
+              " -StorageAccount 'ExistingStorage_Standard'"
+              )
+            }
           }
         }		
         stage('Performance On Hyper-V') {
