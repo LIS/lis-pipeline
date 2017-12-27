@@ -296,6 +296,7 @@ pipeline {
               RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:testKernel.deb'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier 'U16MK'" +
               " -testCycle 'PROVISION'" +
@@ -322,6 +323,7 @@ pipeline {
               RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:testKernel.deb'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier 'U16MK'" +
               " -testCycle 'PROVISION'" +
