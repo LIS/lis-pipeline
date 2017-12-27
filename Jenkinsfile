@@ -293,11 +293,10 @@ pipeline {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:testKernel.deb'" +
-              " -testLocation 'westus'" +
+              " -testLocation 'northeurope'" +
               " -DistroIdentifier 'U16MK'" +
               " -testCycle 'PROVISION'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
@@ -320,11 +319,10 @@ pipeline {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {	
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              RunPowershellCommand("Get-ChildItem -Recurse")
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:testKernel.deb'" +
-              " -testLocation 'westus'" +
+              " -testLocation 'northeurope'" +
               " -DistroIdentifier 'U16MK'" +
               " -testCycle 'PROVISION'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
