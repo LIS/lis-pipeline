@@ -72,7 +72,6 @@ pipeline {
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
-
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
@@ -184,7 +183,7 @@ pipeline {
                 --os_type $OS_TYPE
             '''
         }
-        
+
       }
       post {
         failure {
@@ -298,7 +297,7 @@ pipeline {
           }
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              cleanWs()	
+              cleanWs()
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
@@ -306,9 +305,9 @@ pipeline {
               script {
                   env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
                   env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }              
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
-              RunPowershellCommand(".\\RunAzureTests.ps1" + 
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'northeurope'" +
@@ -324,7 +323,7 @@ pipeline {
         stage('Azure-Performance') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
-          }		
+          }
           agent {
             node {
               label 'azure'
@@ -332,7 +331,7 @@ pipeline {
           }
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              cleanWs()	
+              cleanWs()
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
@@ -340,9 +339,9 @@ pipeline {
               script {
                   env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
                   env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }              
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
-              RunPowershellCommand(".\\RunAzureTests.ps1" + 
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'westus2'" +
@@ -350,13 +349,13 @@ pipeline {
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
-							" -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
-							" -ResultDBTestTag 'LAGSCOPE-TEST'" +              
+              " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
               " -StorageAccount 'ExistingStorage_Standard'"
               )
             }
           }
-        }		
+        }
         stage('Performance On Hyper-V') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
