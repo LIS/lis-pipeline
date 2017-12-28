@@ -235,6 +235,8 @@ pipeline {
           }
           steps {
             withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
                                        string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                        usernamePassword(credentialsId: 'smb_share_user_pass',
                                                         passwordVariable: 'PASSWORD',
@@ -253,7 +255,9 @@ pipeline {
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
                         -IdRSAPub "C:\\bin\\id_rsa.pub"
-                        -XmlTest KvpTests.xml
+                        -XmlTest kernel_pipeline_fvt.xml
+                        -AzureToken "${env:AZURE_SAS}"
+                        -AzureUrl "${env:AZURE_STORAGE_URL}"
                   ''')
                 echo 'Finished running LISA.'
               }
