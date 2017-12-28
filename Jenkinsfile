@@ -65,11 +65,10 @@ pipeline {
                         --use_ccache ${USE_CCACHE}
                     popd
                     '''
-                    writeFile file: 'ARM_IMAGE_NAME.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
-                    writeFile file: 'KERNEL_PACKAGE_NAME.env', text: 'testKernel.deb'
+                    writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
+                    writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
                 }
-                stash includes: 'ARM_IMAGE_NAME.env', name: 'ARM_IMAGE_NAME.env'
-                stash includes: 'KERNEL_PACKAGE_NAME.env', name: 'KERNEL_PACKAGE_NAME.env'
+                stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
@@ -111,11 +110,10 @@ pipeline {
                         --use_ccache ${USE_CCACHE}
                     popd
                     '''
-                    writeFile file: 'ARM_IMAGE_NAME.env', text: 'OpenLogic CentOS 7.3 latest'
-                    writeFile file: 'KERNEL_PACKAGE_NAME.env', text: 'testKernel.rpm'
+                    writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
+                    writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
                 }
-                stash includes: 'ARM_IMAGE_NAME.env', name: 'ARM_IMAGE_NAME.env'
-                stash includes: 'KERNEL_PACKAGE_NAME.env', name: 'KERNEL_PACKAGE_NAME.env'
+                stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
@@ -304,18 +302,17 @@ pipeline {
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
-              unstash 'ARM_IMAGE_NAME.env'
-              unstash 'KERNEL_PACKAGE_NAME.env'
+              unstash 'azure.env'
               script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.env'
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
               }              
               RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'northeurope'" +
-              " -DistroIdentifier 'U16MK'" +
+              " -DistroIdentifier '${BUILD_NUMBER}'" +
               " -testCycle 'PROVISION'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
@@ -339,18 +336,17 @@ pipeline {
               git "https://github.com/iamshital/azure-linux-automation.git"
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
-              unstash 'ARM_IMAGE_NAME.env'
-              unstash 'KERNEL_PACKAGE_NAME.env'
+              unstash 'azure.env'
               script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.env'
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
               }              
               RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')              
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'northeurope'" +
-              " -DistroIdentifier 'U16MK'" +
+              " -DistroIdentifier '${BUILD_NUMBER}'" +
               " -testCycle 'PROVISION'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
