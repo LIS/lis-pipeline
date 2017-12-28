@@ -312,8 +312,8 @@ pipeline {
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'northeurope'" +
-              " -DistroIdentifier '${BUILD_NUMBER}'" +
-              " -testCycle 'PROVISION'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'BVTMK'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
               " -StorageAccount 'ExistingStorage_Standard'"
@@ -345,11 +345,13 @@ pipeline {
               RunPowershellCommand(".\\RunAzureTests.ps1" + 
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -testLocation 'northeurope'" +
-              " -DistroIdentifier '${BUILD_NUMBER}'" +
-              " -testCycle 'PROVISION'" +
-              " -OverrideVMSize 'Standard_D1_v2'" +
+              " -testLocation 'westus2'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
+							" -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
+							" -ResultDBTestTag 'LAGSCOPE-TEST'" +              
               " -StorageAccount 'ExistingStorage_Standard'"
               )
             }
