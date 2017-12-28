@@ -20,6 +20,8 @@ param(
     [String] $QemuPath = "C:\bin\qemu-img.exe",
     [String] $UbuntuImageURL = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
     [String] $CentosImageURL = "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
+    [String] $AzureToken ,
+    [String] $AzureUrl ,
     [String] $KernelVersionPath = "scripts\package_building\kernel_versions.ini"
 )
 
@@ -147,6 +149,7 @@ function Main {
     if (!$kernelPath -or !$kernelTag) {
         throw "Kernel folder cannot be empty."
     }
+    $kernelFolder = $kernelPath
     Write-Host "Using kernel folder name: $kernelPath."
     $kernelPath = Join-Path $mountPoint $KernelPath
     Assert-PathExists $kernelPath
@@ -200,7 +203,7 @@ function Main {
     Copy-Item -Force "${jobPath}\\COM.LOG" $bootLogDirWorkspace
 
     Write-Host "Starting LISA run..."
-    & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
+    & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest -AzureToken $AzureToken -AzureUrl $AzureUrl -KernelFolder $KernelFolder
 }
 
 Main

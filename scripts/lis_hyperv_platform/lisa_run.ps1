@@ -3,6 +3,9 @@ param(
     [string] $VMName = "kernel-validation",
     [string] $KeyPath = "C:\Path\To\Key",
     [string] $XmlTest = "TestName",
+    [String] $AzureToken ,
+    [String] $AzureUrl ,
+    [String] $KernelFolder ,
     [string] $ResultsPath = "C:\Path\To\Results"
 )
 
@@ -47,7 +50,8 @@ function Main {
     ($KeyName, $XmlName) = Get-Dependencies $KeyPath $XmlTest
     Edit-XmlTest $VMName $XmlName $KeyName 
     pushd ".\lis-test\WS2012R2\lisa\"
-    .\lisa.ps1 run xml\$XmlName -dbg 3
+    lisaParams = 'SHARE_URL="' + $AzureUrl + '"' + ';AZURE_TOKEN="' + $AzureToken + '"' + ";KERNEL_FOLDER=$KernelFolder"
+    .\lisa.ps1 run xml\$XmlName -dbg 3 -testParams $lisaParams
     popd
     popd
 }
