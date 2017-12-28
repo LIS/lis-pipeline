@@ -317,6 +317,24 @@ pipeline {
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
               " -StorageAccount 'ExistingStorage_Standard'"
               )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -testLocation 'westus'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'DEPLOYMENT'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Standard'"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -testLocation 'westus'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'DEPLOYMENT'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Premium'"
+              )              
             }
           }
         }
@@ -344,15 +362,91 @@ pipeline {
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -testLocation 'westus2'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
+              " -testLocation 'westus2'" +             
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
               " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
               " -ResultDBTestTag 'LAGSCOPE-TEST'" +
-              " -StorageAccount 'ExistingStorage_Standard'"
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -EnableAcceleratedNetworking"              
               )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -EnableAcceleratedNetworking"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -EnableAcceleratedNetworking"     
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
+              " -testLocation 'westus2'" +             
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
+              " -StorageAccount 'ExistingStorage_Standard'"             
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'"  
+              )    
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
+              " -testLocation 'centralus'" +             
+              " -testCycle 'PERF-FIO'" +
+              " -RunSelectedTests 'ICA-PERF-FIO-TEST-4K'" + 
+              " -OverrideVMSize 'Standard_DS14_v2'" +
+              " -ResultDBTable 'Perf_Storage_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'FIO-12DISKS'" +
+              " -StorageAccount 'NewStorage_Premium'"             
+              )                                 
             }
           }
         }
