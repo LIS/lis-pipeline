@@ -66,7 +66,7 @@ pipeline {
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
-                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd'"                    
+                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"                    
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
@@ -111,7 +111,7 @@ pipeline {
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
-                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd'"
+                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
