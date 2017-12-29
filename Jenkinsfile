@@ -247,31 +247,29 @@ pipeline {
         }
       }
       steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              cleanWs()
-              git "https://github.com/iamshital/azure-linux-automation.git"
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash 'kernel_version_ini'
-              unstash 'azure.env'
-              script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -testLocation 'northeurope'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'PUBLISH-VHD'" +
-              " -OverrideVMSize 'Standard_DS1_v2'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Premium'"
-              )              
-            }
-          }        
+        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+          cleanWs()
+          git "https://github.com/iamshital/azure-linux-automation.git"
+          unstash "${env.KERNEL_ARTIFACTS_PATH}"
+          unstash 'kernel_version_ini'
+          unstash 'azure.env'
+          script {
+              env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+              env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+          }
+          RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+          RunPowershellCommand(".\\RunAzureTests.ps1" +
+          " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+          " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+          " -testLocation 'northeurope'" +
+          " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+          " -testCycle 'PUBLISH-VHD'" +
+          " -OverrideVMSize 'Standard_DS1_v2'" +
+          " -ARMImageName '${ARM_IMAGE_NAME}'" +
+          " -StorageAccount 'ExistingStorage_Premium'"
+          )              
         }
-      }
+      }        
     }    
     stage('Functional Tests') {
      when {
