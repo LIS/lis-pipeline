@@ -66,6 +66,7 @@ pipeline {
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
+                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd'"                    
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
@@ -110,6 +111,7 @@ pipeline {
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
+                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd'"
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
@@ -234,6 +236,43 @@ pipeline {
         }
       }
     }
+    stage('Publish Azure VHD') {
+      when {
+                expression { params.ENABLED_STAGES.contains('validation') }
+                expression { params.ENABLED_STAGES.contains('azure') }
+      }
+      agent {
+        node {
+          label 'azure'
+        }
+      }
+      steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              git "https://github.com/iamshital/azure-linux-automation.git"
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -testLocation 'northeurope'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'PUBLISH-VHD'" +
+              " -OverrideVMSize 'Standard_DS1_v2'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Premium'"
+              )              
+            }
+          }        
+        }
+      }
+    }    
     stage('Functional Tests') {
      when {
       expression { params.ENABLED_STAGES.contains('validation') }
@@ -304,35 +343,33 @@ pipeline {
               unstash 'azure.env'
               script {
                   env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
                   env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
               }
               RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'northeurope'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'BVTMK'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -StorageAccount 'ExistingStorage_Standard'"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'DEPLOYMENT'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -StorageAccount 'ExistingStorage_Standard'"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'DEPLOYMENT'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -StorageAccount 'ExistingStorage_Premium'"
               )              
             }
@@ -356,14 +393,14 @@ pipeline {
               unstash 'azure.env'
               script {
                   env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
                   env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
               }
               RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
+              " -OsVHD '${ARM_OSVHD_NAME}'" +              
               " -testLocation 'westus2'" +             
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
@@ -374,8 +411,7 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testLocation 'westus2'" +
               " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
@@ -387,8 +423,7 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testLocation 'westus2'" +
               " -testCycle 'PERF-NTTTCP'" +
@@ -400,9 +435,8 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
+              " -OsVHD '${ARM_OSVHD_NAME}'" +              
               " -testLocation 'westus2'" +             
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
@@ -412,8 +446,7 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testLocation 'westus2'" +
               " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
@@ -424,8 +457,7 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testLocation 'westus2'" +
               " -testCycle 'PERF-NTTTCP'" +
