@@ -253,7 +253,7 @@ pipeline {
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
                         -IdRSAPub "C:\\bin\\id_rsa.pub"
-                        -XmlTest KvpTests.xml
+                        -XmlTest kernel_pipeline_fvt.xml
                   ''')
                 echo 'Finished running LISA.'
               }
