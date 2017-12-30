@@ -358,7 +358,7 @@ pipeline {
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'DEPLOYMENT'" +
+              " -testCycle 'DEPLOYMENT-LIMITED'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -StorageAccount 'ExistingStorage_Standard'"
               )
@@ -366,7 +366,7 @@ pipeline {
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -testLocation 'westus'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'DEPLOYMENT'" +
+              " -testCycle 'DEPLOYMENT-LIMITED'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -StorageAccount 'ExistingStorage_Premium'"
               )              
