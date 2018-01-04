@@ -1,105 +1,301 @@
 #!/usr/bin/env groovy
 
 def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
 pipeline {
   parameters {
-    string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
-    string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+    string(defaultValue: "upstream", description: 'Kernel', name: 'KERNEL_FLAVOUR')
+    string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+    string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
+    string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
+    string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+           description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
     KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
     UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/upstream-kernel-build-folder'
+    KERNEL_CONFIG = './Microsoft/config-azure'
     CLEAN_ENV = 'False'
-    USE_CCACHE = 'False'
+    USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'upstream_kernel'
-    FOLDER_PREFIX='linux-next'
-    CLONE_DEPTH = '1'
-    THREAD_NUMBER = 'x2'
+  }
+  options {
+    overrideIndexTriggers(false)
   }
   agent {
     node {
-      label 'master'
+      label 'meta_slave'
     }
   }
   stages {
-      stage('Build packages') {
-      parallel {
-          stage('Build Ubuntu deb') {
+          stage('Build packages') {
+          parallel {
+              stage('Build Ubuntu deb') {
+              when {
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+              }
               agent {
                 node {
                   label 'ubuntu_kernel_builder'
                 }
               }
               steps {
-                  git url: 'https://github.com/LIS/lis-pipeline.git'
                   sh '''#!/bin/bash
                     set -xe
                     echo "Building artifacts..."
                     pushd "$WORKSPACE/scripts/package_building"
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
                     bash build_artifacts.sh \\
                         --git_url ${KERNEL_GIT_URL} \\
                         --git_branch ${KERNEL_GIT_BRANCH} \\
-                        --destination_path ${JOB_KERNEL_ARTIFACTS_PATH} \\
-                        --install_deps False \\
+                        --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                        --install_deps True \\
                         --thread_number ${THREAD_NUMBER} \\
                         --debian_os_version ${UBUNTU_VERSION} \\
                         --build_path ${BUILD_PATH} \\
-                        --artifacts_folder_prefix ${FOLDER_PREFIX} \\
+                        --kernel_config ${KERNEL_CONFIG} \\
                         --clean_env ${CLEAN_ENV} \\
                         --use_ccache ${USE_CCACHE} \\
-                        --clone-depth ${CLONE_DEPTH}
+                        --kernel_sources ${KERNEL_FLAVOUR}
                     popd
                     '''
 
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/${env.FOLDER_PREFIX}*/deb/*"), name: "${env.KERNEL_ARTIFACTS_PATH}-deb"
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
-                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
+                archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
-          }
-
-          stage('Build CentOS rpm') {
-              agent {
-                node {
-                  label 'centos_kernel_builder'
-                }
               }
-              steps {
-                  git url: 'https://github.com/LIS/lis-pipeline.git'
-                  sh '''#!/bin/bash
-                    set -xe
-                    echo "Building artifacts..."
-                    pushd "$WORKSPACE/scripts/package_building"
-                    JOB_KERNEL_ARTIFACTS_PATH="${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
-                    bash build_artifacts.sh \\
-                        --git_url ${KERNEL_GIT_URL} \\
-                        --git_branch ${KERNEL_GIT_BRANCH} \\
-                        --destination_path ${JOB_KERNEL_ARTIFACTS_PATH} \\
-                        --install_deps False \\
-                        --thread_number ${THREAD_NUMBER} \\
-                        --debian_os_version ${UBUNTU_VERSION} \\
-                        --build_path ${BUILD_PATH} \\
-                        --artifacts_folder_prefix ${FOLDER_PREFIX} \\
-                        --clean_env ${CLEAN_ENV} \\
-                        --use_ccache ${USE_CCACHE} \\
-                        --clone-depth ${CLONE_DEPTH}
-                    popd
+              stage('Build CentOS') {
+                  when {
+                    expression { params.ENABLED_STAGES.contains('build_artifacts') }
+                  }
+                  agent {
+                    node {
+                      label 'centos_kernel_builder'
+                    }
+                  }
+                  steps {
+                      sh '''#!/bin/bash
+                        set -xe
+                        echo "Building artifacts..."
+                        pushd "$WORKSPACE/scripts/package_building"
+                        bash build_artifacts.sh \\
+                            --git_url ${KERNEL_GIT_URL} \\
+                            --git_branch ${KERNEL_GIT_BRANCH} \\
+                            --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                            --install_deps True \\
+                            --thread_number ${THREAD_NUMBER} \\
+                            --debian_os_version ${UBUNTU_VERSION} \\
+                            --build_path ${BUILD_PATH} \\
+                            --kernel_config ${KERNEL_CONFIG} \\
+                            --clean_env ${CLEAN_ENV} \\
+                            --use_ccache ${USE_CCACHE} \\
+                            --kernel_sources ${KERNEL_FLAVOUR}
+                        popd
+                        '''
+                    stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                    stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                          name: "${env.KERNEL_ARTIFACTS_PATH}"
+                    sh '''
+                        set -xe
+                        rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                     '''
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.KERNEL_ARTIFACTS_PATH}/${env.FOLDER_PREFIX}*/rpm/*"), name: "${env.KERNEL_ARTIFACTS_PATH}-rpm"
-                sh '''
-                    set -xe
-                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${KERNEL_ARTIFACTS_PATH}"
-                '''
-                }
-            }
+                    archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+                  }
         }
     }
     }
+    stage('Temporary Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                               usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                passwordVariable: 'PASSWORD',
+                                                usernameVariable: 'USERNAME')]) {
+                sh '''#!/bin/bash
+                    set -xe
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --pipeline "${KERNEL_FLAVOUR}"
+                        --stage "temp"
+                '''
+            }
+        }
+      }
+    }
+    stage('Boot Validation') {
+      when {
+        expression { params.ENABLED_STAGES.contains('boot_test') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                   usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                   ]) {
+          dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            unstash 'kernel_version_ini'
+            sh 'cat scripts/package_building/kernel_versions.ini'
+          }
+          sh '''
+            bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                --smb_share_url $SMB_SHARE_URL --vm_user_name $OS_TYPE \
+                --os_type $OS_TYPE
+            '''
+        }
+        
+      }
+      post {
+        always {
+          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+        }
+        failure {
+          sh 'echo "Load failure test results."'
+          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+        }
+        success {
+          echo "Cleaning Azure resources up..."
+          sh '''#!/bin/bash
+            pushd ./scripts/azure_kernel_validation
+            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+            popd
+            '''
+          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+        }
+      }
+    }
+    stage('Validated Artifacts Publish') {
+      when {
+        expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                               usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                               ]) {
+                sh '''#!/bin/bash
+                    set -xe
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --pipeline "${KERNEL_FLAVOUR}"
+                '''
+            }
+        }
+      }
+    }
+    stage('Functional Tests') {
+     when {
+      expression { params.ENABLED_STAGES.contains('validation') }
+     }
+     parallel {
+      stage('LISA') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+          }
+          agent {
+            node {
+              label 'hyper-v'
+            }
+          }
+          steps {
+            withCredentials(bindings: [string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                       usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                        passwordVariable: 'PASSWORD',
+                                                        usernameVariable: 'USERNAME')]) {
+                echo 'Running LISA...'
+                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+                }
+                PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
+                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                        -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
+                        -IdRSAPub "C:\\bin\\id_rsa.pub"
+                        -XmlTest KvpTests.xml
+                  ''')
+                echo 'Finished running LISA.'
+              }
+            }
+          post {
+            always {
+              archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}\\bootlogs\\*.LOG"
+              archiveArtifacts 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
+              junit 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml'
+            }
+            success {
+              echo 'Cleaning up LISA environment...'
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                ''')
+            }
+          }
+        }
+        stage('Azure') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+          }
+          agent {
+            node {
+              label 'meta_slave'
+            }
+          }
+          steps {
+            echo "NOOP Azure test."
+          }
+        }
+        stage('Performance On Hyper-V') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+          }
+          agent {
+            node {
+              label 'meta_slave'
+            }
+          }
+          steps {
+            echo "NOOP Hyper-V Performance test."
+          }
+        }
+      }
+    }
+  }
 }
