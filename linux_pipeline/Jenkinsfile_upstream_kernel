@@ -137,7 +137,7 @@ pipeline {
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
                         --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
-                        --pipeline "${KERNEL_FLAVOUR}"
+                        --pipeline "${KERNEL_FLAVOUR}" \\
                         --stage "temp"
                 '''
             }
