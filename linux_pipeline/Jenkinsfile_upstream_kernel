@@ -133,12 +133,13 @@ pipeline {
                                                 usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}\temp-kernel-artifacts" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
-                        --pipeline "${KERNEL_FLAVOUR}" \\
-                        --stage "temp"
+                        --artifacts_folder_prefix "${folder_prefix}"
                 '''
             }
         }
@@ -207,11 +208,13 @@ pipeline {
                                ]) {
                 sh '''#!/bin/bash
                     set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}\${folder_prefix}" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
-                        --pipeline "${KERNEL_FLAVOUR}"
+                        --artifacts_folder_prefix "${folder_prefix}"
                 '''
             }
         }
