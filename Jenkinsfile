@@ -69,7 +69,7 @@ pipeline {
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
-                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"                    
+                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
@@ -245,6 +245,7 @@ pipeline {
         withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
           cleanWs()
           git "https://github.com/iamshital/azure-linux-automation.git"
+          stash includes: '**' , name: 'azure-linux-automation'
           unstash "${env.KERNEL_ARTIFACTS_PATH}"
           unstash 'kernel_version_ini'
           unstash 'azure.env'
@@ -261,11 +262,12 @@ pipeline {
           " -testCycle 'PUBLISH-VHD'" +
           " -OverrideVMSize 'Standard_DS1_v2'" +
           " -ARMImageName '${ARM_IMAGE_NAME}'" +
-          " -StorageAccount 'ExistingStorage_Premium'"
-          )              
+          " -StorageAccount 'ExistingStorage_Premium'" +
+          " -ExitWithZero"
+          )
         }
-      }        
-    }    
+      }
+    }
     stage('Functional Tests') {
      when {
       expression { params.ENABLED_STAGES.contains('validation') }
@@ -331,7 +333,7 @@ pipeline {
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               cleanWs()
-              git "https://github.com/iamshital/azure-linux-automation.git"
+              unstash 'azure-linux-automation'
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
               unstash 'azure.env'
@@ -369,11 +371,12 @@ pipeline {
               " -StorageAccount 'ExistingStorage_Premium'" +
               " -ExitWithZero"
               )
+              junit "report\\*-junit.xml"
               RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
             }
           }
         }
-        stage('Azure-Performance') {
+        stage('Azure-Performance-Network') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
           }
@@ -385,7 +388,7 @@ pipeline {
           steps {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               cleanWs()
-              git "https://github.com/iamshital/azure-linux-automation.git"
+              unstash 'azure-linux-automation'
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
               unstash 'azure.env'
@@ -398,15 +401,15 @@ pipeline {
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +              
-              " -testLocation 'westus2'" +             
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
+              " -testLocation 'westus2'" +
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
               " -ResultDBTestTag 'LAGSCOPE-TEST'" +
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"     
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -432,19 +435,19 @@ pipeline {
               " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
               " -ResultDBTestTag 'NTTTCP-SRIOV'" +
               " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"     
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +              
-              " -testLocation 'westus2'" +             
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
+              " -testLocation 'westus2'" +
               " -testCycle 'PERF-LAGSCOPE'" +
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
               " -ResultDBTestTag 'LAGSCOPE-TEST'" +
               " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ExitWithZero"             
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -468,22 +471,50 @@ pipeline {
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
               " -ResultDBTestTag 'NTTTCP-SRIOV'" +
-              " -ExitWithZero"  
-              )    
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('Azure-Performance-Storage') {
+          when {
+            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +              
-              " -testLocation 'centralus'" +             
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'centralus'" +
               " -testCycle 'PERF-FIO'" +
-              " -RunSelectedTests 'ICA-PERF-FIO-TEST-4K'" + 
+              " -RunSelectedTests 'ICA-PERF-FIO-TEST-4K'" +
               " -OverrideVMSize 'Standard_DS14_v2'" +
               " -ResultDBTable 'Perf_Storage_Azure_MsftKernel'" +
               " -ResultDBTestTag 'FIO-12DISKS'" +
               " -StorageAccount 'NewStorage_Premium'" +
-              " -ExitWithZero"             
-              )               
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
               RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
             }
           }
