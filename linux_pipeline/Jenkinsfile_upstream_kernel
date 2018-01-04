@@ -66,7 +66,7 @@ pipeline {
                     '''
 
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
@@ -104,7 +104,7 @@ pipeline {
                         popd
                         '''
                     stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                    stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                    stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
                           name: "${env.KERNEL_ARTIFACTS_PATH}"
                     sh '''
                         set -xe
