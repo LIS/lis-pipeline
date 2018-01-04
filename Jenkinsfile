@@ -348,7 +348,8 @@ pipeline {
               " -testCycle 'BVTMK'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Standard'"
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -356,7 +357,8 @@ pipeline {
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'DEPLOYMENT-LIMITED'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Standard'"
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -364,8 +366,10 @@ pipeline {
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'DEPLOYMENT-LIMITED'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Premium'"
-              )              
+              " -StorageAccount 'ExistingStorage_Premium'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
             }
           }
         }
@@ -401,7 +405,8 @@ pipeline {
               " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
               " -ResultDBTestTag 'LAGSCOPE-TEST'" +
               " -StorageAccount 'ExistingStorage_Standard'" +
-              " -EnableAcceleratedNetworking"              
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"     
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -413,7 +418,8 @@ pipeline {
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
               " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
-              " -EnableAcceleratedNetworking"
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -425,7 +431,8 @@ pipeline {
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
               " -ResultDBTestTag 'NTTTCP-SRIOV'" +
-              " -EnableAcceleratedNetworking"     
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"     
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -436,7 +443,8 @@ pipeline {
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
               " -ResultDBTestTag 'LAGSCOPE-TEST'" +
-              " -StorageAccount 'ExistingStorage_Standard'"             
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"             
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -447,7 +455,8 @@ pipeline {
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'"
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -ExitWithZero"
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -458,7 +467,8 @@ pipeline {
               " -OverrideVMSize 'Standard_D15_v2'" +
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'NTTTCP-SRIOV'"  
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -ExitWithZero"  
               )    
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
@@ -471,8 +481,10 @@ pipeline {
               " -OverrideVMSize 'Standard_DS14_v2'" +
               " -ResultDBTable 'Perf_Storage_Azure_MsftKernel'" +
               " -ResultDBTestTag 'FIO-12DISKS'" +
-              " -StorageAccount 'NewStorage_Premium'"             
-              )                                 
+              " -StorageAccount 'NewStorage_Premium'" +
+              " -ExitWithZero"             
+              )               
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
             }
           }
         }
