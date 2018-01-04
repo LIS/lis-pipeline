@@ -7,7 +7,7 @@ def PowerShellWrapper(psCmd) {
 
 pipeline {
   parameters {
-    string(defaultValue: "upstream", description: 'Kernel', name: 'KERNEL_FLAVOUR')
+    string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
@@ -61,7 +61,7 @@ pipeline {
                         --kernel_config ${KERNEL_CONFIG} \\
                         --clean_env ${CLEAN_ENV} \\
                         --use_ccache ${USE_CCACHE} \\
-                        --kernel_sources ${KERNEL_FLAVOUR}
+                        --use_kernel_folder_prefix True
                     popd
                     '''
 
@@ -100,7 +100,7 @@ pipeline {
                             --kernel_config ${KERNEL_CONFIG} \\
                             --clean_env ${CLEAN_ENV} \\
                             --use_ccache ${USE_CCACHE} \\
-                            --kernel_sources ${KERNEL_FLAVOUR}
+                            --use_kernel_folder_prefix True
                         popd
                         '''
                     stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
@@ -133,12 +133,13 @@ pipeline {
                                                 usernameVariable: 'USERNAME')]) {
                 sh '''#!/bin/bash
                     set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}\temp-kernel-artifacts" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
-                        --pipeline "${KERNEL_FLAVOUR}" \\
-                        --stage "temp"
+                        --artifacts_folder_prefix "${folder_prefix}"
                 '''
             }
         }
@@ -207,11 +208,13 @@ pipeline {
                                ]) {
                 sh '''#!/bin/bash
                     set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}\${folder_prefix}" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
-                        --pipeline "${KERNEL_FLAVOUR}"
+                        --artifacts_folder_prefix "${folder_prefix}"
                 '''
             }
         }
