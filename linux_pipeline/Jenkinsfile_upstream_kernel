@@ -7,7 +7,7 @@ def PowerShellWrapper(psCmd) {
 
 pipeline {
   parameters {
-    string(defaultValue: "upstream", description: 'Kernel', name: 'KERNEL_FLAVOUR')
+    string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
@@ -61,7 +61,7 @@ pipeline {
                         --kernel_config ${KERNEL_CONFIG} \\
                         --clean_env ${CLEAN_ENV} \\
                         --use_ccache ${USE_CCACHE} \\
-                        --kernel_sources ${KERNEL_FLAVOUR}
+                        --use_kernel_folder_prefix True
                     popd
                     '''
 
@@ -100,7 +100,7 @@ pipeline {
                             --kernel_config ${KERNEL_CONFIG} \\
                             --clean_env ${CLEAN_ENV} \\
                             --use_ccache ${USE_CCACHE} \\
-                            --kernel_sources ${KERNEL_FLAVOUR}
+                            --use_kernel_folder_prefix True
                         popd
                         '''
                     stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
