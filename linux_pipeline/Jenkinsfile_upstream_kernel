@@ -27,7 +27,7 @@ pipeline {
     CLEAN_ENV = 'False'
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
-    BUILD_NAME = 'upstream_kernel'
+    BUILD_NAME = 'u'
   }
   options {
     overrideIndexTriggers(false)
