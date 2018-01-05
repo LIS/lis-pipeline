@@ -1,0 +1,233 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+pipeline {
+    parameters {
+        string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
+        string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+        string(defaultValue: "", description: 'Patch to be aplied to the kernel', name: 'KERNEL_PATCH')
+        string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+            description: 'What stages to run', name: 'ENABLED_STAGES')
+    }
+    environment {
+        KERNEL_ARTIFACTS_PATH = 'dev-patch-kernels'
+        UBUNTU_VERSION = '16'
+        BUILD_PATH = '/mnt/tmp/developer-kernel-build-folder'
+        KERNEL_CONFIG = './Microsoft/config-azure'
+        CLEAN_ENV = 'True'
+        USE_CCACHE = 'True'
+        AZURE_MAX_RETRIES = '60'
+        BUILD_NAME = 'd'
+        FOLDER_PREFIX = 'dev'
+        OS_TYPE = 'ubuntu'
+        THREAD_NUMBER = 'x3'
+        CLONE_DEPTH = '1'
+    }
+    options {
+        overrideIndexTriggers(false)
+    }
+    agent {
+        node {
+            label 'meta_slave'
+        }
+    }
+    stages {
+        stage('build_artifacts') {
+            when {
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+            }
+            agent {
+                node {
+                    label 'ubuntu_kernel_builder'
+                }
+            }
+            steps {
+                sh '''#!/bin/bash
+                      set -xe
+                      echo "Building artifacts..."
+                      pushd "$WORKSPACE/scripts/package_building"
+                      echo ${KERNEL_PATCH} | tr ' ' '\n' > developer_patches
+                      bash build_artifacts.sh \\
+                          --git_url ${KERNEL_GIT_URL} \\
+                          --git_branch ${KERNEL_GIT_BRANCH} \\
+                          --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                          --install_deps True \\
+                          --thread_number ${THREAD_NUMBER} \\
+                          --debian_os_version ${UBUNTU_VERSION} \\
+                          --build_path ${BUILD_PATH} \\
+                          --kernel_config ${KERNEL_CONFIG} \\
+                          --clean_env ${CLEAN_ENV} \\
+                          --use_ccache ${USE_CCACHE} \\
+                          --use_kernel_folder_prefix True \\
+                          --clone_depth ${CLONE_DEPTH} \\
+                          --patch_file developer_patches
+                      popd
+                      '''
+
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
+                name: "${env.KERNEL_ARTIFACTS_PATH}"
+                sh '''
+                    set -xe
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+                    '''
+                archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+            }
+        }
+        stage('publish_temp_artifacts') {
+            when {
+                expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+            }
+            agent {
+                node {
+                    label 'meta_slave'
+                }
+            }
+            steps {
+                dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+                    unstash "${env.KERNEL_ARTIFACTS_PATH}"
+                    withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                   usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                    passwordVariable: 'PASSWORD',
+                                                    usernameVariable: 'USERNAME')]) {
+                        sh '''#!/bin/bash
+                            set -xe
+                            folder_prefix="${KERNEL_GIT_URL##*/}"
+                            folder_prefix="${folder_prefix%.*}"
+                            bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                                --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                                --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
+                                --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                                --artifacts_folder_prefix "${folder_prefix}"
+                            '''
+                    }
+                }
+            }
+        }
+        stage('boot_test') {
+            when {
+                expression { params.ENABLED_STAGES.contains('boot_test') }
+            }
+            agent {
+                node {
+                    label 'meta_slave'
+                }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                           ]) {
+                    dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                        unstash 'kernel_version_ini'
+                        sh 'cat scripts/package_building/kernel_versions.ini'
+                    }
+                    sh '''
+                        bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                            --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                            --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                            --smb_share_url $SMB_SHARE_URL --vm_user_name $OS_TYPE \
+                            --os_type $OS_TYPE
+                        '''
+                }
+
+            }
+            post {
+                always {
+                    archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+                }
+                failure {
+                    sh 'echo "Load failure test results."'
+                    nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+                }
+                success {
+                    echo "Cleaning Azure resources up..."
+                    sh '''#!/bin/bash
+                        pushd ./scripts/azure_kernel_validation
+                        bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                        popd
+                        '''
+                    nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+                }
+            }
+        }
+        stage('publish_artifacts') {
+            when {
+                expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+            }
+            agent {
+                node {
+                    label 'meta_slave'
+                }
+            }
+            steps {
+                dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+                    unstash "${env.KERNEL_ARTIFACTS_PATH}"
+                    withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                       usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                       ]) {
+                        sh '''#!/bin/bash
+                            set -xe
+                            folder_prefix="${KERNEL_GIT_URL##*/}"
+                            folder_prefix="${folder_prefix%.*}"
+                            bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                                --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                                --smb_url "${SMB_SHARE_URL}/${folder_prefix}" --smb_username "${USERNAME}" \\
+                                --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                                --artifacts_folder_prefix "${folder_prefix}"
+                            '''
+                    }
+                }
+            }
+        }
+        stage('validation') {
+            when {
+                expression { params.ENABLED_STAGES.contains('validation') }
+            }
+            parallel {
+                stage('validation_functional_hyperv') {
+                    when {
+                        expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+                    }
+                    agent {
+                        node {
+                            label 'meta_slave'
+                        }
+                    }
+                    steps {
+                        echo "NOOP Lisa test."
+                    }
+                }
+                stage('validation_functional_azure') {
+                    when {
+                        expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+                    }
+                    agent {
+                        node {
+                            label 'meta_slave'
+                        }
+                    }
+                    steps {
+                        echo "NOOP Azure test."
+                    }
+                }
+                stage('validation_perf_hyperv') {
+                    when {
+                        expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+                    }
+                    agent {
+                        node {
+                            label 'meta_slave'
+                        }
+                    }
+                    steps {
+                        echo "NOOP Hyper-V Performance test."
+                    }
+                }
+            }
+        }
+    }
+}
