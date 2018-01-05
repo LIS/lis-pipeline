@@ -490,15 +490,31 @@ pipeline {
         }
         stage('Performance On Hyper-V') {
           when {
+            expression { params.OS_TYPE == 'centos' }
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
           }
           agent {
             node {
-              label 'meta_slave'
+              label 'hyper-v'
             }
           }
           steps {
-            echo "NOOP Hyper-V Performance test."
+            withCredentials(bindings:[ string(credentialsId: 'LOCAL_JENKINS_PERF_JOB',
+                                              variable: 'LOCAL_JENKINS_PERF_JOB'),
+                                       string(credentialsId: 'LOCAL_JENKINS_PERF_TOKEN',
+                                              variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
+              dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                unstash 'kernel_version_ini'
+                PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+              }
+              PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
+                        -KernelVersionPath "${env:WORKSPACE}\\kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
+                        -LocalJenkinsPerfURL "${env:LOCAL_JENKINS_PERF_JOB}"
+                        -LocalJenkinsPerfToken "${env:LOCAL_JENKINS_PERF_TOKEN}"
+              ''')
+              echo "Triggered Local Hyper-V Performance tests."
+            }
           }
         }
       }
