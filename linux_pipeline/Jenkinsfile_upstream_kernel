@@ -5,21 +5,25 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
 pipeline {
   parameters {
-    string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
-    string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
-    string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
+    choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
+    string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+    string(defaultValue: "unstable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
     string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
     KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
     UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/upstream-kernel-build-folder'
-    KERNEL_CONFIG = './Microsoft/config-azure'
+    KERNEL_CONFIG = '.config'
     CLEAN_ENV = 'False'
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
@@ -34,10 +38,9 @@ pipeline {
     }
   }
   stages {
-          stage('Build packages') {
-          parallel {
-              stage('Build Ubuntu deb') {
+          stage('Build Ubuntu') {
               when {
+                expression { params.OS_TYPE == 'ubuntu' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
@@ -46,25 +49,29 @@ pipeline {
                 }
               }
               steps {
-                  sh '''#!/bin/bash
-                    set -xe
-                    echo "Building artifacts..."
-                    pushd "$WORKSPACE/scripts/package_building"
-                    bash build_artifacts.sh \\
-                        --git_url ${KERNEL_GIT_URL} \\
-                        --git_branch ${KERNEL_GIT_BRANCH} \\
-                        --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                        --install_deps True \\
-                        --thread_number ${THREAD_NUMBER} \\
-                        --debian_os_version ${UBUNTU_VERSION} \\
-                        --build_path ${BUILD_PATH} \\
-                        --kernel_config ${KERNEL_CONFIG} \\
-                        --clean_env ${CLEAN_ENV} \\
-                        --use_ccache ${USE_CCACHE} \\
-                        --use_kernel_folder_prefix True
-                    popd
-                    '''
+              sh '''#!/bin/bash
+                set -xe
+                echo "Building artifacts..."
+                pushd "$WORKSPACE/scripts/package_building"
+                bash build_artifacts.sh \\
+                    --git_url ${KERNEL_GIT_URL} \\
+                    --git_branch ${KERNEL_GIT_BRANCH} \\
+                    --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                    --install_deps True \\
+                    --thread_number ${THREAD_NUMBER} \\
+                    --debian_os_version ${UBUNTU_VERSION} \\
+                    --build_path ${BUILD_PATH} \\
+                    --kernel_config ${KERNEL_CONFIG} \\
+                    --clean_env ${CLEAN_ENV} \\
+                    --use_ccache ${USE_CCACHE} \\
+                    --use_kernel_folder_prefix True
+                popd
+                '''
+                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
+                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
+                writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
 
+                stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
@@ -74,46 +81,50 @@ pipeline {
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
+          }
+          stage('Build CentOS') {
+              when {
+                expression { params.OS_TYPE == 'centos' }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
-              stage('Build CentOS') {
-                  when {
-                    expression { params.ENABLED_STAGES.contains('build_artifacts') }
-                  }
-                  agent {
-                    node {
-                      label 'centos_kernel_builder'
-                    }
-                  }
-                  steps {
-                      sh '''#!/bin/bash
-                        set -xe
-                        echo "Building artifacts..."
-                        pushd "$WORKSPACE/scripts/package_building"
-                        bash build_artifacts.sh \\
-                            --git_url ${KERNEL_GIT_URL} \\
-                            --git_branch ${KERNEL_GIT_BRANCH} \\
-                            --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                            --install_deps True \\
-                            --thread_number ${THREAD_NUMBER} \\
-                            --debian_os_version ${UBUNTU_VERSION} \\
-                            --build_path ${BUILD_PATH} \\
-                            --kernel_config ${KERNEL_CONFIG} \\
-                            --clean_env ${CLEAN_ENV} \\
-                            --use_ccache ${USE_CCACHE} \\
-                            --use_kernel_folder_prefix True
-                        popd
-                        '''
-                    stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                    stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
-                          name: "${env.KERNEL_ARTIFACTS_PATH}"
-                    sh '''
-                        set -xe
-                        rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
-                    '''
-                    archiveArtifacts 'scripts/package_building/kernel_versions.ini'
-                  }
-        }
-    }
+              agent {
+                node {
+                  label 'centos_kernel_builder'
+                }
+              }
+              steps {
+                sh '''#!/bin/bash
+                set -xe
+                echo "Building artifacts..."
+                pushd "$WORKSPACE/scripts/package_building"
+                bash build_artifacts.sh \\
+                    --git_url ${KERNEL_GIT_URL} \\
+                    --git_branch ${KERNEL_GIT_BRANCH} \\
+                    --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                    --install_deps True \\
+                    --thread_number ${THREAD_NUMBER} \\
+                    --debian_os_version ${UBUNTU_VERSION} \\
+                    --build_path ${BUILD_PATH} \\
+                    --kernel_config ${KERNEL_CONFIG} \\
+                    --clean_env ${CLEAN_ENV} \\
+                    --use_ccache ${USE_CCACHE} \\
+                    --use_kernel_folder_prefix True
+                popd
+                '''
+                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
+                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
+                writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
+                
+                stash includes: '*.azure.env', name: 'azure.env'
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
+                sh '''
+                    set -xe
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+                '''
+                archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
     }
     stage('Temporary Artifacts Publish') {
       when {
@@ -137,7 +148,7 @@ pipeline {
                     folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}\temp-kernel-artifacts" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
                         --artifacts_folder_prefix "${folder_prefix}"
                 '''
@@ -170,7 +181,7 @@ pipeline {
                 --os_type $OS_TYPE
             '''
         }
-        
+
       }
       post {
         always {
@@ -212,7 +223,7 @@ pipeline {
                     folder_prefix="${folder_prefix%.*}"
                     bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
                         --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
-                        --smb_url "${SMB_SHARE_URL}\${folder_prefix}" --smb_username "${USERNAME}" \\
+                        --smb_url "${SMB_SHARE_URL}/${folder_prefix}" --smb_username "${USERNAME}" \\
                         --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
                         --artifacts_folder_prefix "${folder_prefix}"
                 '''
