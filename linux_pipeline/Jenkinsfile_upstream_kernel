@@ -258,7 +258,7 @@ pipeline {
                 PowerShellWrapper('''
                     & ".\\scripts\\lis_hyperv_platform\\main.ps1"
                         -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
-                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -SharedStoragePath "${env:SMB_SHARE_URL}\\temp-kernel-artifacts"
                         -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
