@@ -40,6 +40,17 @@ function Mount-Share {
         [String] $SharePassword
     )
 
+    # Note(avladu): Sometimes, SMB mappings enter into an
+    # "Unavailable" state and need to be removed, as they cannot be
+    # accessed anymore.
+    $smbMappingsUnavailable = Get-SmbMapping -RemotePath $SharedStoragePath `
+        -ErrorAction SilentlyContinue | Where-Object {$_.Status -eq "Unavailable"}
+    if ($smbMappingsUnavailable) {
+        foreach ($smbMappingUnavailable in $smbMappingsUnavailable) {
+            net use /delete $smbMappingUnavailable.LocalPath
+        }
+    }
+
     $mountPoint = $null
     $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
     if ($smbMapping) {
