@@ -733,6 +733,12 @@ function main {
             --artifacts_folder_prefix)
                 FOLDER_PREFIX="$2"
                 shift 2;;
+            --build_date)
+                # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
+                if [[ "$2" != "" ]];then
+                    BUILD_DATE="$2"
+                fi
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac

@@ -18,6 +18,7 @@ pipeline {
     string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
+    string(defaultValue: "", description: 'Timestamp for artifacts build.', name: 'TIMESTAMP')
   }
   environment {
     KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
@@ -64,7 +65,8 @@ pipeline {
                     --kernel_config ${KERNEL_CONFIG} \\
                     --clean_env ${CLEAN_ENV} \\
                     --use_ccache ${USE_CCACHE} \\
-                    --use_kernel_folder_prefix True
+                    --use_kernel_folder_prefix True \\
+                    --build_date ${TIMESTAMP}
                 popd
                 '''
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
@@ -108,7 +110,8 @@ pipeline {
                     --kernel_config ${KERNEL_CONFIG} \\
                     --clean_env ${CLEAN_ENV} \\
                     --use_ccache ${USE_CCACHE} \\
-                    --use_kernel_folder_prefix True
+                    --use_kernel_folder_prefix True \\
+                    --build_date ${TIMESTAMP}
                 popd
                 '''
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
