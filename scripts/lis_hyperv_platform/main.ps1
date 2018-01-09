@@ -170,7 +170,9 @@ function Main {
 
     $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath
 
-    $bootLogPath = "$jobPath\COM.LOG"
+    $bootLogDirWorkspace = Join-Path (Join-Path $env:Workspace $JobId) "bootlogs"
+    New-Item -Type Directory $bootLogDirWorkspace
+    $bootLogPath = Join-Path $bootLogDirWorkspace "COM.LOG"
     $scriptBlock = {
         param($InstanceName, $BootLogPath)
         & icaserial.exe READ "\\localhost\pipe\$InstanceName" | Out-File $BootLogPath
@@ -204,11 +206,6 @@ function Main {
         }
     }
     $JobManager.RemoveTopic($InstanceName)
-
-    Write-Host "Copying boot logs to workspace..."
-    $bootLogDirWorkspace = Join-Path (Join-Path $env:Workspace $JobId) "bootlogs"
-    New-Item -Force -Type Directory $bootLogDirWorkspace
-    Copy-Item -Force "${jobPath}\\COM.LOG" $bootLogDirWorkspace
 
     Write-Host "Starting LISA run..."
     & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
