@@ -25,7 +25,7 @@ pipeline {
     UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/upstream-kernel-build-folder'
     KERNEL_CONFIG = '.config'
-    CLEAN_ENV = 'False'
+    CLEAN_ENV = 'True'
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'u'
