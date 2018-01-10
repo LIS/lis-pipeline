@@ -555,8 +555,8 @@ function build_kernel (){
     KERNEL_VERSION=$(make kernelversion)
     KERNEL_TAG=$(git log -1 --pretty=format:"%h")
     popd
-    GIT_TAG="$(get_git_tag $source 7)"
-    GIT_TAG12="$(get_git_tag $source 12)"
+    GIT_TAG="$(get_git_tag $source HEAD 7)"
+    GIT_TAG12="$(get_git_tag $source HEAD 12)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
     prepare_kernel_"${os_family}" "$source" 
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
