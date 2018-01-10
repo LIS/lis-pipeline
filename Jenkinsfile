@@ -525,11 +525,27 @@ pipeline {
           }
           agent {
             node {
-              label 'meta_slave'
+              label 'hyper-v'
             }
           }
           steps {
-            echo "NOOP Hyper-V Performance test."
+            withCredentials(bindings:[ string(credentialsId: 'LOCAL_JENKINS_PERF_JOB',
+                                              variable: 'LOCAL_JENKINS_PERF_JOB'),
+                                       string(credentialsId: 'LOCAL_JENKINS_PERF_TOKEN',
+                                              variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
+              unstash 'kernel_version_ini'
+              PowerShellWrapper('Import-Module ' +
+                                '"${env:WORKSPACE}\\scripts\\lis_hyperv_platform\\ini.psm1"' +
+                                ';' +
+                                '$KERNEL_PATH = Get-IniFileValue -Path ' +
+                                '"${env:WORKSPACE}\\scripts\\package_building\\kernel_versions.ini" ' +
+                                '-Section "KERNEL_BUILT" -Key "folder"' +
+                                '; ' +
+                                'Invoke-RestMethod -Method Post -Uri ' +
+                                '"$ENV:LOCAL_JENKINS_PERF_JOB/buildWithParameters?' +
+                                'KERNEL=${KERNEL_PATH}&token=$ENV:LOCAL_JENKINS_PERF_TOKEN"')
+            }
+            echo "Triggered Local Hyper-V Performance tests."
           }
         }
       }
