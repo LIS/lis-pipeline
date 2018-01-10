@@ -233,11 +233,14 @@ get_destination_path() {
 
 get_git_tag(){
     source_path="$1"
-    number="$2"
-    branch="$3"
+    branch="$2"
+    number="$3"
 
     if [[ "$branch" == "" ]];then
         branch="HEAD"
+    fi
+    if [[ "$number" == "" ]];then
+        number="7"
     fi
     pushd "$source_path"
     git_tag="$(git rev-parse --short=$number $branch)"
