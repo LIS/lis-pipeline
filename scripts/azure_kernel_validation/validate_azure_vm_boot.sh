@@ -74,7 +74,7 @@ validate_azure_vm_boot() {
                -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
     scp -i $PRIVATE_KEY_PATH -r -o StrictHostKeyChecking=no "${MOUNT_POINT}/${KERNEL_FOLDER}/${artifacts_folder}" "$VM_USER_NAME@$public_ip:/tmp/"
     run_remote_script "$BASEDIR/prepare_test_vm.sh" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$public_ip" \
-                "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts kernel --vm_username $VM_USER_NAME"
+                "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts azure --vm_username $VM_USER_NAME"
     ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo reboot' || true
     sudo umount $MOUNT_POINT
     sleep 10
