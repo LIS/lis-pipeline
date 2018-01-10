@@ -57,7 +57,7 @@
     "publicIPAddressType": "Dynamic",
     "vmStorageAccountContainerName": "vhds",
     "vmName": "[concat(parameters('buildNumber'),'-Kernel-Validation')]",
-    "vmSize": "Standard_A0",
+    "vmSize": "Standard_A2",
     "virtualNetworkName": "[concat(parameters('buildNumber'),'-VNET')]",
     "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
     "sshKeyPath": "[concat('/home/',parameters('adminUsername'),'/.ssh/authorized_keys')]",
