@@ -213,6 +213,7 @@ pipeline {
         }
       }
       steps {
+        build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-0@kernel_pipeline')], wait: false
         dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
             withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
@@ -242,6 +243,7 @@ pipeline {
         }
       }
       steps {
+        build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-0@kernel_pipeline')], wait: false
         withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
           cleanWs()
           git "https://github.com/iamshital/azure-linux-automation.git"
@@ -331,6 +333,7 @@ pipeline {
             }
           }
           steps {
+            build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-0@kernel_pipeline')], wait: false
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               cleanWs()
               unstash 'azure-linux-automation'
@@ -386,6 +389,7 @@ pipeline {
             }
           }
           steps {
+            build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-0@kernel_pipeline')], wait: false
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               cleanWs()
               unstash 'azure-linux-automation'
@@ -488,6 +492,7 @@ pipeline {
             }
           }
           steps {
+            build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-0@kernel_pipeline')], wait: false
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               cleanWs()
               unstash 'azure-linux-automation'
