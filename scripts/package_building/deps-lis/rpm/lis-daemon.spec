@@ -11,7 +11,7 @@
 %define release %(date +%Y%m%d)
 %define _unpackaged_files_terminate_build 0
 
-Name:			msft-daemons
+Name:			hyperv-daemons
 License:		GPLv2+
 Summary:		Microsoft hyper-v daemons
 Version:		1

@@ -39,7 +39,7 @@ prepare_vm_ubuntu() {
     if [[ "$target_artifacts" == "all" ]];then
         sudo dpkg -i *.deb
     elif [[ "$target_artifacts" == "kernel" ]];then
-        sudo dpkg -i linux-headers* linux-image*
+        sudo dpkg -i *headers* *image*
     fi
     popd
     
@@ -62,7 +62,7 @@ prepare_vm_centos() {
     if [[ "$target_artifacts" == "all" ]];then
         sudo rpm -ivh *.rpm 
     elif [[ "$target_artifacts" == "kernel" ]];then
-        sudo rpm -ivh kernel* --force --nodeps
+        sudo rpm -ivh *kernel* --force --nodeps
     fi
     popd
     sudo sed -i 's%GRUB_DEFAULT=.*%GRUB_DEFAULT=0%' /etc/default/grub
