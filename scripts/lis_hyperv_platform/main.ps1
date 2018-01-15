@@ -147,6 +147,38 @@ function Get-Lisa {
     return ".\lis-test\WS2012R2\lisa\ssh\demo_id_rsa"
 }
 
+function Get-Dependencies {
+    param(
+        [string] $keyPath ,
+        [string] $xmlTest
+    )
+    if ( Test-Path $keyPath ){
+        cp "$keyPath" ".\lis-test\WS2012R2\lisa\ssh"
+    }
+    $keyName = ([System.IO.Path]::GetFileName($keyPath))
+    if ( Test-Path $xmlTest ){
+        cp $xmlTest ".\lis-test\WS2012R2\lisa\xml"
+        $xmlName = ([System.IO.Path]::GetFileName($xmlTest))
+    } else {
+        $xmlName = $xmlTest
+    }
+    return ($keyName, $xmlName)
+}
+
+function Edit-XmlTest {
+    param(
+        [string] $vmName ,
+        [string] $xmlName ,
+        [string] $keyName
+    )
+    pushd ".\lis-test\WS2012R2\lisa\xml"
+    $xml = [xml](Get-Content $xmlName)
+    $xml.config.VMs.vm.vmName = $vmName
+    $xml.config.VMs.vm.sshKey = $keyName
+    $xml.Save("$pwd\$xmlName")
+    popd
+}
+
 function Main {
     $jobPath = Join-Path $WorkingDirectory $JobId
     Write-Host "Mounting the kernel share..."
@@ -208,7 +240,30 @@ function Main {
     $JobManager.RemoveTopic($InstanceName)
 
     Write-Host "Starting LISA run..."
-    & "$scriptPath\lisa_run.ps1" -WorkDir "." -VMName $InstanceName -KeyPath "demo_id_rsa.ppk" -XmlTest $XmlTest
+    $keyPath = "demo_id_rsa.ppk"
+    ($KeyName, $XmlName) = Get-Dependencies $keyPath $XmlTest
+    Edit-XmlTest $InstanceName $XmlName $KeyName
+    pushd ".\lis-test\WS2012R2\lisa\"
+    Write-Host "Started running LISA"
+    try {
+        & .\lisa.ps1 run xml\$XmlName -dbg 3
+        if ($LASTEXITCODE) {
+            throw "Failed running LISA with exit code: ${LASTEXITCODE}"
+        } else {
+            Write-Host "Finished running LISA with exit code: ${LASTEXITCODE}"
+        }
+    } catch {
+        throw $_
+    } finally {
+        $parentProcessPid = $PID
+        $children = Get-WmiObject WIN32_Process | where `
+            {$_.ParentProcessId -eq $parentProcessPid -and $_.Name -ne "conhost.exe"}
+        foreach ($child in $children) {
+            Stop-Process -Force $child.Handle -Confirm:$false `
+                         -ErrorAction SilentlyContinue
+        }
+        popd
+    }
 }
 
 Main
