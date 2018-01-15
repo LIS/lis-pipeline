@@ -547,7 +547,7 @@ function build_debian (){
         pushd "${base_dir}/perf/"
         build_dir="linux-perf_${kernel_version}"
         if [[ "$PACKAGE_PREFIX" != "" ]];then
-            build_dir="${PACKAGE_PREFIX}-${build_dir}"
+            build_dir="${PACKAGE_PREFIX}-perf_${kernel_version}"
         fi
         dpkg-deb --build "$build_dir"
         popd
