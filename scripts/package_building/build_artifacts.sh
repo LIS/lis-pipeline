@@ -727,8 +727,13 @@ function clean_env_rhel (){
     #
     base_dir="$1"
     
-    if [[ -d "$BASE_DIR" ]];then
-        rm -rf "${BASE_DIR}/"*
+    if [[ -d "${base_dir}/perf" ]];then
+        sudo chown -R $(whoami) "${base_dir}/perf"
+        sudo chown $(whoami) "${base_dir}"
+    fi
+
+    if [[ -d "$base_dir" ]];then
+        rm -rf "${base_dir}/"*
     fi
     
     if [[ -a "$HOME/.rpmmacros" ]];then
