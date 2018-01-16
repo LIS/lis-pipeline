@@ -1,18 +1,10 @@
 param(
     [parameter(Mandatory=$true)]
-    [String] $SharedStoragePath,
-    [parameter(Mandatory=$true)]
-    [String] $ShareUser,
-    [parameter(Mandatory=$true)]
-    [String] $SharePassword,
-    [parameter(Mandatory=$true)]
     [String] $JobId,
     [parameter(Mandatory=$true)]
     [String] $InstanceName,
     [parameter(Mandatory=$true)]
     [String] $VHDType,
-    [parameter(Mandatory=$true)]
-    [String] $IdRSAPub,
     [parameter(Mandatory=$true)]
     [String] $XmlTest,
     [Int]    $VMCheckTimeout = 500,
@@ -20,7 +12,16 @@ param(
     [String] $QemuPath = "C:\bin\qemu-img.exe",
     [String] $UbuntuImageURL = "https://cloud-images.ubuntu.com/xenial/current/xenial-server-cloudimg-amd64-disk1.img",
     [String] $CentosImageURL = "https://cloud.centos.org/centos/7/images/CentOS-7-x86_64-GenericCloud.qcow2",
-    [String] $KernelVersionPath = "scripts\package_building\kernel_versions.ini"
+    [String] $KernelVersionPath = "scripts\package_building\kernel_versions.ini",
+    [switch] $LISAManageVMS,
+    [String] $OsVersion,
+    [String] $LISAImagesShareUrl,
+    [String] $AzureToken,
+    [String] $AzureUrl,
+    [String] $SharedStoragePath,
+    [String] $ShareUser,
+    [String] $SharePassword,
+    [String] $IdRSAPub
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,8 +45,10 @@ function Mount-Share {
     # "Unavailable" state and need to be removed, as they cannot be
     # accessed anymore.
     $smbMappingsUnavailable = Get-SmbMapping -RemotePath $SharedStoragePath `
-        -ErrorAction SilentlyContinue | Where-Object {$_.Status -eq "Unavailable"}
+        -ErrorAction SilentlyContinue | `
+        Where-Object {$_.Status -ne "Ok"}
     if ($smbMappingsUnavailable) {
+        Write-Host "Removing $smbMappingsUnavailable"
         foreach ($smbMappingUnavailable in $smbMappingsUnavailable) {
             net use /delete $smbMappingUnavailable.LocalPath
         }
@@ -54,6 +57,7 @@ function Mount-Share {
     $mountPoint = $null
     $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
     if ($smbMapping) {
+        Write-Host "Available SMB mappings are: $smbMapping"
         if ($smbMapping.LocalPath -is [array]){
             return $smbMapping.LocalPath[0]
         } else {
@@ -63,11 +67,12 @@ function Mount-Share {
     for ([byte]$c = [char]'G'; $c -le [char]'Z'; $c++) {
         $mountPoint = [char]$c + ":"
         try {
+            Write-Host "Trying mount point: $mountPoint"
             net.exe use $mountPoint $SharedStoragePath /u:"AZURE\$ShareUser" "$SharePassword" | Out-Null
             if ($LASTEXITCODE) {
                 throw "Failed to mount share $SharedStoragePath to $mountPoint."
             } else {
-                Write-Host "Successfully monted SMB share on $mountPoint"
+                Write-Host "Successfully mounted SMB share on $mountPoint"
                 return $mountPoint
             }
         } catch {
@@ -134,13 +139,13 @@ function Wait-VMReady {
 
 function Get-Lisa {
     $puttyBinaries = "https://the.earth.li/~sgtatham/putty/0.70/w32/putty.zip"
-    if ( Test-Path .\lis-test ) {
-        rm -Recurse -Force .\lis-test
+    if (Test-Path ".\lis-test") {
+        rm -Recurse -Force ".\lis-test"
     }
     git clone https://github.com/LIS/lis-test.git
     Invoke-WebRequest -Uri $puttyBinaries -OutFile "PuttyBinaries.zip"
     if ($LastExitCode) {
-        throw "Failed to download Putty binaries"
+        throw "Failed to download Putty binaries."
     }
     Expand-Archive ".\PuttyBinaries.zip" ".\lis-test\WS2012R2\lisa\bin"
 
@@ -165,88 +170,115 @@ function Get-Dependencies {
     return ($keyName, $xmlName)
 }
 
-function Edit-XmlTest {
+function Edit-TestXML {
     param(
-        [string] $vmName ,
-        [string] $xmlName ,
-        [string] $keyName
+        [string] $Path,
+        [string] $VMPrefix,
+        [string] $KeyName
     )
     pushd ".\lis-test\WS2012R2\lisa\xml"
-    $xml = [xml](Get-Content $xmlName)
-    $xml.config.VMs.vm.vmName = $vmName
-    $xml.config.VMs.vm.sshKey = $keyName
-    $xml.Save("$pwd\$xmlName")
+    $xmlFullPath = Join-Path $PWD $Path
+    if (!(Test-Path $xmlFullPath)) {
+        throw "Test XML $xmlFullPath does not exist."
+    }
+    $xml = [xml](Get-Content $xmlFullPath)
+    $index = 0
+    if ($xml.config.VMs.vm -is [array]) {
+        foreach ($vmDef in $xml.config.VMs.vm) {
+            $xml.config.VMS.vm[$index].vmName = $VMPrefix + $vmDef.vmName
+            if ($KeyName) {
+                $xml.config.VMS.vm[$index].sshKey = $KeyName
+            }
+            $index = $index + 1
+        }
+    } else {
+        $xml.config.VMS.vm.vmName = $VMPrefix + $xml.config.VMS.vm.vmName
+        if ($KeyName) {
+            $xml.config.VMS.vm.sshKey = $KeyName
+        }
+    }
+    $xml.Save($xmlFullPath)
     popd
 }
 
 function Main {
-    $jobPath = Join-Path $WorkingDirectory $JobId
-    Write-Host "Mounting the kernel share..."
-    $mountPoint = Mount-Share -SharedStoragePath $SharedStoragePath `
-                              -ShareUser $ShareUser -SharePassword $SharePassword
     $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
-    $kernelPath = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
+    $kernelFolder = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
     $kernelTag = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "git_tag"
-    if (!$kernelPath -or !$kernelTag) {
+    if (!$kernelFolder -or !$kernelTag) {
         throw "Kernel folder cannot be empty."
     }
-    Write-Host "Using kernel folder name: $kernelPath."
-    $kernelPath = Join-Path $mountPoint $KernelPath
-    Assert-PathExists $kernelPath
+    $jobPath = Join-Path -Path (Resolve-Path $WorkingDirectory) -ChildPath $JobId
+    New-Item -Path $jobPath -Type "Directory" -Force
 
-    if (!(Test-Path $WorkingDirectory)) {
-        New-Item -Path $jobPath -Type Directory -Force | Out-Null
-    }
-    $WorkingDirectory = Resolve-Path $WorkingDirectory
-    New-Item -Path $jobPath -Type "Directory" -Force | Out-Null
+    if ($LISAManageVMS) {
+        Write-Host "Getting the proper VHD folder name for LISA with ${OsVersion} and ${kernelPath} and ${kernelTag}"
+        $imageFolder = Join-Path $LISAImagesShareUrl ("{0}\{0}_{1}" -f @($VHDType, $OsVersion))
+        ls $imageFolder
+        Write-Host "Getting LISA code..."
+        $idRSAPriv = Get-Lisa
+        Write-Host "Copying private keys"
+        Copy-Item -Force -Path "C:\bin\*.ppk" -Destination ".\lis-test\WS2012R2\lisa\ssh\"
+        Edit-TestXML -Path $XmlTest -VMPrefix $InstanceName
+    } else {
+        Write-Host "Using kernel folder name: $kernelFolder from $mountPoint."
+        Get-PSDrive | Out-Null
+        $kernelPath = Join-Path -Path $mountPoint -ChildPath $kernelFolder
+        Write-Host "Using $kernelPath ..."
+        Assert-PathExists $kernelPath
 
-    $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath
+        Write-Host "Mounting the kernel share..."
+        $mountPoint = Mount-Share -SharedStoragePath $SharedStoragePath `
+                              -ShareUser $ShareUser -SharePassword $SharePassword
+        $vhdPath = Get-VHD -VHDType $VHDType -JobPath $jobPath
 
-    $bootLogDirWorkspace = Join-Path (Join-Path $env:Workspace $JobId) "bootlogs"
-    New-Item -Type Directory $bootLogDirWorkspace
-    $bootLogPath = Join-Path $bootLogDirWorkspace "COM.LOG"
-    $scriptBlock = {
-        param($InstanceName, $BootLogPath)
-        & icaserial.exe READ "\\localhost\pipe\$InstanceName" | Out-File $BootLogPath
-    }
-    $argumentList = @($InstanceName, $BootLogPath)
-    $JobManager = [PSJobManager]::new()
-    $JobManager.AddJob($InstanceName, $scriptBlock, $argumentList, $())
-
-    Write-Host "Creating the VM required for LISA to run..."
-    & (Join-Path "$scriptPath" "setup_env.ps1") -JobPath $jobPath -VHDPath $vhdPath `
-        -KernelPath $kernelPath -InstanceName $InstanceName -IdRSAPub $IdRSAPub `
-        -VHDType $VHDType
-    if ($LastExitCode) {
-        Write-Host $Error[0]
-        throw "Creating the LISA VM failed."
-    }
-
-    $idRSAPriv = Get-Lisa
-    $ip = Wait-VMReady $InstanceName $VMCheckTimeout
-
-    Execute-WithRetry {
-        $kernelRevision = & ssh.exe -i $idRSAPriv -o StrictHostKeyChecking=no `
-                                    -o ConnectTimeout=10 "root@$ip" "uname -r"
-        if ($LASTEXITCODE) {
-            throw "Ssh connection failed with error code: $LASTEXITCODE"
+        $bootLogDirWorkspace = Join-Path (Join-Path $env:Workspace $JobId) "bootlogs"
+        New-Item -Type Directory $bootLogDirWorkspace
+        $bootLogPath = Join-Path $bootLogDirWorkspace "COM.LOG"
+        $scriptBlock = {
+            param($InstanceName, $BootLogPath)
+            & icaserial.exe READ "\\localhost\pipe\$InstanceName" | Out-File $BootLogPath
         }
-        if ($kernelRevision -like "*$kernelTag*") {
-            Write-Host "Kernel $kernelRevision matched"
-        } else {
-            throw "Could not find the kernel: $kernelTag"
-        }
-    }
-    $JobManager.RemoveTopic($InstanceName)
+        $argumentList = @($InstanceName, $BootLogPath)
+        $JobManager = [PSJobManager]::new()
+        $JobManager.AddJob($InstanceName, $scriptBlock, $argumentList, $())
 
-    Write-Host "Starting LISA run..."
-    $keyPath = "demo_id_rsa.ppk"
-    ($KeyName, $XmlName) = Get-Dependencies $keyPath $XmlTest
-    Edit-XmlTest $InstanceName $XmlName $KeyName
+        Write-Host "Creating the VM required for LISA to run..."
+        & (Join-Path "$scriptPath" "setup_env.ps1") -JobPath $jobPath -VHDPath $vhdPath `
+            -KernelPath $kernelPath -InstanceName $InstanceName -IdRSAPub $IdRSAPub `
+            -VHDType $VHDType
+        if ($LastExitCode) {
+            Write-Host $Error[0]
+            throw "Creating the LISA VM failed."
+        }
+
+        $idRSAPriv = Get-Lisa
+        $ip = Wait-VMReady $InstanceName $VMCheckTimeout
+
+        Execute-WithRetry {
+            $kernelRevision = & ssh.exe -i $idRSAPriv -o StrictHostKeyChecking=no `
+                                        -o ConnectTimeout=10 "root@$ip" "uname -r"
+            if ($LASTEXITCODE) {
+                throw "Ssh connection failed with error code: $LASTEXITCODE"
+            }
+            if ($kernelRevision -like "*$kernelTag*") {
+                Write-Host "Kernel $kernelRevision matched"
+            } else {
+                throw "Could not find the kernel: $kernelTag"
+            }
+        }
+        $JobManager.RemoveTopic($InstanceName)
+        Write-Host "Starting LISA run..."
+        $keyPath = "demo_id_rsa.ppk"
+        ($KeyName, $XmlTest) = Get-Dependencies $keyPath $XmlTest
+        Edit-TestXML $XmlTest $InstanceName $KeyName
+    }
+
     pushd ".\lis-test\WS2012R2\lisa\"
     Write-Host "Started running LISA"
     try {
-        & .\lisa.ps1 run xml\$XmlName -dbg 3
+        $lisaParams = ("SHARE_URL='{0}';AZURE_TOKEN='{1}';KERNEL_FOLDER='{2}'" -f @($AzureUrl, $AzureToken, $kernelFolder))
+        & .\lisa.ps1 -cmdVerb run -cmdNoun ".\xml\${XmlTest}" -dbgLevel 6 -CLImageStorDir $imageFolder -testParams $lisaParams
         if ($LASTEXITCODE) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
         } else {
