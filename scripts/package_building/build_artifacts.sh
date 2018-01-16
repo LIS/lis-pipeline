@@ -138,13 +138,12 @@ function get_sources_git (){
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
-    git_params="$source_path"
     if [[ "$clone_depth" != "" ]];then
-        git_params="$git_params --depth $clone_depth"
+        git_params="--depth $clone_depth"
     fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
-        git clone "$git_params" > /dev/null
+        git clone $git_params  "$source_path" > /dev/null
     fi
     pushd "$source"
     git reset --hard > /dev/null
@@ -623,9 +622,10 @@ function build_kernel (){
     build_date="$8"
     folder_prefix="$9"
     package_prefix="${10}"
+    clone_depth="${11}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
+    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth)"
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
     KERNEL_TAG=$(git log -1 --pretty=format:"%h")
@@ -766,6 +766,7 @@ function main {
     BUILD_DATE="$(date +'%d%m%Y')"
     FOLDER_PREFIX="msft"
     SOURCE_TYPE=""
+    CLONE_DEPTH=""
     
     while true;do
         case "$1" in
@@ -880,7 +881,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
