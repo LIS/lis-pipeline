@@ -134,19 +134,20 @@ function get_sources_git (){
     source_path="$2"
     git_branch="$3"
     clone_depth="$4"
+    patches="$5"
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
     if [[ "$clone_depth" != "" ]];then
-        git_params="--depth $clone_depth"
+        git_params="--depth $clone_depth --no-single-branch"
     fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
         git clone $git_params  "$source_path" > /dev/null
     fi
     pushd "$source"
-    git reset --hard > /dev/null
+    git reset --hard HEAD~1 > /dev/null
     git fetch > /dev/null
     # Note(avladu): the checkout to master is needed to
     # get from a detached HEAD state
@@ -155,6 +156,9 @@ function get_sources_git (){
     git pull > /dev/null
     popd
     popd
+    if [[ $patches != "" ]]; then
+        patch_kernel "$patches" "$source"
+    fi
     echo "$source"
 }
 
@@ -495,6 +499,27 @@ function prepare_perf_debian (){
     fi
 }
 
+function patch_kernel() {
+    local patches; local kernel_path
+    patches="$1"
+    kernel_path="$2"
+
+    cp "$patches" "$kernel_path"
+    pushd "$kernel_path"
+    for patch in $(cat $patches); do
+        curl -s "$patch" | patch -f -p1 > /dev/null #2>&1
+        if [[ $? -ne 0 ]]; then
+            echo "Patch failed, looking for error files"
+            find . -name "*.rej" | xargs cat
+            exit 1
+        fi
+    done
+
+    git add ${patches##*/}
+    git commit -m "patches: $(tail -1 ${patches})" > /dev/null
+    popd
+}
+
 function build_debian (){
     #
     # Building the kernel or daemons for deb based OSs
@@ -623,9 +648,11 @@ function build_kernel (){
     folder_prefix="$9"
     package_prefix="${10}"
     clone_depth="${11}"
+    patches="${12}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth)"
+    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth $patches)"
+
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
     KERNEL_TAG=$(git log -1 --pretty=format:"%h")
@@ -767,6 +794,7 @@ function main {
     FOLDER_PREFIX="msft"
     SOURCE_TYPE=""
     CLONE_DEPTH=""
+    PATCHES=""
     
     while true;do
         case "$1" in
@@ -817,6 +845,9 @@ function main {
                 shift 2;;
             --artifacts_folder_prefix)
                 FOLDER_PREFIX="$2"
+                shift 2;;
+            --patch_file)
+                PATCHES="$2"
                 shift 2;;
             --build_date)
                 # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
@@ -881,7 +912,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
