@@ -93,11 +93,10 @@ function build_kernel_metapackages_deb () {
 
     pushd "$artifacts_dir"
     filename=$(find . -name "linux-image*" | head -1)
-    kernel_abi=$(basename $filename | gawk '{n=split($$0,v,"-"); print v[4];}')
     popd
 
-    kernel_version="$kernel_version-$kernel_abi"
-    kernel_version="$kernel_version-g$kernel_git_commit"
+    kernel_version="$kernel_version"
+    kernel_version="$kernel_version-$kernel_git_commit"
     changelog_loc=$(readlink -f $(find ./kernel_metapackages -name changelog))
     debian_rules_loc=$(readlink -f $(find ./kernel_metapackages -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
@@ -187,13 +186,19 @@ function prepare_kernel_debian (){
     # Make kernel config file 
     #
     source="$1"
+    package_prefix="$2"
+    git_tag="$3"
+    dep_path="$4"
     
-    pushd "$source"  
+    pushd "$source"
+    kernel_version="$(make kernelversion)"
     if [[ -e "$KERNEL_CONFIG" ]]&&[[ "$KERNEL_CONFIG" != ".config" ]];then
         cp "$KERNEL_CONFIG" .config
     else
         make olddefconfig
     fi
+    cp "$dep_path/setlocalversion" ./scripts
+    sed -i -e "s/%version%/-${git_tag}/g" ./scripts/setlocalversion
     touch REPORTING-BUGS
     popd
 }
@@ -477,7 +482,9 @@ function prepare_perf_debian (){
         mkdir "./usr"
         dirs=(bin lib64 libexec)
         for dir in ${dirs[@]};do
-            for file in $(ls ./$dir);do
+            files=$(ls ./$dir)
+            IFS=$'\n' files=($files)
+            for file in ${files[@]};do
                 mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
             done
         done
@@ -532,6 +539,7 @@ function build_debian (){
     build_date="$6"
     kernel_version_local="$7"
     kernel_git_commit="$8"
+    additions_folder="$9"
 
     artifacts_dir="${base_dir}/${build_state}/"
     if [[ -d "$artifacts_dir" ]];then
@@ -541,14 +549,13 @@ function build_debian (){
     fi
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        params="--rootcmd fakeroot --initrd  --revision $build_date -j$thread_number kernel_image kernel_headers kernel_source kernel_debug"
+        params="--rootcmd fakeroot --initrd  --revision $build_date -j$thread_number"
         if [[ "$PACKAGE_PREFIX" != "" ]];then
             params="--stem $PACKAGE_PREFIX $params"
+        elif [[ -e "$additions_folder/changelog" ]];then
+            params="--overlay-dir $additions_folder $params"
         fi
-        if [[ "$kernel_git_commit" != "" ]];then
-            params="--append-to-version -$kernel_git_commit $params"
-        fi
-        make-kpkg $params
+        make-kpkg $params kernel_image kernel_headers kernel_source kernel_debug
         popd
         build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
     elif [[ "$build_state" == "daemons" ]];then
@@ -649,6 +656,7 @@ function build_kernel (){
     package_prefix="${10}"
     clone_depth="${11}"
     patches="${12}"
+    dep_path="${13}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth $patches)"
@@ -660,9 +668,13 @@ function build_kernel (){
     GIT_TAG="$(get_git_tag $source HEAD 7)"
     GIT_TAG12="$(get_git_tag $source HEAD 12)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
-    prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12"
+    additions_folder="${base_dir}/kernel/additions"
+    if [[ "$os_FAMILY" == "debian" ]];then
+        create_deb_changelog "$source" "$additions_folder" "linux-source" "${KERNEL_VERSION}-${GIT_TAG12}" 2> /dev/null
+    fi
+    prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
-	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$package_prefix"
+	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$additions_folder"
     DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
     DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
     echo "Updating the kernel build information for later usage."
@@ -912,7 +924,7 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
