@@ -14,8 +14,9 @@ pipeline {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
-    string(defaultValue: "x2", description: 'How many cores to use', name: 'THREAD_NUMBER')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
+    string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for Ubuntu, 7.4 for CentOS). Used only if LISA manages VM creation', name: 'OS_VERSION')
+    string(defaultValue: "kernel_pipeline_fvt.xml", description: 'LISA xml test definition name', name: 'LISA_TEST_XML')
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_azure_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -28,6 +29,7 @@ pipeline {
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
+    THREAD_NUMBER = 'x3'
   }
   options {
     overrideIndexTriggers(false)
@@ -38,7 +40,7 @@ pipeline {
     }
   }
   stages {
-          stage('Build Ubuntu') {
+          stage('build_artifacts_ubuntu') {
               when {
                 expression { params.OS_TYPE == 'ubuntu' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
@@ -83,7 +85,7 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
           }
-          stage('Build CentOS') {
+          stage('build_artifacts_centos') {
               when {
                 expression { params.OS_TYPE == 'centos' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
@@ -127,7 +129,7 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
     }
-    stage('Temporary Artifacts Publish') {
+    stage('publish_temp_artifacts') {
       when {
         expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
       }
@@ -156,7 +158,7 @@ pipeline {
         }
       }
     }
-    stage('Boot Validation') {
+    stage('boot_test') {
       when {
         expression { params.ENABLED_STAGES.contains('boot_test') }
       }
@@ -203,7 +205,7 @@ pipeline {
         }
       }
     }
-    stage('Validated Artifacts Publish') {
+    stage('publish_artifacts') {
       when {
         expression { params.ENABLED_STAGES.contains('publish_artifacts') }
       }
@@ -231,10 +233,11 @@ pipeline {
         }
       }
     }
-    stage('Publish Azure VHD') {
+    stage('publish_azure_vhd') {
       when {
-                expression { params.ENABLED_STAGES.contains('validation') }
-                expression { params.ENABLED_STAGES.contains('azure') }
+        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
+        expression { params.ENABLED_STAGES.contains('validation') }
+        expression { params.ENABLED_STAGES.contains('azure') }
       }
       agent {
         node {
@@ -268,12 +271,12 @@ pipeline {
         }
       }
     }
-    stage('Functional Tests') {
+    stage('validation') {
      when {
       expression { params.ENABLED_STAGES.contains('validation') }
      }
      parallel {
-      stage('LISA') {
+      stage('validation_functional_hyperv') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
           }
@@ -283,11 +286,9 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                                       string(credentialsId: 'WIN_SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                       usernamePassword(credentialsId: 'smb_share_user_pass',
-                                                        passwordVariable: 'PASSWORD',
-                                                        usernameVariable: 'USERNAME')]) {
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL')]) {
                 echo 'Running LISA...'
                 dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                     unstash 'kernel_version_ini'
@@ -296,13 +297,13 @@ pipeline {
                 PowerShellWrapper('''
                     & ".\\scripts\\lis_hyperv_platform\\main.ps1"
                         -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
-                        -SharedStoragePath "${env:SMB_SHARE_URL}\\${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
-                        -ShareUser $env:USERNAME -SharePassword $env:PASSWORD
                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
-                        -IdRSAPub "C:\\bin\\id_rsa.pub"
-                        -XmlTest kernel_pipeline_fvt.xml
+                        -OSVersion "${env:OS_VERSION}" -LISAManageVMS:$true
+                        -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
+                        -AzureToken "${env:AZURE_SAS}"
+                        -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
                   ''')
                 echo 'Finished running LISA.'
               }
@@ -321,7 +322,7 @@ pipeline {
             }
           }
         }
-        stage('Azure-Functional') {
+        stage('validation_functional_azure') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
           }
@@ -376,7 +377,7 @@ pipeline {
             }
           }
         }
-        stage('Azure-Performance-Network') {
+        stage('validation_perf_azure_net') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
           }
@@ -478,7 +479,7 @@ pipeline {
             }
           }
         }
-        stage('Azure-Performance-Storage') {
+        stage('validation_perf_azure_stor') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
           }
@@ -519,7 +520,7 @@ pipeline {
             }
           }
         }
-        stage('Performance On Hyper-V') {
+        stage('validation_perf_hyperv') {
           when {
             expression { params.OS_TYPE == 'centos' }
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
