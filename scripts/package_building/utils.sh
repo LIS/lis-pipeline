@@ -343,7 +343,7 @@ create_deb_changelog() {
     pushd "$repo"
     tags=$(git tag --sort version:refname | grep -i -B 1 $(git describe --tags --abbrev=0))
     IFS=$'\n' tags=($tags)
-    commit_ids=$(git log HEAD...${tags[1]} --pretty=format:"%h")
+    commit_ids=$(git log HEAD...${tags[0]} --pretty=format:"%h")
     IFS=$'\n' commit_ids=($commit_ids)
     for i in ${commit_ids[@]};do
         git_entry=$(git show $i)
