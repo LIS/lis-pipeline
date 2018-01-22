@@ -13,8 +13,8 @@ pipeline {
   parameters {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
+    string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for ubuntu, 7.4 for centos)', name: 'OS_VERSION')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
-    string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for Ubuntu, 7.4 for CentOS). Used only if LISA manages VM creation', name: 'OS_VERSION')
     string(defaultValue: "kernel_pipeline_fvt.xml", description: 'LISA xml test definition name', name: 'LISA_TEST_XML')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_azure_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
