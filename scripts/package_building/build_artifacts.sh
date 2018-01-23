@@ -669,8 +669,9 @@ function build_kernel (){
     GIT_TAG12="$(get_git_tag $source HEAD 12)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
     additions_folder="${base_dir}/kernel/additions"
+    # Note(mbivolan): Continue if changelog creation fails, as it is a non-critical artifact
     if [[ "$os_FAMILY" == "debian" ]];then
-        create_deb_changelog "$source" "$additions_folder" "linux-source" "${KERNEL_VERSION}-${GIT_TAG12}" 2> /dev/null
+        create_deb_changelog "$source" "$additions_folder" "linux-source" "${KERNEL_VERSION}-${GIT_TAG12}" 2> /dev/null || true
     fi
     prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
