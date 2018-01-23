@@ -19,7 +19,7 @@ pipeline {
     string(defaultValue: "", description: 'Timestamp for artifacts build.', name: 'TIMESTAMP')
     string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for Ubuntu, 7.4 for CentOS). Used only if LISA manages VM creation', name: 'OS_VERSION')
     string(defaultValue: "kernel_pipeline_bvt.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -41,7 +41,7 @@ pipeline {
     }
   }
   stages {
-          stage('Build Ubuntu') {
+          stage('build_artifacts_ubuntu') {
               when {
                 expression { params.OS_TYPE == 'ubuntu' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
@@ -86,7 +86,7 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
           }
-          stage('Build CentOS') {
+          stage('build_artifacts_centos') {
               when {
                 expression { params.OS_TYPE == 'centos' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
@@ -131,7 +131,7 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
     }
-    stage('Temporary Artifacts Publish') {
+    stage('publish_temp_artifacts') {
       when {
         expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
       }
@@ -161,7 +161,7 @@ pipeline {
         }
       }
     }
-    stage('Boot Validation') {
+    stage('boot_test') {
       when {
         expression { params.ENABLED_STAGES.contains('boot_test') }
       }
@@ -207,7 +207,7 @@ pipeline {
         }
       }
     }
-    stage('Validated Artifacts Publish') {
+    stage('publish_artifacts') {
       when {
         expression { params.ENABLED_STAGES.contains('publish_artifacts') }
       }
@@ -236,12 +236,9 @@ pipeline {
         }
       }
     }
-    stage('Functional Tests') {
-     when {
-      expression { params.ENABLED_STAGES.contains('validation') }
-     }
+    stage('validation') {
      parallel {
-      stage('LISA') {
+      stage('validation_functional_hyperv') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
           }
@@ -289,7 +286,7 @@ pipeline {
             }
           }
         }
-        stage('Azure') {
+        stage('validation_functional_azure') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
           }
@@ -302,7 +299,7 @@ pipeline {
             echo "NOOP Azure test."
           }
         }
-        stage('Performance On Hyper-V') {
+        stage('validation_perf_hyperv') {
           when {
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
           }
