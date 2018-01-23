@@ -9,11 +9,10 @@ pipeline {
     parameters {
         string(defaultValue: "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git", description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
         string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
-        string(defaultValue: "", description: 'URL to patch to be applied to the kernel', name: 'KERNEL_PATCH')
+        string(defaultValue: "", description: 'URL to raw patch file. Use space separator for multiple URLs', name: 'KERNEL_PATCH')
         string(defaultValue: "kernel_pipeline_bvt.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
-        string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for Ubuntu, 7.4 for CentOS). Used only if LISA manages VM creation', name: 'OS_VERSION')
         string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
-            description: 'What stages to run', name: 'ENABLED_STAGES')
+            description: 'What stages to run. By default all stages are enabled', name: 'ENABLED_STAGES')
     }
     environment {
         KERNEL_ARTIFACTS_PATH = 'dev-patch-kernels'
@@ -26,6 +25,7 @@ pipeline {
         BUILD_NAME = 'd'
         FOLDER_PREFIX = 'dev'
         OS_TYPE = 'ubuntu'
+        OS_VERSION = '16.04.3'
         THREAD_NUMBER = 'x3'
         CLONE_DEPTH = '1'
     }
