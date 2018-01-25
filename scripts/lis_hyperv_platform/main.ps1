@@ -278,6 +278,9 @@ function Main {
     Write-Host "Started running LISA"
     try {
         $lisaParams = ("SHARE_URL='{0}';AZURE_TOKEN='{1}';KERNEL_FOLDER='{2}'" -f @($AzureUrl, $AzureToken, $kernelFolder))
+        # Note(avladu): Lisa requires ErrorActionPreference = Continue, otherwise it will fail to
+        # run all the tests.
+        $ErrorActionPreference = "Continue"
         & .\lisa.ps1 -cmdVerb run -cmdNoun ".\xml\${XmlTest}" -dbgLevel 6 -CLImageStorDir $imageFolder -testParams $lisaParams
         if ($LASTEXITCODE) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
