@@ -798,91 +798,125 @@ function main {
         var_value="${info#*=}"
         declare $var_name="$var_value"
     done
-    
+
     BASE_DIR="$(pwd)/temp_build"
     DEP_PATH="$(pwd)/deps-lis/${os_PACKAGE}"
     INI_FILE="$(pwd)/kernel_versions.ini"
-    USE_CCACHE="False"
-    GIT_BRANCH="master"
-    CLEAN_ENV="False"
-    DOWNLOAD_METHOD=""
-    THREAD_NUMBER="2"
-    INSTALL_DEPS="True"
-    DEBIAN_OS_VERSION="${os_RELEASE%.*}"
-    KERNEL_CONFIG="./Microsoft/config-azure"
-    DEFAULT_BRANCH="stable"
-    GIT_TAG=""
+
+    # Mandatory:
+    THREAD_NUMBER='2'
+
+    # Optional:
+    GIT_BRANCH='master'
+    KERNEL_CONFIG='./Microsoft/config-azure'
+    DEFAULT_BRANCH='stable'
+    FOLDER_PREFIX='msft'
     BUILD_DATE="$(date +'%d%m%Y')"
-    FOLDER_PREFIX="msft"
-    SOURCE_TYPE=""
-    CLONE_DEPTH=""
-    PATCHES=""
+    DEBIAN_OS_VERSION="${os_RELEASE%.*}"
+
+    # Flags:
+    USE_CCACHE='False'
+    CLEAN_ENV='False'
+    INSTALL_DEPS='False'
+
+    TEMP=$(getopt -o q:w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:lzxc --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,source_type:,build_date:,clone_depth:,patch_file:,use_ccache,clean_env,install_deps,use_kernel_folder_prefix -n 'test_params.sh' -- "$@")
+    if [[ $? -ne 0 ]]; then
+        exit 1
+    fi
+
+    echo $TEMP
+
+    eval set -- "$TEMP"
     
-    while true;do
+    while true ; do
         case "$1" in
             --git_url)
-                DOWNLOAD_METHOD="git"
-                SOURCE_PATH="$2" 
-                shift 2;;
+                case "$2" in
+                    "") shift 2 ;;
+                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='git' ; shift 2 ;;
+                esac ;;
             --git_branch)
-                GIT_BRANCH="$2" 
-                shift 2;;
+                case "$2" in
+                    "") shift 2 ;;
+                    *) GIT_BRANCH="$2" ; shift 2 ;;
+                esac ;;
             --archive_url)
-                DOWNLOAD_METHOD="http"
-                SOURCE_PATH="$2" 
-                shift 2;;
+                case "$2" in
+                    "") shift 2 ;;
+                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='http' ;  shift 2 ;;
+                esac;;
             --local_path)
-                DOWNLOAD_METHOD="local"
-                SOURCE_PATH="$2" 
-                shift 2;;
-            --use_ccache)
-                USE_CCACHE="$2" 
-                shift 2;;
-            --clean_env)
-                CLEAN_ENV="$2" 
-                shift 2;;
-            --destination_path)
-                DESTINATION_PATH="$2" 
-                shift 2;;
+                case "$2" in
+                    "") shift 2 ;;
+                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='local' shift 2 ;;
+                esac;;
             --build_path)
-                BASE_DIR="$2"
-                shift 2;;
-            --mount_destination)
-                MOUNT_DESTINATION="$2" 
-                shift 2;;
-            --thread_number)
-                THREAD_NUMBER="$2" 
-                shift 2;;
+                case "$2" in
+                    "") BASE_DIR="$(pwd)/temp_build" ; shift 2 ;;
+                    *) BASE_DIR="$2" ; shift 2 ;;
+                esac;;
             --debian_os_version)
-                DEBIAN_OS_VERSION="$2" 
-                shift 2;;
-            --install_deps)
-                INSTALL_DEPS="$2"
-                shift 2;;
-            --kernel_config)
-                KERNEL_CONFIG="$2"
-                shift 2;;
-            --clone_depth)
-                CLONE_DEPTH="$2"
-                shift 2;;
+                case "$2" in
+                    "") DEBIAN_OS_VERSION="${os_RELEASE%.*}" ; shift 2 ;;
+                    *) DEBIAN_OS_VERSION="$2" ; shift 2;;
+                esac;;
             --artifacts_folder_prefix)
-                FOLDER_PREFIX="$2"
-                shift 2;;
-            --patch_file)
-                PATCHES="$2"
-                shift 2;;
+                case "$2" in
+                    "") FOLDER_PREFIX='msft' ; shift 2 ;;
+                    *) FOLDER_PREFIX="$2" ; shift 2 ;;
+                esac;;
+            --thread_number)
+                case "$2" in
+                    "") THREAD_NUMBER='2' ; shift 2 ;;
+                    *) THREAD_NUMBER="$2" ; shift 2 ;;
+                esac;;
+            --destination_path)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) DESTINATION_PATH="$2" ; shift 2 ;;
+                esac ;;
+            --kernel_config)
+                case "$2" in
+                    "") KERNEL_CONFIG='./Microsoft/config-azure' ; shift 2 ;;
+                    *) KERNEL_CONFIG="$2" shift 2 ;;
+                esac ;;
+            --default_branch)
+                case "$2" in
+                    "") DEFAULT_BRANCH="stable" ; shift 2 ;;
+                    *) DEFAULT_BRANCH="$2" shift 2 ;;
+                esac ;;
+            --git_tag)
+                case "$2" in
+                    "") GIT_TAG="DEFAULT_VALUE" ; shift 2 ;;
+                    *) GIT_TAG="$2" shift 2 ;;
+                esac ;;
+            --source_type)
+                case "$2" in
+                    "") SOURCE_TYPE="DEFAULT_VALUE" ; shift 2 ;;
+                    *) SOURCE_TYPE="$2" shift 2 ;;
+                esac ;;
             --build_date)
                 # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
-                if [[ "$2" != "" ]];then
-                    BUILD_DATE="$2"
-                    shift
-                fi
-                shift;;
-            --use_kernel_folder_prefix)
-                USE_KERNEL_PREFIX="$2"
-                shift 2;;
-            --) shift; break ;;
-            *) break ;;
+                case "$2" in
+                    "") BUILD_DATE=$(date + '%d%m%Y') ; shift 2 ;;
+                    *) BUILD_DATE="$2" shift 2 ;;
+                esac ;;
+            --clone_depth)
+                case "$2" in
+                    "") CLONE_DEPTH="DEFAULT_VALUE" ; shift 2 ;;
+                    *) CLONE_DEPTH="$2" shift 2 ;;
+                esac ;;
+            --patch_file)
+                case "$2" in
+                    "") PATCHES="DEFAULT_VALUE" ; shift 2 ;;
+                    *) PATCHES="$2" shift 2 ;;
+                esac ;;
+            --use_ccache) USE_CCACHE='True' ; shift ;;
+            --clean_env) CLEAN_ENV='True' ; shift ;;
+            --install_deps) INSTALL_DEPS='True' ; shift ;;
+            --use_kernel_folder_prefix) USE_KERNEL_PREFIX='True' ; shift;;
+            --) shift ; break ;;
+            *) echo "Wrong parameters!" ; exit 1 ;;
         esac
     done
     
