@@ -192,10 +192,14 @@ function prepare_kernel_debian (){
     
     pushd "$source"
     kernel_version="$(make kernelversion)"
-    if [[ -e "$KERNEL_CONFIG" ]]&&[[ "$KERNEL_CONFIG" != ".config" ]];then
-        cp "$KERNEL_CONFIG" .config
-    else
-        make olddefconfig
+    if [[ "$KERNEL_CONFIG" != ".config" ]];then
+        if [[ -e "./$KERNEL_CONFIG" ]];then
+            cp "$KERNEL_CONFIG" .config
+        elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
+            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
+        else
+            make olddefconfig
+        fi
     fi
     cp "$dep_path/setlocalversion" ./scripts
     sed -i -e "s/%version%/-${git_tag}/g" ./scripts/setlocalversion
@@ -210,15 +214,20 @@ function prepare_kernel_rhel (){
     source="$1"
     package_prefix="$2"
     kernel_tag="$3"
+    dep_path="$4"
     
     pushd "${source}"
     if [[ -e "tools/hv/lis-daemon.spec" ]];then
         mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
     fi
-    if [[ -e "$KERNEL_CONFIG" ]]&&[[ "$KERNEL_CONFIG" != ".config" ]];then
-        cp "$KERNEL_CONFIG" .config
-    else
-        make olddefconfig
+    if [[ "$KERNEL_CONFIG" != ".config" ]];then
+        if [[ -e "./$KERNEL_CONFIG" ]];then
+            cp "$KERNEL_CONFIG" .config
+        elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
+            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
+        else
+            make olddefconfig
+        fi
     fi
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"

@@ -23,7 +23,7 @@ pipeline {
     KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
     UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/kernel-build-folder'
-    KERNEL_CONFIG = './Microsoft/config-azure'
+    KERNEL_CONFIG = 'Microsoft/config-azure'
     CLEAN_ENV = 'False'
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
