@@ -31,6 +31,7 @@ pipeline {
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'u'
+    CREATE_CHANGELOG='False'
   }
   options {
     overrideIndexTriggers(false)
@@ -69,6 +70,7 @@ pipeline {
                     --use_ccache "${USE_CCACHE}" \\
                     --use_kernel_folder_prefix \\
                     --build_date "${TIMESTAMP}"
+                    --create_changelog "${CREATE_CHANGELOG}"
                 popd
                 '''
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
