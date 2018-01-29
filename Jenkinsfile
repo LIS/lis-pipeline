@@ -58,16 +58,16 @@ pipeline {
                     echo "Building artifacts..."
                     pushd "$WORKSPACE/scripts/package_building"
                     bash build_artifacts.sh \\
-                        --git_url ${KERNEL_GIT_URL} \\
-                        --git_branch ${KERNEL_GIT_BRANCH} \\
+                        --git_url "${KERNEL_GIT_URL}" \\
+                        --git_branch "${KERNEL_GIT_BRANCH}" \\
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                        --install_deps True \\
-                        --thread_number ${THREAD_NUMBER} \\
-                        --debian_os_version ${UBUNTU_VERSION} \\
-                        --build_path ${BUILD_PATH} \\
-                        --kernel_config ${KERNEL_CONFIG} \\
-                        --clean_env ${CLEAN_ENV} \\
-                        --use_ccache ${USE_CCACHE}
+                        --install_deps "True" \\
+                        --thread_number "${THREAD_NUMBER}" \\
+                        --debian_os_version "${UBUNTU_VERSION}" \\
+                        --build_path "${BUILD_PATH}" \\
+                        --kernel_config "${KERNEL_CONFIG}" \\
+                        --clean_env "${CLEAN_ENV}" \\
+                        --use_ccache "${USE_CCACHE}" 
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
@@ -102,16 +102,16 @@ pipeline {
                     echo "Building artifacts..."
                     pushd "$WORKSPACE/scripts/package_building"
                     bash build_artifacts.sh \\
-                        --git_url ${KERNEL_GIT_URL} \\
-                        --git_branch ${KERNEL_GIT_BRANCH} \\
+                        --git_url "${KERNEL_GIT_URL}" \\
+                        --git_branch "${KERNEL_GIT_BRANCH}" \\
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                        --install_deps True \\
-                        --thread_number ${THREAD_NUMBER} \\
-                        --debian_os_version ${UBUNTU_VERSION} \\
-                        --build_path ${BUILD_PATH} \\
-                        --kernel_config ${KERNEL_CONFIG} \\
-                        --clean_env ${CLEAN_ENV} \\
-                        --use_ccache ${USE_CCACHE}
+                        --install_deps "True" \\
+                        --thread_number "${THREAD_NUMBER}" \\
+                        --debian_os_version "${UBUNTU_VERSION}" \\
+                        --build_path "${BUILD_PATH}" \\
+                        --kernel_config "${KERNEL_CONFIG}" \\
+                        --clean_env "${CLEAN_ENV}" \\
+                        --use_ccache "${USE_CCACHE}"
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'

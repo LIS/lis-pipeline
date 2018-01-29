@@ -59,23 +59,22 @@ pipeline {
                           pushd "$WORKSPACE/scripts/package_building"
                           echo ${KERNEL_PATCH} | tr ' ' '\n' > developer_patches
                           bash build_artifacts.sh \\
-                              --git_url ${KERNEL_GIT_URL} \\
-                              --git_branch ${KERNEL_GIT_BRANCH} \\
+                              --git_url "${KERNEL_GIT_URL}" \\
+                              --git_branch "${KERNEL_GIT_BRANCH}" \\
                               --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                              --install_deps True \\
-                              --thread_number ${THREAD_NUMBER} \\
-                              --debian_os_version ${UBUNTU_VERSION} \\
-                              --build_path ${BUILD_PATH} \\
-                              --kernel_config ${KERNEL_CONFIG} \\
-                              --clean_env ${CLEAN_ENV} \\
-                              --use_ccache ${USE_CCACHE} \\
-                              --use_kernel_folder_prefix True \\
-                              --patch_file developer_patches \\
-                              --clone_depth ${CLONE_DEPTH}
+                              --install_deps \\
+                              --thread_number "${THREAD_NUMBER}" \\
+                              --debian_os_version "${UBUNTU_VERSION}" \\
+                              --build_path "${BUILD_PATH}" \\
+                              --kernel_config "${KERNEL_CONFIG}" \\
+                              --clean_env "${CLEAN_ENV}" \\
+                              --use_ccache "${USE_CCACHE}" \\
+                              --use_kernel_folder_prefix \\
+                              --clone_depth "${CLONE_DEPTH}" \\
+                              --patch_file "developer_patches"
                           popd
                           '''
                 }
-
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                 name: "${env.KERNEL_ARTIFACTS_PATH}"
