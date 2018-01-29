@@ -12,8 +12,8 @@ RELEASE_NAME=test
 # SAZ - 5 digit versions (2.6.38-<abi>-<commit>), 3 digit kernel base versions (2.6.38)
 KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
 	's/Version: \([0-9]*\.[0-9]*\.[0-9]*\)\-.*/\1/')
-KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"-"); print v[3];}')
-KERNEL_COMMIT=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"-");print v[4];}' | sed -re 's/\(*\).*//' )
+#KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"-"); print v[3];}')
+KERNEL_COMMIT=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"-");print v[3];}' | sed -re 's/\(*\).*//' )
 
 # 5 digit versions (2.6.38.<abi>.<upload>, 3 digit kernel base versions (2.6.38)
 #KERNEL_VERSION=$(shell dpkg-parsechangelog | grep ^Version | sed -e \
@@ -25,7 +25,7 @@ KERNEL_COMMIT=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"-");pr
 #	's/Version: \([0-9]*\.[0-9]*\)\..*/\1/')
 #KERNEL_ABI=$(shell head -n1 < debian/changelog | gawk '{n=split($$0,v,"."); print v[3];}')
 
-KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_ABI)-$(KERNEL_COMMIT)
+KERNEL_ABI_VERSION=$(KERNEL_VERSION)-$(KERNEL_COMMIT)
 
 GENERIC_amd64=azure
 
