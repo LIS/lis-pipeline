@@ -821,7 +821,7 @@ function main {
     USE_CCACHE='False'
     CLEAN_ENV='False'
     INSTALL_DEPS='False'
-    CREATE_CHANGELOG='True'
+    CREATE_CHANGELOG='False'
 
     TEMP=$(getopt -o q:w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:c:lzxc --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,source_type:,clone_depth:,patch_file:,create_changelog:,build_date::,use_ccache,clean_env,install_deps,use_kernel_folder_prefix -n 'test_params.sh' -- "$@")
     if [[ $? -ne 0 ]]; then

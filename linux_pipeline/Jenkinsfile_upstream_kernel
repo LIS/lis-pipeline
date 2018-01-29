@@ -252,7 +252,7 @@ pipeline {
           steps {
             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                        string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'UPSTREAM_AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL')]) {
+                                       string(credentialsId: 'UPSTREAM_AZURE_STORAGE_URL', variable: 'UPSTREAM_AZURE_STORAGE_URL')]) {
                 echo 'Running LISA...'
                 dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                     unstash 'kernel_version_ini'
