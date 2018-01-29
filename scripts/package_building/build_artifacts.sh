@@ -93,11 +93,10 @@ function build_kernel_metapackages_deb () {
 
     pushd "$artifacts_dir"
     filename=$(find . -name "linux-image*" | head -1)
-    kernel_abi=$(basename $filename | gawk '{n=split($$0,v,"-"); print v[4];}')
     popd
 
-    kernel_version="$kernel_version-$kernel_abi"
-    kernel_version="$kernel_version-g$kernel_git_commit"
+    kernel_version="$kernel_version"
+    kernel_version="$kernel_version-$kernel_git_commit"
     changelog_loc=$(readlink -f $(find ./kernel_metapackages -name changelog))
     debian_rules_loc=$(readlink -f $(find ./kernel_metapackages -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
@@ -134,20 +133,20 @@ function get_sources_git (){
     source_path="$2"
     git_branch="$3"
     clone_depth="$4"
+    patches="$5"
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
     
-    git_params="$source_path"
     if [[ "$clone_depth" != "" ]];then
-        git_params="$git_params --depth $clone_depth"
+        git_params="--depth $clone_depth --no-single-branch"
     fi
     pushd "${base_dir}/kernel"
     if [[ ! -d "${source}" ]];then
-        git clone "$git_params" > /dev/null
+        git clone $git_params  "$source_path" > /dev/null
     fi
     pushd "$source"
-    git reset --hard > /dev/null
+    git reset --hard HEAD~1 > /dev/null
     git fetch > /dev/null
     # Note(avladu): the checkout to master is needed to
     # get from a detached HEAD state
@@ -156,6 +155,9 @@ function get_sources_git (){
     git pull > /dev/null
     popd
     popd
+    if [[ $patches != "" ]]; then
+        patch_kernel "$patches" "$source"
+    fi
     echo "$source"
 }
 
@@ -184,13 +186,23 @@ function prepare_kernel_debian (){
     # Make kernel config file 
     #
     source="$1"
+    package_prefix="$2"
+    git_tag="$3"
+    dep_path="$4"
     
-    pushd "$source"  
-    if [[ -e "$KERNEL_CONFIG" ]];then
-        cp "$KERNEL_CONFIG" .config
-    else
-        make olddefconfig
+    pushd "$source"
+    kernel_version="$(make kernelversion)"
+    if [[ "$KERNEL_CONFIG" != ".config" ]];then
+        if [[ -e "./$KERNEL_CONFIG" ]];then
+            cp "$KERNEL_CONFIG" .config
+        elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
+            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
+        else
+            make olddefconfig
+        fi
     fi
+    cp "$dep_path/setlocalversion" ./scripts
+    sed -i -e "s/%version%/-${git_tag}/g" ./scripts/setlocalversion
     touch REPORTING-BUGS
     popd
 }
@@ -200,15 +212,31 @@ function prepare_kernel_rhel (){
     # Make kernel cofig file
     #
     source="$1"
+    package_prefix="$2"
+    kernel_tag="$3"
+    dep_path="$4"
     
     pushd "${source}"
     if [[ -e "tools/hv/lis-daemon.spec" ]];then
         mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
     fi
-    if [[ -e "$KERNEL_CONFIG" ]];then
-        cp "$KERNEL_CONFIG" .config
-    else
-        make olddefconfig
+    if [[ "$KERNEL_CONFIG" != ".config" ]];then
+        if [[ -e "./$KERNEL_CONFIG" ]];then
+            cp "$KERNEL_CONFIG" .config
+        elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
+            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
+        else
+            make olddefconfig
+        fi
+    fi
+    if [[ "$package_prefix" != "" ]];then
+        sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
+        sed -i -e "s/\$S	Source: /\$S	Source: ${package_prefix}-/g" "./scripts/package/mkspec"
+        sed -i -e "s/\$S\$M	%description -n kernel-devel/\$S\$M	%description -n ${package_prefix}-kernel-devel/g" "./scripts/package/mkspec"
+        sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/package/Makefile"
+        sed -i "s|CONFIG_LOCALVERSION_AUTO=.*|CONFIG_LOCALVERSION_AUTO=n|" ".config"
+        sed -i "s|CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION=\"-$kernel_tag\"|" ".config"
+        touch .scmversion
     fi
     popd
 }
@@ -221,7 +249,12 @@ function prepare_daemons_debian (){
     source="$2"
     dep_path="$3"
     debian_version="$4"
+    package_prefix="$5"
     
+    build_folder="hyperv-daemons"
+    if [[ "$package_prefix" != "" ]];then
+        build_folder="${package_prefix}-${build_folder}"
+    fi
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
@@ -229,13 +262,16 @@ function prepare_daemons_debian (){
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
         exit 3
-    else 
-        cp ./tools/hv/* "${base_dir}/daemons/hyperv-daemons"
-        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/hyperv-daemons/Makefile"
+    else
+        if [[ "$package_prefix" != "" ]];then
+            mv "${base_dir}/daemons/hyperv-daemons" "${base_dir}/daemons/$build_folder"
+        fi
+        cp ./tools/hv/* "${base_dir}/daemons/$build_folder"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
     fi
     popd
-    pushd "${base_dir}/daemons/hyperv-daemons"
-    dch --create --distribution unstable --package "hyperv-daemons" \
+    pushd "${base_dir}/daemons/$build_folder"
+    dch --create --distribution unstable --package "$build_folder" \
         --newversion "$kernel_version" "jenkins"
     for i in *.sh;do
         cp "$i" "${i%.*}"
@@ -246,6 +282,8 @@ function prepare_daemons_debian (){
         cp "${dep_path}/14/"* "./debian"
     fi
     sed -i -e "s/Standards-Version:.*/Standards-Version: $kernel_version/g" "./debian/control"
+    sed -i -e "s/Package:.*/Package: $build_folder/g" "./debian/control"
+    sed -i -e "s/Source:.*/Source: $build_folder/g" "./debian/control"
     popd
 }
 
@@ -256,6 +294,7 @@ function prepare_daemons_rhel (){
     base_dir="$1"
     source="$2"
     dep_path="$3"
+    package_prefix="$5"
     
     pushd "${base_dir}/daemons"
     sudo yumdownloader --source hyperv-daemons
@@ -299,6 +338,9 @@ function prepare_daemons_rhel (){
         sed -i '/Requires:/d' "SPECS/hyperv-daemons.spec"
         spec="hyperv-daemons.spec"
     fi
+    if [[ "$package_prefix" != "" ]];then
+        sed -i -e "s/Name:.*/Name:  ${package_prefix}-hyperv-daemons/g" "SPECS/$spec"
+    fi
     popd
 }
 
@@ -309,8 +351,12 @@ function prepare_tools_debian (){
     base_dir="$1"
     source="$2"
     dep_path="$3"
-    debian_version="$4"
+    package_prefix="$4"
     
+    build_folder="hyperv-tools"
+    if [[ "$package_prefix" != "" ]];then
+        build_folder="${package_prefix}-${build_folder}"
+    fi
     pushd "$source"
     # Get kernel version
     kernel_version="$(make kernelversion)"
@@ -319,14 +365,19 @@ function prepare_tools_debian (){
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
         exit 3
-    else 
-        cp ./tools/hv/lsvmbus "${base_dir}/tools/hyperv-tools"
+    else
+        if [[ "$package_prefix" != "" ]];then
+            mv "${base_dir}/tools/hyperv-tools" "${base_dir}/tools/${build_folder}"
+        fi
+        cp ./tools/hv/lsvmbus "${base_dir}/tools/${build_folder}"
     fi
     popd
-    pushd "${base_dir}/tools/hyperv-tools"
-    dch --create --distribution unstable --package "hyperv-tools" \
+    pushd "${base_dir}/tools/${build_folder}"
+    dch --create --distribution unstable --package "${build_folder}" \
         --newversion "$kernel_version" "tools"
     cp "${dep_path}/tools/"* "./debian"
+    sed -i -e "s/Package:.*/Package: $build_folder/g" "./debian/control"
+    sed -i -e "s/Source:.*/Source: $build_folder/g" "./debian/control"
     popd
 }
 
@@ -337,6 +388,7 @@ function prepare_tools_rhel (){
     base_dir="$1"
     source="$2"
     dep_path="$3"
+    package_prefix="$4"
     
     mkdir -p "${base_dir}/tools/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
     pushd "$source"
@@ -358,6 +410,9 @@ function prepare_tools_rhel (){
     else
         exit 1
     fi
+    if [[ "$package_prefix" != "" ]];then
+        sed -i -e "s/Name:.*/Name:  ${package_prefix}-hyperv-tools/g" "SPECS/$spec"
+    fi
     popd
 }
 
@@ -368,6 +423,7 @@ function prepare_perf_rhel (){
     base_dir="$1"
     source="$2"
     dep_path="$3"
+    package_prefix="$4"
     
     mkdir -p "${base_dir}/perf/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
     pushd "$source"
@@ -398,6 +454,9 @@ function prepare_perf_rhel (){
     else
         exit 1
     fi
+    if [[ "$package_prefix" != "" ]];then
+        sed -i -e "s/Name:.*/Name:  ${package_prefix}-perf/g" "SPECS/$spec"
+    fi
     popd
 }
 
@@ -408,11 +467,16 @@ function prepare_perf_debian (){
     base_dir="$1"
     source="$2"
     dep_path="$3"
+    package_prefix="$4"
     
     pushd "$source"
     kernel_version="$(make kernelversion)"
     kernel_version="${kernel_version%-*}"
-    pack_folder="${base_dir}/perf/linux-perf_${kernel_version}"    
+    if [[ "$package_prefix" == "" ]];then
+        pack_folder="${base_dir}/perf/linux-perf_${kernel_version}"
+    else
+        pack_folder="${base_dir}/perf/${package_prefix}-perf_${kernel_version}"
+    fi
     if [[ -d "$pack_folder" ]];then
         rm -rf "$pack_folder"
     fi
@@ -427,7 +491,9 @@ function prepare_perf_debian (){
         mkdir "./usr"
         dirs=(bin lib64 libexec)
         for dir in ${dirs[@]};do
-            for file in $(ls ./$dir);do
+            files=$(ls ./$dir)
+            IFS=$'\n' files=($files)
+            for file in ${files[@]};do
                 mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
             done
         done
@@ -443,6 +509,31 @@ function prepare_perf_debian (){
     mkdir "${pack_folder}/DEBIAN"
     cp "${dep_path}/perf/"* "${pack_folder}/DEBIAN/"
     sed -i -e "s/Version:.*/Version:  $kernel_version/g" "${pack_folder}/DEBIAN/control"
+    if [[ "$package_prefix" != "" ]];then
+        sed -i -e "s/Package:.*/Package: ${package_prefix}-perf/g" "${pack_folder}/DEBIAN/control"
+        sed -i -e "s/Source:.*/Source: ${package_prefix}-perf/g" "${pack_folder}/DEBIAN/control"
+    fi
+}
+
+function patch_kernel() {
+    local patches; local kernel_path
+    patches="$1"
+    kernel_path="$2"
+
+    cp "$patches" "$kernel_path"
+    pushd "$kernel_path"
+    for patch in $(cat $patches); do
+        curl -s "$patch" | patch -f -p1 > /dev/null #2>&1
+        if [[ $? -ne 0 ]]; then
+            echo "Patch failed, looking for error files"
+            find . -name "*.rej" | xargs cat
+            exit 1
+        fi
+    done
+
+    git add ${patches##*/}
+    git commit -m "patches: $(tail -1 ${patches})" > /dev/null
+    popd
 }
 
 function build_debian (){
@@ -457,6 +548,7 @@ function build_debian (){
     build_date="$6"
     kernel_version_local="$7"
     kernel_git_commit="$8"
+    additions_folder="$9"
 
     artifacts_dir="${base_dir}/${build_state}/"
     if [[ -d "$artifacts_dir" ]];then
@@ -466,20 +558,38 @@ function build_debian (){
     fi
     if [[ "$build_state" == "kernel" ]];then
         pushd "$source"
-        make-kpkg --rootcmd fakeroot --initrd  --revision "$build_date" -j"$thread_number" kernel_image kernel_headers kernel_source kernel_debug
+        params="--rootcmd fakeroot --initrd  --revision $build_date -j$thread_number"
+        if [[ "$PACKAGE_PREFIX" != "" ]];then
+            params="--stem $PACKAGE_PREFIX $params"
+        elif [[ -e "$additions_folder/changelog" ]];then
+            params="--overlay-dir $additions_folder $params"
+        fi
+        make-kpkg $params kernel_image kernel_headers kernel_source kernel_debug
         popd
-	build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
+        build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
     elif [[ "$build_state" == "daemons" ]];then
-        pushd "${base_dir}/daemons/hyperv-daemons"
+        build_dir="hyperv-daemons"
+        if [[ "$PACKAGE_PREFIX" != "" ]];then
+            build_dir="${PACKAGE_PREFIX}-${build_dir}"
+        fi
+        pushd "${base_dir}/daemons/${build_dir}"
         echo "y" | debuild -us -uc
         popd
     elif [[ "$build_state" == "tools" ]];then
-        pushd "${base_dir}/tools/hyperv-tools"
+        build_dir="hyperv-tools"
+        if [[ "$PACKAGE_PREFIX" != "" ]];then
+            build_dir="${PACKAGE_PREFIX}-${build_dir}"
+        fi
+        pushd "${base_dir}/tools/${build_dir}"
         debuild -us -uc
         popd
     elif [[ "$build_state" == "perf" ]];then
         pushd "${base_dir}/perf/"
-        dpkg-deb --build linux-perf_${kernel_version}
+        build_dir="linux-perf_${kernel_version}"
+        if [[ "$PACKAGE_PREFIX" != "" ]];then
+            build_dir="${PACKAGE_PREFIX}-perf_${kernel_version}"
+        fi
+        dpkg-deb --build "$build_dir"
         popd
     fi
     copy_artifacts "$artifacts_dir" "$destination_path"
@@ -494,6 +604,9 @@ function build_rhel {
     build_state="$3"
     thread_number="$4"
     destination_path="$5"
+    build_date="$6"
+    kernel_version_local="$7"
+    kernel_git_commit="$8"
 
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
@@ -516,6 +629,7 @@ function build_rhel {
         fi
         pushd "$source"
         make rpm -j"$thread_number"
+        sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"
         popd
         copy_artifacts "$source_package_dir" "$destination_path"
     elif [[ "$build_state" == "daemons" ]];then
@@ -548,9 +662,14 @@ function build_kernel (){
     git_branch="$7"
     build_date="$8"
     folder_prefix="$9"
+    package_prefix="${10}"
+    clone_depth="${11}"
+    patches="${12}"
+    dep_path="${13}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path $git_branch)"
+    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth $patches)"
+
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
     KERNEL_TAG=$(git log -1 --pretty=format:"%h")
@@ -558,9 +677,14 @@ function build_kernel (){
     GIT_TAG="$(get_git_tag $source HEAD 7)"
     GIT_TAG12="$(get_git_tag $source HEAD 12)"
     DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
-    prepare_kernel_"${os_family}" "$source" 
+    additions_folder="${base_dir}/kernel/additions"
+    # Note(mbivolan): Continue if changelog creation fails, as it is a non-critical artifact
+    if [[ "$os_FAMILY" == "debian" ]];then
+        create_deb_changelog "$source" "$additions_folder" "linux-source" "${KERNEL_VERSION}-${GIT_TAG12}" 2> /dev/null || true
+    fi
+    prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
-	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12"
+	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$additions_folder"
     DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
     DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
     echo "Updating the kernel build information for later usage."
@@ -581,10 +705,11 @@ function build_daemons (){
     debian_version="$5"
     destination_path="$6"
     dep_path="$7"
+    package_prefix="$8"
     build_state="daemons"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    prepare_daemons_"${os_family}" "$base_dir" "$source" "$dep_path" "$debian_version"
+    prepare_daemons_"${os_family}" "$base_dir" "$source" "$dep_path" "$debian_version" "$package_prefix"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
@@ -597,10 +722,11 @@ function build_tools (){
     os_family="$3"
     destination_path="$4"
     dep_path="$5"
+    package_prefix="$6"
     build_state="tools"
     
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    prepare_tools_"${os_family}" "$base_dir" "$source" "$dep_path"
+    prepare_tools_"${os_family}" "$base_dir" "$source" "$dep_path" "$package_prefix"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
 
@@ -613,10 +739,11 @@ function build_perf (){
     os_family="$3"
     destination_path="$4"
     dep_path="$5"
+    package_prefix="$6"
     build_state="perf"
     
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    prepare_perf_"${os_family}" "$base_dir" "$source" "$dep_path"
+    prepare_perf_"${os_family}" "$base_dir" "$source" "$dep_path" "$package_prefix"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$destination_path" "$spec"
 }
     
@@ -649,8 +776,13 @@ function clean_env_rhel (){
     #
     base_dir="$1"
     
-    if [[ -d "$BASE_DIR" ]];then
-        rm -rf "${BASE_DIR}/"*
+    if [[ -d "${base_dir}/perf" ]];then
+        sudo chown -R $(whoami) "${base_dir}/perf"
+        sudo chown $(whoami) "${base_dir}"
+    fi
+
+    if [[ -d "$base_dir" ]];then
+        rm -rf "${base_dir}/"*
     fi
     
     if [[ -a "$HOME/.rpmmacros" ]];then
@@ -682,6 +814,9 @@ function main {
     GIT_TAG=""
     BUILD_DATE="$(date +'%d%m%Y')"
     FOLDER_PREFIX="msft"
+    SOURCE_TYPE=""
+    CLONE_DEPTH=""
+    PATCHES=""
     
     while true;do
         case "$1" in
@@ -733,11 +868,18 @@ function main {
             --artifacts_folder_prefix)
                 FOLDER_PREFIX="$2"
                 shift 2;;
+            --patch_file)
+                PATCHES="$2"
+                shift 2;;
             --build_date)
                 # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
                 if [[ "$2" != "" ]];then
                     BUILD_DATE="$2"
+                    shift
                 fi
+                shift;;
+            --use_kernel_folder_prefix)
+                USE_KERNEL_PREFIX="$2"
                 shift 2;;
             --) shift; break ;;
             *) break ;;
@@ -765,7 +907,17 @@ function main {
     if [[ "${THREAD_NUMBER:0:1}" == "x" ]];then
         THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x*})"
     fi
-
+    
+    if [[ "$USE_KERNEL_PREFIX" == "True" ]];then
+        if [[ "$DOWNLOAD_METHOD" == "git" ]] && [[ "$SOURCE_PATH" != "" ]];then
+            FOLDER_PREFIX="${SOURCE_PATH##*/}"
+            FOLDER_PREFIX="${FOLDER_PREFIX%.*}"
+            PACKAGE_PREFIX="$FOLDER_PREFIX"
+        else
+            exit 1
+        fi
+    fi
+    
     INITIAL_BRANCH_NAME=$GIT_BRANCH
     if [[ "$GIT_BRANCH" == "" ]];then
         GIT_BRANCH="$DEFAULT_BRANCH"
@@ -782,11 +934,11 @@ function main {
     fi
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
-        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX"
+        "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
-        "$DESTINATION_PATH" "$DEP_PATH"
-    build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
-    build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH"
+        "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+    build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+    build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
 
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH

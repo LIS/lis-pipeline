@@ -325,3 +325,66 @@ build_metapackages () {
     export PATH="$aux_PATH"
 }
 
+create_deb_changelog() {
+    repo="$1"
+    changelog_path="$2"
+    package_name="$3"
+    package_version="$4"
+    build_date="$(date +'%d%m%Y')"
+
+    if [[ -e "$changelog_path" ]];then
+        rm "$changelog_path"/*
+    else
+        mkdir "$changelog_path"
+    fi
+    touch "$changelog_path"/changelog
+    changelog="$(realpath $changelog_path/changelog)"
+
+    pushd "$repo"
+    tags=$(git tag --sort version:refname | grep -i -B 1 $(git describe --tags --abbrev=0))
+    IFS=$'\n' tags=($tags)
+    commit_ids=$(git log HEAD...${tags[0]} --pretty=format:"%h")
+    IFS=$'\n' commit_ids=($commit_ids)
+    for i in ${commit_ids[@]};do
+        git_entry=$(git show $i)
+        #Get the commit tag
+        git_tag=$(echo "$git_entry" | grep -m1 commit)
+        #Get the mantainer
+        author=$(echo "$git_entry" | grep Author:)
+        author=${author#Author: *}
+        #Get the date
+        commit_date=$(echo "$git_entry" | grep Date:)
+        commit_date=${commit_date#Date: *}
+        commit_date=${commit_date:2}
+        com_day=${commit_date%% *}
+        commit_date=${commit_date#* }
+        com_mon=${commit_date%% *}
+        commit_date=${commit_date#* }
+        com_day_n=${commit_date%% *}
+        commit_date=${commit_date#* }
+        com_time=${commit_date%% *}
+        commit_date=${commit_date#* }
+        com_year=${commit_date%% *}
+        commit_date=${commit_date#* }
+        com_timezone=${commit_date%% *}
+        #Parse the date
+        meta_data="$author  $com_day, $com_day_n $com_mon $com_year $com_time $com_timezone"
+        #Get the commit message
+        commit_message=$(echo "$git_entry" | sed '/Date:/,// !d')
+        commit_message=$(echo "$commit_message" | tail -n +2)
+        commit_message=$(echo "$commit_message" | sed 's/    //')
+        commit_message=$(echo "$commit_message" | sed 's/^/    /')
+        #Echo the entry
+        cat << EOF >> "$changelog"
+$package_name-${package_version} ($build_date) ubuntu; urgency=low
+
+    $git_tag
+$commit_message
+
+ -- $meta_data
+
+EOF
+    done
+    export IFS=$' '
+    popd
+}
