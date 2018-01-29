@@ -169,14 +169,14 @@ function Get-Dependencies {
     }
     return ($keyName, $xmlName)
 }
-
 function Edit-TestXML {
     param(
+        [parameter(Mandatory=$true)]
         [string] $Path,
-        [string] $VMPrefix,
+        [parameter(Mandatory=$true)]
+        [string] $VMSuffix,
         [string] $KeyName
     )
-    pushd ".\lis-test\WS2012R2\lisa\xml"
     $xmlFullPath = Join-Path $PWD $Path
     if (!(Test-Path $xmlFullPath)) {
         throw "Test XML $xmlFullPath does not exist."
@@ -185,20 +185,30 @@ function Edit-TestXML {
     $index = 0
     if ($xml.config.VMs.vm -is [array]) {
         foreach ($vmDef in $xml.config.VMs.vm) {
-            $xml.config.VMS.vm[$index].vmName = $VMPrefix + $vmDef.vmName
+            $xml.config.VMS.vm[$index].vmName = $vmDef.vmName + $VMSuffix
             if ($KeyName) {
                 $xml.config.VMS.vm[$index].sshKey = $KeyName
+            }
+            $testParams = $vmDef.testParams
+            if ($testParams) {
+                $paramIndex = 0
+                foreach ($testParam in $testParams.param) {
+                    if ($testParam -like "VM2NAME=*") {
+                        $testParams.ChildNodes.Item($paramIndex)."#text" = `
+                            $testParam + $VMSuffix
+                    }
+                    $paramIndex = $paramIndex + 1
+                }
             }
             $index = $index + 1
         }
     } else {
-        $xml.config.VMS.vm.vmName = $VMPrefix + $xml.config.VMS.vm.vmName
+        $xml.config.VMS.vm.vmName = $xml.config.VMS.vm.vmName + $VMSuffix
         if ($KeyName) {
             $xml.config.VMS.vm.sshKey = $KeyName
         }
     }
     $xml.Save($xmlFullPath)
-    popd
 }
 
 function Main {
@@ -219,7 +229,15 @@ function Main {
         $idRSAPriv = Get-Lisa
         Write-Host "Copying private keys"
         Copy-Item -Force -Path "C:\bin\*.ppk" -Destination ".\lis-test\WS2012R2\lisa\ssh\"
-        Edit-TestXML -Path $XmlTest -VMPrefix $InstanceName
+
+        pushd ".\lis-test\WS2012R2\lisa\xml"
+        try {
+            Edit-TestXML -Path $XmlTest -VMSuffix $InstanceName
+        } catch {
+            throw
+        } finally {
+            popd
+        }
     } else {
         Write-Host "Using kernel folder name: $kernelFolder from $mountPoint."
         Get-PSDrive | Out-Null
