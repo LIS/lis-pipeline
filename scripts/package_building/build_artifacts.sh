@@ -823,7 +823,7 @@ function main {
     INSTALL_DEPS='False'
     CREATE_CHANGELOG='True'
 
-    TEMP=$(getopt -o q:w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:c:lzxc --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,source_type:,build_date:,clone_depth:,patch_file:,create_changelog:,use_ccache,clean_env,install_deps,use_kernel_folder_prefix -n 'test_params.sh' -- "$@")
+    TEMP=$(getopt -o q:w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:c:lzxc --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,source_type:,clone_depth:,patch_file:,create_changelog:,build_date::,use_ccache,clean_env,install_deps,use_kernel_folder_prefix -n 'test_params.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -902,7 +902,7 @@ function main {
             --build_date)
                 # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
                 case "$2" in
-                    "") BUILD_DATE=$(date + '%d%m%Y') ; shift 2 ;;
+                    "") BUILD_DATE="$(date +'%d%m%Y')" ; shift 2 ;;
                     *) BUILD_DATE="$2" shift 2 ;;
                 esac ;;
             --clone_depth)

@@ -69,7 +69,7 @@ pipeline {
                     --clean_env "${CLEAN_ENV}" \\
                     --use_ccache "${USE_CCACHE}" \\
                     --use_kernel_folder_prefix \\
-                    --build_date "${TIMESTAMP}"
+                    --build_date="${TIMESTAMP}"
                     --create_changelog "${CREATE_CHANGELOG}"
                 popd
                 '''
@@ -115,7 +115,7 @@ pipeline {
                     --clean_env "${CLEAN_ENV}" \\
                     --use_ccache "${USE_CCACHE}" \\
                     --use_kernel_folder_prefix \\
-                    --build_date "${TIMESTAMP}"
+                    --build_date="${TIMESTAMP}"
                 popd
                 '''
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
