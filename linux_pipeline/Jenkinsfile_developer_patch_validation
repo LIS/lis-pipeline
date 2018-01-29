@@ -72,7 +72,7 @@ pipeline {
                               --use_ccache "${USE_CCACHE}" \\
                               --use_kernel_folder_prefix \\
                               --clone_depth "${CLONE_DEPTH}" \\
-                              --patch_file "developer_patches"
+                              --patch_file "developer_patches" \\
                               --create_changelog "${CREATE_CHANGELOG}"
                           popd
                           '''
