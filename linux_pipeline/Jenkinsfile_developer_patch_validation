@@ -49,8 +49,8 @@ pipeline {
                 }
             }
             steps {
-                withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL',
-                                                  variable: 'MSFT_KERNEL_GIT_URL')]) {
+                withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
+                                           string(credentialsId: 'USER_HOST', variable: 'USER_HOST')]) {
                     sh '''#!/bin/bash
                           set -xe
                           if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
@@ -59,6 +59,17 @@ pipeline {
                           echo "Building artifacts..."
                           pushd "$WORKSPACE/scripts/package_building"
                           echo ${KERNEL_PATCH} | tr ' ' '\n' > developer_patches
+                          i='0'
+                          IFS=$'\t\n'
+                          for url in $(cat developer_patches); do
+                              i=$(( i + 1))
+                              protocol=${url%%://*}
+                              url=${url#*//}
+                              if [[ $protocol == "scp" ]]; then
+                                  sed -i "${i}s/.*/scp:\\/\\/$USER_HOST:${url//\\//\\\\/}/" developer_patches
+                              fi
+                          done
+                          IFS=$' '
                           bash build_artifacts.sh \\
                               --git_url "${KERNEL_GIT_URL}" \\
                               --git_branch "${KERNEL_GIT_BRANCH}" \\
