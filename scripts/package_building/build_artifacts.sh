@@ -671,7 +671,7 @@ function build_kernel (){
     create_changelog="${14}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
-    source="$(get_sources_${download_method} $base_dir $source_path $git_branch $clone_depth $patches)"
+    source=$(get_sources_${download_method} "$base_dir" "$source_path" "$git_branch" "$clone_depth" "$patches")
 
     pushd $source
     KERNEL_VERSION=$(make kernelversion)
@@ -807,23 +807,31 @@ function main {
     INI_FILE="$(pwd)/kernel_versions.ini"
 
     # Mandatory:
-    THREAD_NUMBER='2'
+    SOURCE_PATH=""
+    DESTINATION_PATH=""
+    DOWNLOAD_METHOD=""
 
     # Optional:
     GIT_BRANCH='master'
-    KERNEL_CONFIG='./Microsoft/config-azure'
-    DEFAULT_BRANCH='stable'
-    FOLDER_PREFIX='msft'
-    BUILD_DATE="$(date +'%d%m%Y')"
+    BASE_DIR="$(pwd)/temp_build"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
+    FOLDER_PREFIX='msft'
+    THREAD_NUMBER='x2'
+    KERNEL_CONFIG='Microsoft/config-azure'
+    DEFAULT_BRANCH='master'
+    BUILD_DATE="$(date +'%d%m%Y')"
+    GIT_TAG=""
+    CLONE_DEPTH=""
+    PATCHES=""
 
     # Flags:
     USE_CCACHE='False'
     CLEAN_ENV='False'
     INSTALL_DEPS='False'
-    CREATE_CHANGELOG='False'
+    USE_KERNEL_PREFIX='False'
+    CREATE_CHANGELOG='True'
 
-    TEMP=$(getopt -o q:w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:c:lzxc --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,source_type:,clone_depth:,patch_file:,create_changelog:,build_date::,use_ccache,clean_env,install_deps,use_kernel_folder_prefix -n 'test_params.sh' -- "$@")
+    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix: -n 'build_artifacts.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -856,22 +864,22 @@ function main {
                 esac;;
             --build_path)
                 case "$2" in
-                    "") BASE_DIR="$(pwd)/temp_build" ; shift 2 ;;
+                    "") shift 2 ;;
                     *) BASE_DIR="$2" ; shift 2 ;;
                 esac;;
             --debian_os_version)
                 case "$2" in
-                    "") DEBIAN_OS_VERSION="${os_RELEASE%.*}" ; shift 2 ;;
+                    "") shift 2 ;;
                     *) DEBIAN_OS_VERSION="$2" ; shift 2;;
                 esac;;
             --artifacts_folder_prefix)
                 case "$2" in
-                    "") FOLDER_PREFIX='msft' ; shift 2 ;;
+                    "") shift 2 ;;
                     *) FOLDER_PREFIX="$2" ; shift 2 ;;
                 esac;;
             --thread_number)
                 case "$2" in
-                    "") THREAD_NUMBER='2' ; shift 2 ;;
+                    "") shift 2 ;;
                     *) THREAD_NUMBER="$2" ; shift 2 ;;
                 esac;;
             --destination_path)
@@ -881,49 +889,60 @@ function main {
                 esac ;;
             --kernel_config)
                 case "$2" in
-                    "") KERNEL_CONFIG='./Microsoft/config-azure' ; shift 2 ;;
-                    *) KERNEL_CONFIG="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) KERNEL_CONFIG="$2" ; shift 2 ;;
                 esac ;;
             --default_branch)
                 case "$2" in
-                    "") DEFAULT_BRANCH="stable" ; shift 2 ;;
-                    *) DEFAULT_BRANCH="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) DEFAULT_BRANCH="$2" ; shift 2 ;;
                 esac ;;
             --git_tag)
                 case "$2" in
-                    "") GIT_TAG="DEFAULT_VALUE" ; shift 2 ;;
-                    *) GIT_TAG="$2" shift 2 ;;
-                esac ;;
-            --source_type)
-                case "$2" in
-                    "") SOURCE_TYPE="DEFAULT_VALUE" ; shift 2 ;;
-                    *) SOURCE_TYPE="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) GIT_TAG="$2" ; shift 2 ;;
                 esac ;;
             --build_date)
                 # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
                 case "$2" in
-                    "") BUILD_DATE="$(date +'%d%m%Y')" ; shift 2 ;;
-                    *) BUILD_DATE="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) BUILD_DATE="$2" ; shift 2 ;;
                 esac ;;
             --clone_depth)
                 case "$2" in
-                    "") CLONE_DEPTH="DEFAULT_VALUE" ; shift 2 ;;
-                    *) CLONE_DEPTH="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) CLONE_DEPTH="$2" ; shift 2 ;;
                 esac ;;
             --patch_file)
                 case "$2" in
-                    "") PATCHES="DEFAULT_VALUE" ; shift 2 ;;
-                    *) PATCHES="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) PATCHES="$2" ; shift 2 ;;
+                esac ;;
+            --use_ccache)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) USE_CCACHE="$2" ; shift 2 ;;
+                esac ;;
+            --clean_env)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) CLEAN_ENV="$2" ; shift 2 ;;
+                esac ;;
+            --install_deps)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) INSTALL_DEPS="$2" ; shift 2 ;;
+                esac ;;
+            --use_kernel_folder_prefix)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) USE_KERNEL_PREFIX="$2" ; shift 2 ;;
                 esac ;;
             --create_changelog)
                 case "$2" in
-                    "") CREATE_CHANGELOG="DEFAULT_VALUE" ; shift 2 ;;
-                    *) CREATE_CHANGELOG="$2" shift 2 ;;
+                    "") shift 2 ;;
+                    *) CREATE_CHANGELOG="$2" ; shift 2 ;;
                 esac ;;
-            --use_ccache) USE_CCACHE='True' ; shift ;;
-            --clean_env) CLEAN_ENV='True' ; shift ;;
-            --install_deps) INSTALL_DEPS='True' ; shift ;;
-            --use_kernel_folder_prefix) USE_KERNEL_PREFIX='True' ; shift;;
             --) shift ; break ;;
             *) echo "Wrong parameters!" ; exit 1 ;;
         esac
@@ -934,7 +953,7 @@ function main {
     fi
     
     if [[ ! "$DOWNLOAD_METHOD" ]];then
-        printf "No download method was specified.Exiting."
+        printf "You need to specify a download method."
         exit 1
     fi
     if [[ ! "$DESTINATION_PATH" ]];then
@@ -948,7 +967,7 @@ function main {
     fi
     
     if [[ "${THREAD_NUMBER:0:1}" == "x" ]];then
-        THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x*})"
+        THREAD_NUMBER="$(get_job_number ${THREAD_NUMBER#x})"
     fi
     
     if [[ "$USE_KERNEL_PREFIX" == "True" ]];then

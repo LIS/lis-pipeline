@@ -31,7 +31,9 @@ pipeline {
     USE_CCACHE = 'True'
     AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'u'
-    CREATE_CHANGELOG='False'
+    CREATE_CHANGELOG = 'False'
+    INSTALL_DEPS = 'True'
+    USE_KERNEL_FOLDER_PREFIX = 'True'
   }
   options {
     overrideIndexTriggers(false)
@@ -61,14 +63,14 @@ pipeline {
                     --git_url "${KERNEL_GIT_URL}" \\
                     --git_branch "${KERNEL_GIT_BRANCH}" \\
                     --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                    --install_deps \\
+                    --install_deps "${INSTALL_DEPS}" \\
                     --thread_number "${THREAD_NUMBER}" \\
                     --debian_os_version "${UBUNTU_VERSION}" \\
                     --build_path "${BUILD_PATH}" \\
                     --kernel_config "${KERNEL_CONFIG}" \\
                     --clean_env "${CLEAN_ENV}" \\
                     --use_ccache "${USE_CCACHE}" \\
-                    --use_kernel_folder_prefix \\
+                    --use_kernel_folder_prefix" "${USE_KERNEL_FOLDER_PREFIX}" \\
                     --build_date="${TIMESTAMP}" \\
                     --create_changelog "${CREATE_CHANGELOG}"
                 popd
@@ -107,14 +109,14 @@ pipeline {
                     --git_url "${KERNEL_GIT_URL}" \\
                     --git_branch "${KERNEL_GIT_BRANCH}" \\
                     --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
-                    --install_deps \\
+                    --install_deps "${INSTALL_DEPS}" \\
                     --thread_number "${THREAD_NUMBER}" \\
                     --debian_os_version "${UBUNTU_VERSION}" \\
                     --build_path "${BUILD_PATH}" \\
                     --kernel_config "${KERNEL_CONFIG}" \\
                     --clean_env "${CLEAN_ENV}" \\
                     --use_ccache "${USE_CCACHE}" \\
-                    --use_kernel_folder_prefix \\
+                    --use_kernel_folder_prefix "${USE_KERNEL_FOLDER_PREFIX}" \\
                     --build_date="${TIMESTAMP}"
                 popd
                 '''
