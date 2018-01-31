@@ -42,6 +42,7 @@ pipeline {
   stages {
           stage('build_artifacts_ubuntu') {
               when {
+                beforeAgent true
                 expression { params.OS_TYPE == 'ubuntu' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
@@ -87,6 +88,7 @@ pipeline {
           }
           stage('build_artifacts_centos') {
               when {
+                beforeAgent true
                 expression { params.OS_TYPE == 'centos' }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
@@ -131,6 +133,7 @@ pipeline {
     }
     stage('publish_temp_artifacts') {
       when {
+        beforeAgent true
         expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
       }
       agent {
@@ -160,6 +163,7 @@ pipeline {
     }
     stage('boot_test') {
       when {
+        beforeAgent true
         expression { params.ENABLED_STAGES.contains('boot_test') }
       }
       agent {
@@ -207,6 +211,7 @@ pipeline {
     }
     stage('publish_artifacts') {
       when {
+        beforeAgent true
         expression { params.ENABLED_STAGES.contains('publish_artifacts') }
       }
       agent {
@@ -235,6 +240,7 @@ pipeline {
     }
     stage('publish_azure_vhd') {
       when {
+        beforeAgent true
         expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
         expression { params.ENABLED_STAGES.contains('validation') }
         expression { params.ENABLED_STAGES.contains('azure') }
@@ -284,11 +290,13 @@ pipeline {
     }
     stage('validation') {
      when {
+      beforeAgent true
       expression { params.ENABLED_STAGES.contains('validation') }
      }
      parallel {
       stage('validation_functional_hyperv') {
           when {
+            beforeAgent true
             expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
           }
           agent {
@@ -335,6 +343,7 @@ pipeline {
         }
         stage('validation_functional_azure') {
           when {
+            beforeAgent true
             expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
           }
           agent {
@@ -391,6 +400,7 @@ pipeline {
         }
         stage('validation_perf_azure_net') {
           when {
+            beforeAgent true
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
@@ -494,6 +504,7 @@ pipeline {
         }
         stage('validation_perf_azure_stor') {
           when {
+            beforeAgent true
             expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
@@ -536,6 +547,7 @@ pipeline {
         }
         stage('validation_perf_hyperv') {
           when {
+            beforeAgent true
             expression { params.OS_TYPE == 'centos' }
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
           }

@@ -41,6 +41,7 @@ pipeline {
     stages {
         stage('build_artifacts') {
             when {
+                beforeAgent true
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
             }
             agent {
@@ -100,6 +101,7 @@ pipeline {
         }
         stage('publish_temp_artifacts') {
             when {
+                beforeAgent true
                 expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
             }
             agent {
@@ -134,6 +136,7 @@ pipeline {
         }
         stage('boot_test') {
             when {
+                beforeAgent true
                 expression { params.ENABLED_STAGES.contains('boot_test') }
             }
             agent {
@@ -180,6 +183,7 @@ pipeline {
         }
         stage('publish_artifacts') {
             when {
+                beforeAgent true
                 expression { params.ENABLED_STAGES.contains('publish_artifacts') }
             }
             agent {
@@ -214,11 +218,13 @@ pipeline {
         }
         stage('validation') {
             when {
+                beforeAgent true
                 expression { params.ENABLED_STAGES.contains('validation') }
             }
             parallel {
                 stage('validation_functional_hyperv') {
                     when {
+                        beforeAgent true
                         expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
                     }
                     agent {
@@ -263,6 +269,7 @@ pipeline {
                 }
                 stage('validation_functional_azure') {
                     when {
+                        beforeAgent true
                         expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
                     }
                     agent {
@@ -276,6 +283,7 @@ pipeline {
                 }
                 stage('validation_perf_hyperv') {
                     when {
+                        beforeAgent true
                         expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
                     }
                     agent {
