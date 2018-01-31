@@ -263,10 +263,20 @@ pipeline {
           " -testLocation 'northeurope'" +
           " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
           " -testCycle 'PUBLISH-VHD'" +
-          " -OverrideVMSize 'Standard_DS1_v2'" +
+          " -OverrideVMSize 'Standard_D2_v2'" +
           " -ARMImageName '${ARM_IMAGE_NAME}'" +
-          " -StorageAccount 'ExistingStorage_Premium'" +
+          " -StorageAccount 'ExistingStorage_Standard'" +
           " -ExitWithZero"
+          )
+          script {
+              env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+          }
+          RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" + 
+          " -sourceLocation northeurope " +
+          " -destinationLocations 'westus,westus2,northeurope'" +
+          " -destinationAccountType Standard" + 
+          " -sourceVHDName '${ARM_OSVHD_NAME}'" +
+          " -destinationVHDName '${ARM_OSVHD_NAME}'"
           )
         }
       }
