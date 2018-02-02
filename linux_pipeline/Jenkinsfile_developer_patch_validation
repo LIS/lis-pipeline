@@ -29,7 +29,7 @@ pipeline {
         THREAD_NUMBER = 'x3'
         CLONE_DEPTH = '1'
         CREATE_CHANGELOG = 'False'
-        USE_KERNEL_FOLDER_PREFIX = 'False'
+        USE_KERNEL_FOLDER_PREFIX = 'True'
         INSTALL_DEPS = 'True'
     }
     options {
