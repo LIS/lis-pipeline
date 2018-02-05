@@ -28,12 +28,14 @@ validate_azure_vm_boot() {
     OS_TYPE=$9
     WORK_DIR="${10}"
     VM_USER_NAME=$OS_TYPE
-    
+    FULL_BUILD_NAME_LONG="$BUILD_NAME$BUILD_NUMBER"
+    FULL_BUILD_NAME=$(echo ${FULL_BUILD_NAME_LONG//[-._aeiouyw]/})
+
     KERNEL_VERSION_FILE="./kernel_version${BUILD_NUMBER}/scripts/package_building/kernel_versions.ini"
     KERNEL_FOLDER=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT folder)
     DESIRED_KERNEL_VERSION=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT version)
     DESIRED_KERNEL_TAG=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT git_tag)
-    
+
     if [[ "$OS_TYPE" == "ubuntu" ]];then
         artifacts_folder="deb"
     elif [[ "$OS_TYPE" == "centos" ]];then
@@ -41,7 +43,8 @@ validate_azure_vm_boot() {
     fi
 
     pushd "$BASEDIR"
-    bash create_azure_vm.sh --build_number "$BUILD_NAME$BUILD_NUMBER" \
+
+    bash create_azure_vm.sh --build_number "$FULL_BUILD_NAME" \
         --vm_params "username=$USERNAME,password=$PASSWORD,samba_path=$SMB_SHARE_URL/temp-kernel-artifacts,kernel_path=$KERNEL_FOLDER" \
         --resource_group $RESOURCE_GROUP --os_type $OS_TYPE
     popd
@@ -49,7 +52,7 @@ validate_azure_vm_boot() {
     INTERVAL=5
     COUNTER=0
     while [ $COUNTER -lt $AZURE_MAX_RETRIES ]; do
-        public_ip_raw=$(az network public-ip show --name "$BUILD_NAME$BUILD_NUMBER-PublicIP" --resource-group kernel-validation --query '{address: ipAddress }')
+        public_ip_raw=$(az network public-ip show --name "$FULL_BUILD_NAME-PublicIP" --resource-group kernel-validation --query '{address: ipAddress }')
         public_ip=$(echo $public_ip_raw | awk '{if (NR == 1) {print $3}}' | tr -d '"')
         if [ !  -z $public_ip ]; then
             echo "Public ip available: $public_ip."
@@ -85,7 +88,7 @@ validate_azure_vm_boot() {
         KERNEL_NAME=$(ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" uname -r || true)
         if [[ "$KERNEL_NAME" == *"$DESIRED_KERNEL_TAG"* ]]; then
             echo "Kernel ${KERNEL_NAME} matched."
-            bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${BUILD_NAME}${BUILD_NUMBER}-Kernel-Validation" \
+            bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${FULL_BUILD_NAME}-Kernel-Validation" \
                 --destination_path "${WORK_DIR}/${BUILD_NAME}${BUILD_NUMBER}-boot-diagnostics"
             exit 0
         else
@@ -97,7 +100,7 @@ validate_azure_vm_boot() {
             sleep $INTERVAL
         fi
     done
-    bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${BUILD_NAME}${BUILD_NUMBER}-Kernel-Validation" \
+    bash "$BASEDIR/get_azure_boot_diagnostics.sh" --vm_name "${FULL_BUILD_NAME}-Kernel-Validation" \
          --destination_path "${WORK_DIR}/${BUILD_NAME}${BUILD_NUMBER}-boot-diagnostics"
     exit 1
 }

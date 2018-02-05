@@ -14,12 +14,6 @@
         "description": "User name for the Virtual Machine."
       }
     },
-    "dnsNameForPublicIP": {
-      "type": "string",
-      "metadata": {
-        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
-      }
-    },
     "sshKeyData": {
       "type": "string",
       "metadata": {
@@ -32,18 +26,6 @@
       "metadata": {
         "description": "Build number"
       }
-    },
-    "share_username": {
-       "type": "string"
-    },
-    "share_password": {
-       "type": "string"
-    },
-    "share_url": {
-       "type": "string"
-    },
-    "artifacts_path": {
-       "type": "string"
     }
   },
   "variables": {
@@ -74,10 +56,7 @@
       "name": "[variables('publicIPAddressName')]",
       "location": "[resourceGroup().location]",
       "properties": {
-        "publicIPAllocationMethod": "[variables('publicIPAddressType')]",
-        "dnsSettings": {
-          "domainNameLabel": "[parameters('dnsNameForPublicIP')]"
-        }
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
       }
     },
     {
