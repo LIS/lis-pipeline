@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -xe
+set -xe -o pipefail
 
 . utils.sh
 
@@ -152,6 +152,9 @@ function get_sources_git (){
     # get from a detached HEAD state
     git checkout -f master > /dev/null
     git checkout -f "$git_branch" > /dev/null
+    if [[ $? -ne 0 ]];then
+        exit 1
+    fi
     git pull > /dev/null
     popd
     popd
