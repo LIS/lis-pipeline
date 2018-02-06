@@ -532,23 +532,20 @@ function patch_kernel() {
         url=${patch#*//}
         case $protocol in
             http|https)
-                curl -s "$patch" | patch -f -p1 > /dev/null
+                git_patch_msg=$(curl -s "$patch" | git am 2>&1)
                 ;;
             scp)
                 host=${url%%:*}
                 path=${url#*:}
-                ssh $host -o StrictHostKeyChecking=no "cat $path" | patch -f -p1 > /dev/null
+                git_patch_msg=$(ssh $host -o StrictHostKeyChecking=no "cat $path" | git am 2>&1)
                 ;;
         esac
         if [[ ${PIPESTATUS[0]} -ne 0 ]] || [[ ${PIPESTATUS[1]} -ne 0 ]]; then
-            echo "Patch failed, looking for error files"
-            find . -name "*.rej" | xargs cat
+            echo "Patch failed with error message: $git_patch_msg"
             exit $(( ${PIPESTATUS[0]} + ${PIPESTATUS[1]} ))
         fi
     done
 
-    git add ${patches##*/}
-    git commit -m "patches: $(tail -1 ${patches})" > /dev/null
     popd
 }
 
