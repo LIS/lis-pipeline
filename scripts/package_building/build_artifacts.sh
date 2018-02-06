@@ -233,7 +233,7 @@ function prepare_kernel_rhel (){
         fi
     fi
     # Select the default config option for any new options in the newer kernel version
-    yes "" | make oldconfig
+    yes "" | make oldconfig > /dev/null
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S	Source: /\$S	Source: ${package_prefix}-/g" "./scripts/package/mkspec"
