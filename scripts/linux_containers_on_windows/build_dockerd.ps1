@@ -1,56 +1,86 @@
+param(
+    [parameter(Mandatory=$true)]
+    [String] $DockerGitRepo,
+    [parameter(Mandatory=$true)]
+    [String] $DockerGitBranch,
+    [parameter(Mandatory=$true)]
+    [String] $ClonePath,
+    [parameter(Mandatory=$true)]
+    [String] $GoPath,
+    [parameter(Mandatory=$true)]
+    [String] $DockerTestsGitRepo,
+    [parameter(Mandatory=$true)]
+    [String] $DockerTestsGitBranch
+)
+
 $ErrorActionPreference = "Stop"
-$DOCKER_GIT_REPO=$args[0]
-$DOCKER_GIT_BRANCH=$args[1]
-$CLONE_PATH=$args[2]
-$GO_PATH=$args[3]
-$DOCKER_TESTS_GIT_REPO=$args[4]
-$DOCKER_TESTS_GIT_BRANCH=$args[5]
 
 function Clone-Dockerd {
-    Param(
-        [Parameter(Mandatory=$true)]
-        [string]$repo,
-        [Parameter(Mandatory=$true)]
-        [string]$branch,
-        [Parameter(Mandatory=$true)]
-        [string]$path,
-        [Parameter(Mandatory=$true)]
-        [string]$tests_repo,
-        [Parameter(Mandatory=$true)]
-        [string]$tests_branch
+    param(
+        [String] $Repo,
+        [String] $Branch,
+        [String] $Path,
+        [String] $TestsRepo,
+        [String] $TestsBranch
     )
 
-    if (Get-Service dockerd -ErrorAction SilentlyContinue) {
-        Stop-Service dockerd
-        sc.exe delete dockerd
+    if (Get-Service "dockerd" -ErrorAction SilentlyContinue) {
+        Stop-Service "dockerd" -Force
+        sc.exe delete "dockerd"
+        if ($LastExitCode) {
+            Write-Host "Failed to remove Docker daemon"
+        }
     }
 
-    if (Test-Path $path/docker) { Remove-Item -Force -Recurse $path/docker }
-    git clone $repo -b $branch $path\docker
-
-    if (Test-Path $path/docker_tests) { Remove-Item -Force -Recurse $path/docker_tests }
-    git clone $tests_repo -b $tests_branch $path\docker_tests
+    if (Test-Path "$Path\docker") {
+        Remove-Item -Force -Recurse "$Path\docker"
+    }
+    git.exe clone $Repo -b $Branch "$Path\docker"
+    if ($LastExitCode) {
+        Write-Host "Could not clone docker"
+        exit 1
+    }
+    Write-Host "Docker cloned successfully"
+    
+    if (Test-Path "$Path\docker_tests") {
+        Remove-Item -Force -Recurse "$Path\docker_tests"
+    }
+    git.exe clone $TestsRepo -b $TestsBranch "$Path\docker_tests"
+    if ($LastExitCode) {
+        Write-Host "Could not clone docker-tests"
+        exit 1
+    }
+    Write-Host "docker-tests cloned successfully"
 }
 
 function Build-Dockerd {
-    Param(
-        [Parameter(Mandatory=$true)]
-        [string]$path
+    param(
+        [String] $Path
     )
 
     # build both daemon and client
     # TODO because of broken patch we need to use and existing client,
     # otherwise use -Binary
-    & $path\docker\hack\make.ps1
-    #Remove-Item "$path\docker\bundles\docker.exe"
-    cp "C:\docker.exe" "$path\docker\bundles"
+    & $Path\docker\hack\make.ps1
+    Copy-Item "C:\docker.exe" "$Path\docker\bundles"
 }
 
-$env:GOPATH="$GO_PATH"
-$env:PATH +="C:\tool-chain\bin;"
+function Main {
+    $ClonePath = "${env:HOMEDRIVE}\${env:HOMEPATH}\$ClonePath"
+    $GoPath = "${env:HOMEDRIVE}\${env:HOMEPATH}\$GoPath"
 
-if (-not (Test-Path $GO_PATH)) { Throw "GOPATH could not be found" }
-if (-not (Test-Path $CLONE_PATH)) { Throw "BUILD PATH could not be found" }
+    Write-Host "Clone Path : $ClonePath"
+    Write-Host "Go Path : $GoPath"
 
-Clone-Dockerd $DOCKER_GIT_REPO $DOCKER_GIT_BRANCH $CLONE_PATH $DOCKER_TESTS_GIT_REPO $DOCKER_TESTS_GIT_BRANCH
-Build-Dockerd $CLONE_PATH
+    $env:GOPATH = $GoPath
+    $env:PATH +=";C:\tool-chains\bin"
+
+    if (-not (Test-Path $GoPath)) { Throw "$GoPath could not be found" }
+    if (-not (Test-Path $ClonePath)) { Throw "$ClonePath PATH could not be found" }
+
+    Clone-Dockerd $DockerGitRepo $DockerGitBranch $ClonePath `
+        $DockerTestsGitRepo $DockerTestsGitBranch
+    Build-Dockerd $ClonePath
+}
+
+Main
