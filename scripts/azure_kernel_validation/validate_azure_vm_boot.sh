@@ -28,8 +28,7 @@ validate_azure_vm_boot() {
     OS_TYPE=$9
     WORK_DIR="${10}"
     VM_USER_NAME=$OS_TYPE
-    FULL_BUILD_NAME_LONG="$BUILD_NAME$BUILD_NUMBER"
-    FULL_BUILD_NAME=$(echo ${FULL_BUILD_NAME_LONG//[-._aeiouyw]/})
+    FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
 
     KERNEL_VERSION_FILE="./kernel_version${BUILD_NUMBER}/scripts/package_building/kernel_versions.ini"
     KERNEL_FOLDER=$(crudini --get $KERNEL_VERSION_FILE KERNEL_BUILT folder)
