@@ -75,6 +75,12 @@ pipeline {
                     writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
                 }
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
                 stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
@@ -119,6 +125,12 @@ pipeline {
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
                     writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                     writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
+                }
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
                 }
                 stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
