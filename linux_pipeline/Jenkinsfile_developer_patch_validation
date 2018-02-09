@@ -92,6 +92,12 @@ pipeline {
                           popd
                           '''
                 }
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                 name: "${env.KERNEL_ARTIFACTS_PATH}"

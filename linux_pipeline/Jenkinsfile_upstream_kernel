@@ -76,6 +76,12 @@ pipeline {
                     --create_changelog "${CREATE_CHANGELOG}"
                 popd
                 '''
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
                 writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                 writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
@@ -122,6 +128,12 @@ pipeline {
                     --build_date="${TIMESTAMP}"
                 popd
                 '''
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
                 writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
                 writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                 writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
