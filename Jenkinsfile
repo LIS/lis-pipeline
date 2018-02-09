@@ -341,7 +341,6 @@ pipeline {
             }
           post {
             always {
-              archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}\\bootlogs\\*.LOG"
               archiveArtifacts 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
               junit 'lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml'
             }
