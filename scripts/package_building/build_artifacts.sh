@@ -462,6 +462,7 @@ function prepare_perf_rhel (){
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/Name:.*/Name:  ${package_prefix}-perf/g" "SPECS/$spec"
     fi
+    change_perf_options "./SOURCES/tools/perf/Makefile.perf" "NO_GTK2=True"
     popd
 }
 
@@ -491,6 +492,7 @@ function prepare_perf_debian (){
         exit 3
     else 
         pushd "${source}/tools/perf"
+        change_perf_options "./Makefile.perf" "NO_GTK2=True"
         make DESTDIR="$pack_folder" install install-doc
         pushd "$pack_folder"
         mkdir "./usr"

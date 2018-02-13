@@ -388,3 +388,16 @@ EOF
     export IFS=$' '
     popd
 }
+
+change_perf_options(){
+    perf_makefile="$1"
+    perf_options="$2"
+
+    IFS=$';' perf_options=($perf_options)
+
+    for i in ${perf_options[@]};do
+        entry="$i"
+        var="${entry%=*}"
+        sed -i "s/# Define ${var}.*/$entry/" $perf_makefile
+    done
+}
