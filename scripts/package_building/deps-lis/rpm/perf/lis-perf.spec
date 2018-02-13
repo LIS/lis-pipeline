@@ -31,5 +31,4 @@ mv %{buildroot}%{_usr}/etc %{buildroot}
 %{_mandir}/man[1-8]/perf*
 %{_sysconfdir}/bash_completion.d/perf
 %{_bindir}/trace
-%{_usr}/%{_lib}/libperf-gtk.so
 %{_usr}/share/*
