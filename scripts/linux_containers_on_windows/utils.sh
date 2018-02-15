@@ -59,3 +59,15 @@ exec_with_retry2 () {
     done
     return $EXIT
 }
+
+function get_job_number (){
+    #
+    # Multiply current number of threads with a number
+    # Usage:
+    #   ./build_artifacts.sh --thread_number x10
+    #
+    multi="${1#*x}"
+    cores="$(cat /proc/cpuinfo | grep -c processor)"
+    result="$(expr $cores*$multi | bc)"
+    echo ${result%.*}
+}
