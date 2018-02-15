@@ -28,7 +28,7 @@ function main() {
     else
         mkdir -p "$DESTINATION_PATH"
     fi
-    
+    sleep 30
     az vm boot-diagnostics get-boot-log --name "$VM_NAME" --resource-group "$RESOURCE_GROUP" > "$DESTINATION_PATH/boot_${VM_NAME}.log"
 }
 
