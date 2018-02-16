@@ -16,6 +16,7 @@ pipeline {
     string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for ubuntu, 7.4 for centos)', name: 'OS_VERSION')
     string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
     string(defaultValue: "kernel_pipeline_fvt.xml", description: 'LISA xml test definition name', name: 'LISA_TEST_XML')
+    choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_azure_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
@@ -68,7 +69,8 @@ pipeline {
                         --build_path "${BUILD_PATH}" \\
                         --kernel_config "${KERNEL_CONFIG}" \\
                         --clean_env "${CLEAN_ENV}" \\
-                        --use_ccache "${USE_CCACHE}" 
+                        --use_ccache "${USE_CCACHE}" \\
+                        --enable_kernel_debug "${KERNEL_DEBUG}"
                     popd
                     '''
                     writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'

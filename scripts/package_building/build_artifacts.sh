@@ -192,6 +192,8 @@ function prepare_kernel_debian (){
     package_prefix="$2"
     git_tag="$3"
     dep_path="$4"
+    enable_debug="$5"
+    debug_path="$6"
     
     pushd "$source"
     kernel_version="$(make kernelversion)"
@@ -200,9 +202,11 @@ function prepare_kernel_debian (){
             cp "$KERNEL_CONFIG" .config
         elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
             cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
-        else
-            make olddefconfig
         fi
+    fi
+    make olddefconfig
+    if [[ "$enable_debug" == "True" ]];then
+        ./scripts/kconfig/merge_config.sh .config "$debug_path"
     fi
     cp "$dep_path/setlocalversion" ./scripts
     sed -i -e "s/%version%/-${git_tag}/g" ./scripts/setlocalversion
@@ -218,6 +222,8 @@ function prepare_kernel_rhel (){
     package_prefix="$2"
     kernel_tag="$3"
     dep_path="$4"
+    enable_debug="$5"
+    debug_path="$6"
     
     pushd "${source}"
     if [[ -e "tools/hv/lis-daemon.spec" ]];then
@@ -227,13 +233,14 @@ function prepare_kernel_rhel (){
         if [[ -e "./$KERNEL_CONFIG" ]];then
             cp "$KERNEL_CONFIG" .config
         elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
-            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
-        else
-            make olddefconfig
+            cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config 
         fi
     fi
     # Select the default config option for any new options in the newer kernel version
-    yes "" | make oldconfig > /dev/null || true
+    make olddefconfig
+    if [[ "$enable_debug" == "True" ]];then
+        ./scripts/kconfig/merge_config.sh .config "$debug_path"
+    fi
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S	Source: /\$S	Source: ${package_prefix}-/g" "./scripts/package/mkspec"
@@ -684,6 +691,8 @@ function build_kernel (){
     patches="${12}"
     dep_path="${13}"
     create_changelog="${14}"
+    enable_debug="${15}"
+    debug_path="${16}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source=$(get_sources_${download_method} "$base_dir" "$source_path" "$git_branch" "$clone_depth" "$patches")
@@ -700,7 +709,7 @@ function build_kernel (){
         additions_folder="${base_dir}/kernel/additions"
         create_deb_changelog "$source" "$additions_folder" "linux-source" "${KERNEL_VERSION}-${GIT_TAG12}" 2> /dev/null || true
     fi
-    prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path"
+    prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path" "$enable_debug" "$debug_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
 	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$additions_folder" "$create_changelog"
     DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
@@ -820,6 +829,7 @@ function main {
     BASE_DIR="$(pwd)/temp_build"
     DEP_PATH="$(pwd)/deps-lis/${os_PACKAGE}"
     INI_FILE="$(pwd)/kernel_versions.ini"
+    DEBUG_CONFIG_PATH="$(pwd)/deps-lis/kernel_config/debug_flags.ini"
 
     # Mandatory:
     SOURCE_PATH=""
@@ -845,8 +855,9 @@ function main {
     INSTALL_DEPS='False'
     USE_KERNEL_PREFIX='False'
     CREATE_CHANGELOG='True'
+    ENABLE_DEBUG='False'
 
-    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix: -n 'build_artifacts.sh' -- "$@")
+    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug: -n 'build_artifacts.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -958,6 +969,11 @@ function main {
                     "") shift 2 ;;
                     *) CREATE_CHANGELOG="$2" ; shift 2 ;;
                 esac ;;
+            --enable_kernel_debug)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) ENABLE_DEBUG="$2" ; shift 2 ;;
+                esac ;;
             --) shift ; break ;;
             *) echo "Wrong parameters!" ; exit 1 ;;
         esac
@@ -995,6 +1011,10 @@ function main {
         fi
     fi
     
+    if [[ "$ENABLE_DEBUG" == "True" ]];then
+        FOLDER_PREFIX="$FOLDER_PREFIX-debug"
+    fi
+
     INITIAL_BRANCH_NAME=$GIT_BRANCH
     if [[ "$GIT_BRANCH" == "" ]];then
         GIT_BRANCH="$DEFAULT_BRANCH"
@@ -1012,7 +1032,7 @@ function main {
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH" \
-        "$CREATE_CHANGELOG"
+        "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
