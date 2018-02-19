@@ -9,7 +9,7 @@ pipeline {
   parameters {
     choice(choices: "True\nFalse", description: 'Cleanup environment', name: 'CLEAN_ENV')
     string(defaultValue: "x3", description: 'Number of cores', name: 'BUILD_THREAD_NUMBER')
-    string(defaultValue: "prepare_build_env, build_linux_kernel, build_opengcs_tools, generate_kernel_initrd, build_dockerd_daemon, run_docker_tests",
+    string(defaultValue: "prepare_build_env, build_linux_kernel, build_opengcs_tools, generate_kernel_initrd, build_dockerd_daemon, run_docker_tests, publish_artifacts",
             description: 'What stages to run. By default all stages are enabled', name: 'ENABLED_STAGES')
   }
   environment {
@@ -214,6 +214,7 @@ pipeline {
                     -DBConfFilePath "${env:DB_CONF}"
             ''')
             echo 'Finished running Docker tests'
+            stash includes: 'artifacts\\*', name: 'artifacts'
           }
         }
         post {
@@ -223,6 +224,25 @@ pipeline {
           success {
             echo 'Cleaning up the environment...'
             PowerShellWrapper('Remove-Item results -Force -Recurse')
+          }
+        }
+      }
+      stage('publish_artifacts') {
+        when {
+          beforeAgent true
+          expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+        }
+        agent {
+          node {
+            label 'windows_meta_slave'
+          }
+        }
+        steps {
+          dir("artifacts") {
+            unstash "artifacts"
+          }
+          withCredentials(bindings: [string(credentialsId: 'MS_RD_SHARE_PATH', variable: 'MS_RD_SHARE_PATH')]) {
+            PowerShellWrapper('& ".\\scripts\\linux_containers_on_windows\\copy_artifacts.ps1 -SharedStoragePath ${env:MS_RD_SHARE_PATH} -Location "artifacts" -Destination "${env:MS_RD_SHARE_PATH}\\${env:BUILD_NUMBER}"')
           }
         }
       }
