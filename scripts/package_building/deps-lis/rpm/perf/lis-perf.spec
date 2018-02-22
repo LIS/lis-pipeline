@@ -32,3 +32,4 @@ mv %{buildroot}%{_usr}/etc %{buildroot}
 %{_sysconfdir}/bash_completion.d/perf
 %{_bindir}/trace
 %{_usr}/share/*
+%{_usr}/lib64/libperf-jvmti.so
