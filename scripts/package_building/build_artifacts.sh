@@ -693,6 +693,7 @@ function build_kernel (){
     create_changelog="${14}"
     enable_debug="${15}"
     debug_path="${16}"
+    custom_build_tag="${17}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source=$(get_sources_${download_method} "$base_dir" "$source_path" "$git_branch" "$clone_depth" "$patches")
@@ -703,7 +704,11 @@ function build_kernel (){
     popd
     GIT_TAG="$(get_git_tag $source HEAD 7)"
     GIT_TAG12="$(get_git_tag $source HEAD 12)"
-    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $build_date $folder_prefix)"
+    folder_sufix="$build_date"
+    if [[ "$custom_build_tag" != "" ]];then
+        folder_sufix="${build_date}-${custom_build_tag}"
+    fi
+    DESTINATION_PATH="$(get_destination_path $source $base_dest_path $os_PACKAGE $GIT_TAG $folder_sufix $folder_prefix)"
     # Note(mbivolan): Continue if changelog creation fails, as it is a non-critical artifact
     if [[ "$os_FAMILY" == "debian" ]] && [[ "$create_changelog" == "True" ]];then
         additions_folder="${base_dir}/kernel/additions"
@@ -857,7 +862,7 @@ function main {
     CREATE_CHANGELOG='True'
     ENABLE_DEBUG='False'
 
-    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug: -n 'build_artifacts.sh' -- "$@")
+    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k:m: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,custom_build_tag:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug: -n 'build_artifacts.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -929,10 +934,14 @@ function main {
                     *) GIT_TAG="$2" ; shift 2 ;;
                 esac ;;
             --build_date)
-                # Note(mbivolan): This parameter should be a unix timestamp or a date in the format (ddmmyy)
                 case "$2" in
                     "") shift 2 ;;
                     *) BUILD_DATE="$2" ; shift 2 ;;
+                esac ;;
+            --custom_build_tag)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) CUSTOM_BUILD_TAG="$2" ; shift 2 ;;
                 esac ;;
             --clone_depth)
                 case "$2" in
@@ -1032,7 +1041,7 @@ function main {
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH" \
-        "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH"
+        "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH" "$CUSTOM_BUILD_TAG"
     build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
         "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
