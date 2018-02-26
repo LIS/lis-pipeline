@@ -11,6 +11,7 @@ pipeline {
         string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
         string(defaultValue: "", description: 'Valid examples: \n scp://my-scp-hostname:/home/my-username/patch.p1 \n scp://my-username@my-scp-hostname:/home/my-username/patch.p1 \n http://my-website.com/patch.p1 \n Use the space separator for multiple patches.' , name: 'KERNEL_PATCH')
         choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
+        string(defaultValue: "", description: 'Custom build tag for artifacts', name: 'CUSTOM_BUILD_TAG')
         string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv",
             description: 'What stages to run. By default all stages are enabled', name: 'ENABLED_STAGES')
     }
@@ -88,7 +89,8 @@ pipeline {
                               --use_kernel_folder_prefix "${USE_KERNEL_FOLDER_PREFIX}" \\
                               --clone_depth "${CLONE_DEPTH}" \\
                               --patch_file "developer_patches" \\
-                              --create_changelog "${CREATE_CHANGELOG}"
+                              --create_changelog "${CREATE_CHANGELOG}" \\
+                              --custom_build_tag "${CUSTOM_BUILD_TAG}"
                           popd
                           '''
                 }
