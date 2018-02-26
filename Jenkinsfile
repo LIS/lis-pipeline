@@ -13,9 +13,8 @@ pipeline {
   parameters {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
-    string(defaultValue: "16.04.3", description: 'OS version (ex:16.04.3 for ubuntu, 7.4 for centos)', name: 'OS_VERSION')
-    string(defaultValue: "ubuntu", description: 'OS type (ubuntu or centos)', name: 'OS_TYPE')
-    string(defaultValue: "kernel_pipeline_fvt.xml", description: 'LISA xml test definition name', name: 'LISA_TEST_XML')
+    choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
+    choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_azure_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
@@ -44,7 +43,7 @@ pipeline {
           stage('build_artifacts_ubuntu') {
               when {
                 beforeAgent true
-                expression { params.OS_TYPE == 'ubuntu' }
+                expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
@@ -97,7 +96,7 @@ pipeline {
           stage('build_artifacts_centos') {
               when {
                 beforeAgent true
-                expression { params.OS_TYPE == 'centos' }
+                expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
                 expression { params.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
@@ -117,7 +116,6 @@ pipeline {
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps "True" \\
                         --thread_number "${THREAD_NUMBER}" \\
-                        --debian_os_version "${UBUNTU_VERSION}" \\
                         --build_path "${BUILD_PATH}" \\
                         --kernel_config "${KERNEL_CONFIG}" \\
                         --clean_env "${CLEAN_ENV}" \\
@@ -194,7 +192,9 @@ pipeline {
             unstash 'kernel_version_ini'
             sh 'cat scripts/package_building/kernel_versions.ini'
           }
-          sh '''
+          sh '''#!/bin/bash
+            OS_TYPE=${DISTRO_VERSION%_*}
+            OS_TYPE=${OS_TYPE,,}
             bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
                 --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
                 --smb_share_username $USERNAME --smb_share_password $PASSWORD \
@@ -332,8 +332,8 @@ pipeline {
                         -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
-                        -VHDType $env:OS_TYPE -WorkingDirectory "C:\\workspace"
-                        -OSVersion "${env:OS_VERSION}" -LISAManageVMS:$true
+                        -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
+                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]" -LISAManageVMS:$true
                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
                         -AzureToken "${env:AZURE_SAS}"
                         -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
