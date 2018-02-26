@@ -119,7 +119,7 @@ main() {
             --build_number)
                 BUILD_NUMBER="$2" 
                 shift 2;;
-            --sbm_share_username)
+            --smb_share_username)
                 USERNAME="$2" 
                 shift 2;;
             --smb_share_password)
@@ -138,9 +138,9 @@ main() {
         esac
     done
 
-    validate_azure_vm_boot $BASEDIR $BUILD_NAME $BUILD_NUMBER $USERNAME \
-        $PASSWORD $SMB_SHARE_URL $PRIVATE_KEY_PATH $VM_USER_NAME $OS_TYPE \
-        $WORKDIR
+    validate_azure_vm_boot "$BASEDIR" "$BUILD_NAME" "$BUILD_NUMBER" "$USERNAME" \
+        "$PASSWORD" "$SMB_SHARE_URL" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$OS_TYPE" \
+        "$WORKDIR"
     
 }
 main $@
