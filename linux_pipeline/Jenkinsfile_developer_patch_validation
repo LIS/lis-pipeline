@@ -90,7 +90,7 @@ pipeline {
                               --clone_depth "${CLONE_DEPTH}" \\
                               --patch_file "developer_patches" \\
                               --create_changelog "${CREATE_CHANGELOG}" \\
-                              --custom_build_tag "${CUSTOM_BUILD_TAG}"
+                              --custom_build_tag="${CUSTOM_BUILD_TAG}"
                           popd
                           '''
                 }
