@@ -21,11 +21,14 @@ param(
     [String] $SharedStoragePath,
     [String] $ShareUser,
     [String] $SharePassword,
-    [String] $IdRSAPub
+    [String] $IdRSAPub,
+    [String] $LisaTestDependencies
 )
 
 $ErrorActionPreference = "Stop"
 
+$LISA_FOLDER = ".\lis-test"
+$LISA_REL_PATH = "${LISA_FOLDER}\WS2012R2\lisa"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 . "$scriptPath\retrieve_ip.ps1"
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
@@ -137,19 +140,11 @@ function Wait-VMReady {
     return $ip
 }
 
-function Get-Lisa {
-    $puttyBinaries = "https://the.earth.li/~sgtatham/putty/0.70/w32/putty.zip"
-    if (Test-Path ".\lis-test") {
-        rm -Recurse -Force ".\lis-test"
+function Get-LisaCode {
+    if (Test-Path "${LISA_FOLDER}") {
+        rm -Recurse -Force "${LISA_FOLDER}"
     }
-    git clone https://github.com/LIS/lis-test.git
-    Invoke-WebRequest -Uri $puttyBinaries -OutFile "PuttyBinaries.zip"
-    if ($LastExitCode) {
-        throw "Failed to download Putty binaries."
-    }
-    Expand-Archive ".\PuttyBinaries.zip" ".\lis-test\WS2012R2\lisa\bin"
-
-    return ".\lis-test\WS2012R2\lisa\ssh\demo_id_rsa"
+    git clone https://github.com/LIS/lis-test.git ${LISA_FOLDER}
 }
 
 function Get-Dependencies {
@@ -158,17 +153,31 @@ function Get-Dependencies {
         [string] $xmlTest
     )
     if ( Test-Path $keyPath ){
-        cp "$keyPath" ".\lis-test\WS2012R2\lisa\ssh"
+        cp "$keyPath" "${LISA_REL_PATH}\ssh"
     }
     $keyName = ([System.IO.Path]::GetFileName($keyPath))
     if ( Test-Path $xmlTest ){
-        cp $xmlTest ".\lis-test\WS2012R2\lisa\xml"
+        cp $xmlTest "${LISA_REL_PATH}\xml"
         $xmlName = ([System.IO.Path]::GetFileName($xmlTest))
     } else {
         $xmlName = $xmlTest
     }
     return ($keyName, $xmlName)
 }
+
+function Copy-LisaTestDependencies {
+    param([string[]] $TestDependenciesFolders)
+
+    # This function copies test dependencies in lisa folder from a given share
+    if (!(Test-Path $LisaTestDependencies)) {
+        throw "${LisaTestDependencies} path does not exist!"
+    }
+    foreach ($folder in $TestDependenciesFolders) {
+        Copy-Item -Force -Recurse -Path "${LisaTestDependencies}${folder}" `
+            -Destination "${LISA_REL_PATH}\"
+    } 
+}
+
 function Edit-TestXML {
     param(
         [parameter(Mandatory=$true)]
@@ -224,13 +233,11 @@ function Main {
     if ($LISAManageVMS) {
         Write-Host "Getting the proper VHD folder name for LISA with ${OsVersion} and ${kernelPath} and ${kernelTag}"
         $imageFolder = Join-Path $LISAImagesShareUrl ("{0}\{0}_{1}" -f @($VHDType, $OsVersion))
-        ls $imageFolder
         Write-Host "Getting LISA code..."
-        $idRSAPriv = Get-Lisa
-        Write-Host "Copying private keys"
-        Copy-Item -Force -Path "C:\bin\*.ppk" -Destination ".\lis-test\WS2012R2\lisa\ssh\"
-
-        pushd ".\lis-test\WS2012R2\lisa\xml"
+        Get-LisaCode
+        Write-Host "Copying lisa dependencies from share"
+        Copy-LisaTestDependencies @("bin", "Infrastructure", "tools", "ssh")
+        pushd "${LISA_REL_PATH}\xml"
         try {
             Edit-TestXML -Path $XmlTest -VMSuffix $InstanceName
         } catch {
@@ -270,7 +277,14 @@ function Main {
             throw "Creating the LISA VM failed."
         }
 
-        $idRSAPriv = Get-Lisa
+        Get-LisaCode
+        $puttyBinaries = "https://the.earth.li/~sgtatham/putty/0.70/w32/putty.zip"
+        Invoke-WebRequest -Uri $puttyBinaries -OutFile "PuttyBinaries.zip"
+        if ($LastExitCode) {
+            throw "Failed to download Putty binaries."
+        }
+        Expand-Archive ".\PuttyBinaries.zip" "${LISA_REL_PATH}\bin"
+        $idRSAPriv = "${LISA_REL_PATH}\ssh\demo_id_rsa"
         $ip = Wait-VMReady $InstanceName $VMCheckTimeout
 
         Execute-WithRetry {
@@ -292,7 +306,7 @@ function Main {
         Edit-TestXML $XmlTest $InstanceName $KeyName
     }
 
-    pushd ".\lis-test\WS2012R2\lisa\"
+    pushd "${LISA_REL_PATH}\"
     Write-Host "Started running LISA"
     try {
         $lisaParams = ("SHARE_URL='{0}';AZURE_TOKEN='{1}';KERNEL_FOLDER='{2}'" -f @($AzureUrl, $AzureToken, $kernelFolder))

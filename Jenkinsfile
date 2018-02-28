@@ -321,7 +321,8 @@ pipeline {
           steps {
             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                        string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL')]) {
+                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
                 echo 'Running LISA...'
                 dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                     unstash 'kernel_version_ini'
@@ -337,6 +338,7 @@ pipeline {
                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
                         -AzureToken "${env:AZURE_SAS}"
                         -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
                   ''')
                 echo 'Finished running LISA.'
               }
