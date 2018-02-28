@@ -142,8 +142,8 @@ function get_sources_git (){
     git_folder_git_extension=${source_path##*/}
     git_folder=${git_folder_git_extension%%.*}
     source="${base_dir}/kernel/${git_folder}"
-    
-    if [[ "$clone_depth" != "" ]];then
+
+    if [[ "$git_branch" == "master" && "$clone_depth" != "" ]];then
         git_params="--depth $clone_depth --no-single-branch"
     fi
     pushd "${base_dir}/kernel"
