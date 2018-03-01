@@ -1,0 +1,193 @@
+#!/usr/bin/env groovy
+
+pipeline {
+    parameters {
+        choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
+        string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+        string(defaultValue: "HEAD", description: 'Specific commit id to build', name: 'KERNEL_GIT_COMMIT_ID')
+        choice(choices: 'Ubuntu\nCentOS', description: 'Distro version.', name: 'DISTRO_VERSION')
+        string(defaultValue: "build_artifacts, boot_test", description: 'What stages to run', name: 'ENABLED_STAGES')
+    }
+    environment {
+        UBUNTU_VERSION = '16'
+        BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
+        KERNEL_CONFIG = 'Microsoft/config-azure'
+        AZURE_MAX_RETRIES = '10'
+        BUILD_NAME = 'b'
+        INSTALL_DEPS = 'True'
+        USE_KERNEL_FOLDER_PREFIX = 'True'
+        THREAD_NUMBER = 'x3'
+    }
+    options {
+        overrideIndexTriggers(false)
+    }
+    agent {
+        node {
+            label 'meta_slave'
+        }
+    }
+    stages {
+        stage('build_artifacts_ubuntu') {
+                when {
+                    beforeAgent true
+                    expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+                    expression { params.ENABLED_STAGES.contains('build_artifacts') }
+                }
+                agent {
+                    node {
+                        label 'ubuntu_kernel_builder'
+                    }
+                }
+                steps {
+                    withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL')]) {
+                        sh '''#!/bin/bash
+                            set -xe
+
+                            if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                                    KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
+                            fi
+
+                            echo "Building artifacts..."
+                            pushd "$WORKSPACE/scripts/package_building_bisect"
+                            bash build_artifacts_bisect.sh \\
+                                --git_url "${KERNEL_GIT_URL}" \\
+                                --git_branch "${KERNEL_GIT_BRANCH}" \\
+                                --git_commit_id "${KERNEL_GIT_COMMIT_ID}" \\
+                                --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                                --build_path "${BUILD_PATH}"
+                            popd
+                            '''
+                            sh '''#!/bin/bash
+                                echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                               '''
+                    script {
+                        currentBuild.displayName = readFile "./build_name"
+                    }
+
+                    stash includes: ("scripts/package_building_bisect/${env.BUILD_NUMBER}-${env.BRANCH_NAME}/**/deb/**"),
+                                name: "kernel_artifacts"
+                    stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                    sh '''
+                            set -xe
+                            rm -rf "scripts/package_building_bisect/${BUILD_NUMBER}-${BRANCH_NAME}"
+                    '''
+                }
+            }
+        }
+        stage('build_artifacts_centos') {
+            when {
+                beforeAgent true
+                expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+            }
+            agent {
+                node {
+                    label 'centos_kernel_builder'
+                }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL')]) {
+                    sh '''#!/bin/bash
+                        set -xe
+ 
+                        if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                            KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
+                        fi
+ 
+                        echo "Building artifacts..."
+                        pushd "$WORKSPACE/scripts/package_building_bisect"
+                        bash build_artifacts_bisect.sh \\
+                            --git_url "${KERNEL_GIT_URL}" \\
+                            --git_branch "${KERNEL_GIT_BRANCH}" \\
+                            --git_commit_id "${KERNEL_GIT_COMMIT_ID}" \\
+                            --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                            --build_path "${BUILD_PATH}"
+                        popd
+                        '''
+                        sh '''#!/bin/bash
+                            echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                        '''
+                    script {
+                        currentBuild.displayName = readFile "./build_name"
+                    }
+                    stash includes: ("scripts/package_building_bisect/${env.BUILD_NUMBER}-${env.BRANCH_NAME}/**/rpm/**"),
+                                name: "kernel_artifacts"
+                    stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                    sh '''
+                        set -xe
+                        rm -rf "scripts/package_building_bisect/${BUILD_NUMBER}-${BRANCH_NAME}"
+                    '''
+                }
+            }
+        }
+        stage('boot_test') {
+            when {
+                beforeAgent true
+                expression { params.ENABLED_STAGES.contains('boot_test') }
+            }
+            agent {
+                node {
+                    label 'meta_slave'
+                }
+            }
+            steps {
+                dir("${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+                    unstash "kernel_artifacts"
+                }
+                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    sh 'cat scripts/package_building/kernel_versions.ini'
+                }
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                                  usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                          ]) {
+                    sh '''#!/bin/bash
+                        set -xe
+                        OS_TYPE=${DISTRO_VERSION%_*}
+                        OS_TYPE=${OS_TYPE,,}
+
+                        if [[ $OS_TYPE == "ubuntu" ]]; then
+                            PACKAGE_NAME="deb"
+                        elif [[ $OS_TYPE == "centos" ]]; then
+                            PACKAGE_NAME="rpm"
+                        fi
+
+                        pushd ${BUILD_NUMBER}${BRANCH_NAME}
+                        mkdir -p "$PACKAGE_NAME"
+                        art=$(find . -name "*.$PACKAGE_NAME")
+                        mv $art "$PACKAGE_NAME"
+                        popd
+                    '''
+                    sh '''#!/bin/bash
+                        OS_TYPE=${DISTRO_VERSION%_*}
+                        OS_TYPE=${OS_TYPE,,}
+                        local_path=$(readlink -f ${BUILD_NUMBER}${BRANCH_NAME})
+                        bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                                --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                                --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                                --local_path $local_path
+                        '''
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+                    echo "Cleaning Azure resources up..."
+                    sh '''#!/bin/bash
+                        pushd ./scripts/azure_kernel_validation
+                        bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                        popd
+                        '''
+                }
+                failure {
+                    sh 'echo "Load failure test results."'
+                    nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+                }
+                success {
+                    nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+                }
+            }
+        }
+    }
+}

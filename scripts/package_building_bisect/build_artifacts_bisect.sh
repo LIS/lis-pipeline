@@ -13,6 +13,7 @@ function clean_env_debian () {
     
     if [[ -d "$base_dir" ]];then
         pushd $base_dir
+        find . -name "*.deb" | xargs rm -f
         git_folders=$(find . -name .git -type d -prune)
         IFS=$'\n'
         for folder in $git_folders; do
@@ -39,6 +40,7 @@ function clean_env_rhel () {
     fi
     if [[ -d "$base_dir" ]];then
         pushd $base_dir
+        find . -name "*.rpm" | xargs rm -f
         git_folders=$(find . -name .git -type d -prune)
         IFS=$'\n'
         for folder in $git_folders; do
