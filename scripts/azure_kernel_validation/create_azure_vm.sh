@@ -59,13 +59,15 @@ function create_vm(){
     deploy_data="$1"
     resource_group="$2"
     build_number="$3"
+    resource_location="$4"
 
     chmod +x ./az-group-deploy.sh
-    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l northeurope -n "$build_number"
+    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l "$resource_location" -n "$build_number"
 }
 
 function main(){
     RESOURCE_GROUP=""
+    RESOURCE_LOCATION=""
     VM_PARAMS=""
     TEMPLATE_FOLDER="$WORKSPACE/scripts/azure_kernel_validation/azure_templates"
     BASE_DIR="$(pwd)"
@@ -89,11 +91,14 @@ function main(){
             --build_number)
                 BUILD_NUMBER="$2"
                 shift 2;;
+            --resource_location)
+                RESOURCE_LOCATION="$2"
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
     done
-    
+
     if [[ "$INSTALL_DEPS" == "y" ]];then
         install_deps
     fi
@@ -118,7 +123,7 @@ function main(){
     change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR"
     popd
     pushd "$BASE_DIR"
-    create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER"
+    create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER" "$RESOURCE_LOCATION"
     popd
 }
 
