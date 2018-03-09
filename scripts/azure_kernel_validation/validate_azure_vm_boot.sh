@@ -27,6 +27,7 @@ validate_azure_vm_boot() {
     WORK_DIR="${10}"
     RESOURCE_GROUP="${11}"
     RESOURCE_LOCATION="${12}"
+    LOCAL_PATH="${13}"
     VM_USER_NAME=$OS_TYPE
     FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
 
@@ -75,9 +76,16 @@ validate_azure_vm_boot() {
     mkdir -p $MOUNT_POINT
     sudo mount -t cifs "${SMB_SHARE_URL}/temp-kernel-artifacts" $MOUNT_POINT \
                -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
-    scp -i $PRIVATE_KEY_PATH -r -o StrictHostKeyChecking=no "${MOUNT_POINT}/${KERNEL_FOLDER}/${artifacts_folder}" "$VM_USER_NAME@$public_ip:/tmp/"
+    if [[ "$LOCAL_PATH" == "" ]]; then
+        target_url="${MOUNT_POINT}/${KERNEL_FOLDER}/${artifacts_folder}"
+        target_artifacts="kernel"
+    else
+        target_url="$LOCAL_PATH/$artifacts_folder"
+        target_artifacts="all"
+    fi
+    scp -i $PRIVATE_KEY_PATH -r -o StrictHostKeyChecking=no "$target_url" "$VM_USER_NAME@$public_ip:/tmp/"
     run_remote_script "$BASEDIR/prepare_test_vm.sh" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$public_ip" \
-                "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts kernel --vm_username $VM_USER_NAME"
+                "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts $target_artifacts --vm_username $VM_USER_NAME"
     ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo reboot' || true
     sudo umount $MOUNT_POINT
     sleep 10
@@ -142,13 +150,16 @@ main() {
             --resource_location)
                 RESOURCE_LOCATION="$2"
                 shift 2;;
+            --local_path)
+                LOCAL_PATH="$2"
+                shift 2;;
             *) break ;;
         esac
     done
 
     validate_azure_vm_boot "$BASEDIR" "$BUILD_NAME" "$BUILD_NUMBER" "$USERNAME" \
         "$PASSWORD" "$SMB_SHARE_URL" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$OS_TYPE" \
-        "$WORKDIR" "$RESOURCE_GROUP" "$RESOURCE_LOCATION"
+        "$WORKDIR" "$RESOURCE_GROUP" "$RESOURCE_LOCATION" "$LOCAL_PATH"
     
 }
 main $@
