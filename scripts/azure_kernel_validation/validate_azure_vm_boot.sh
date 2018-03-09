@@ -2,8 +2,6 @@
 
 set -xe
 
-RESOURCE_GROUP="kernel-validation"
-
 run_remote_script() {
     script_path="$1"
     private_key_path="$2"
@@ -27,6 +25,8 @@ validate_azure_vm_boot() {
     VM_USER_NAME=$8
     OS_TYPE=$9
     WORK_DIR="${10}"
+    RESOURCE_GROUP="${11}"
+    RESOURCE_LOCATION="${12}"
     VM_USER_NAME=$OS_TYPE
     FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
 
@@ -45,7 +45,8 @@ validate_azure_vm_boot() {
 
     bash create_azure_vm.sh --build_number "$FULL_BUILD_NAME" \
         --vm_params "username=$USERNAME,password=$PASSWORD,samba_path=$SMB_SHARE_URL/temp-kernel-artifacts,kernel_path=$KERNEL_FOLDER" \
-        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE
+        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE \
+        --resource_location "$RESOURCE_LOCATION"
     popd
 
     INTERVAL=5
@@ -105,11 +106,12 @@ validate_azure_vm_boot() {
 }
 
 main() {
-
     WORKDIR="$(pwd)"
     BASEDIR=$(dirname $0)
     PRIVATE_KEY_PATH="${HOME}/azure_priv_key.pem"
     VM_USER_NAME="ubuntu"
+    RESOURCE_GROUP="kernel-validation"
+    RESOURCE_LOCATION="northeurope"
 
     while true;do
         case "$1" in
@@ -134,13 +136,19 @@ main() {
             --os_type)
                 OS_TYPE="$2"
                 shift 2;;
+            --resource_group)
+                RESOURCE_GROUP="$2"
+                shift 2;;
+            --resource_location)
+                RESOURCE_LOCATION="$2"
+                shift 2;;
             *) break ;;
         esac
     done
 
     validate_azure_vm_boot "$BASEDIR" "$BUILD_NAME" "$BUILD_NUMBER" "$USERNAME" \
         "$PASSWORD" "$SMB_SHARE_URL" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$OS_TYPE" \
-        "$WORKDIR"
+        "$WORKDIR" "$RESOURCE_GROUP" "$RESOURCE_LOCATION"
     
 }
 main $@
