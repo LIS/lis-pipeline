@@ -83,7 +83,7 @@ function main {
             --ms_kernel_git_repo)
                 case "$2" in
                     "") shift 2 ;;
-                    *) ms_kernel_git_repo="$2" ; shift 2 ;;
+                    *) MS_KERNEL_GIT_REPO="$2" ; shift 2 ;;
                 esac ;;
             --git_branch)
                 case "$2" in
@@ -100,8 +100,8 @@ function main {
         esac
     done
 
-    OPENGCS_ARTIFACT_DIR_PATH=$(ls -td -- $ARTIFACTS_PATH/* |  grep "__opengcs$" | head -n 1)
-    KERNEL_ARTIFACT_DIR_PATH=$(ls -td -- "$ARTIFACTS_PATH"/* |  grep  __msft-kernel_4.12 | head -n 1)
+    OPENGCS_ARTIFACT_DIR_PATH=$(ls -td -- $ARTIFACTS_PATH/* | grep "__opengcs$" | head -n 1)
+    KERNEL_ARTIFACT_DIR_PATH=$(ls -td -- "$ARTIFACTS_PATH"/* | grep  __msft-kernel_4.12 | head -n 1)
 
     if [[ ! -d "${ARTIFACTS_PATH}" ]]; then
         echo "${ARTIFACTS_PATH} artifacts path is not accessible, check the SMB share connectivity"
@@ -112,11 +112,11 @@ function main {
     check_opengcs_last_commit
     check_mskernel_last_commit
 
-    if [[ "$build_opengcs_status" == "no" ] && [ "$build_kernel_status" == "no" ]]; then
-        echo "NOT triggering pipeline, NO new commits!"
+    if [[ "$build_opengcs_status" == "no" && "$build_kernel_status" == "no" ]]; then
+        echo "Not triggering pipeline, no new commits!"
         exit 1
     else
-        echo "Triggering pipeline, NEW commits!"
+        echo "Triggering pipeline, new commits!"
     fi
 }
 
