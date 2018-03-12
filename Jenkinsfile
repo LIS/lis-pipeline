@@ -216,7 +216,7 @@ pipeline {
           echo "Cleaning Azure resources up..."
           sh '''#!/bin/bash
             pushd ./scripts/azure_kernel_validation
-            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}" &
             popd
             '''
           nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
