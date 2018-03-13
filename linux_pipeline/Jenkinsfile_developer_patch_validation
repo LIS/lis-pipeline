@@ -18,7 +18,7 @@ pipeline {
     environment {
         KERNEL_ARTIFACTS_PATH = 'dev-patch-kernels'
         UBUNTU_VERSION = '16'
-        BUILD_PATH = '/mnt/tmp/developer-kernel-build-folder'
+        BUILD_PATH = '/mnt/tmp/developer-kernel-build-folder-comparison'
         KERNEL_CONFIG = 'Microsoft/config-azure'
         CLEAN_ENV = 'True'
         USE_CCACHE = 'True'
@@ -188,6 +188,7 @@ pipeline {
                         bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
                         popd
                         '''
+                    archiveArtifacts 'scripts/azure_kernel_validation/tests.xml'
                     nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
                 }
             }
