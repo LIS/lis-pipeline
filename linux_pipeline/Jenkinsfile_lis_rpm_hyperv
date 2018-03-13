@@ -64,22 +64,22 @@ DISTROS = getDistros (DISTRO_VERSIONS, supportedDistros)
 stage ("Deploy stage") {
     def runs = [:]
     nodesMap.keySet().each {
-        testNode = it
-        mappedDistros = nodesMap[it]
+        def testNode = it
+        def mappedDistros = nodesMap[it]
         if (testNode != 'sriov') {
             testNode = 'ws2016'
         }
         DISTROS.each {
             if (mappedDistros.contains("${it},")) {
-                node = testNode
-                runs ["${it}-${node}"] = {
-                    node ("${node}") {
-                        stage ("${it}-${node}") {
+                runs ["${it}-${testNode}"] = {
+                    node ("${testNode}") {
+                        stage ("${it}-${testNode}") {
                             withCredentials(bindings: [string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                         string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LIS_SECRET_PARAMS', variable: 'LIS_SECRET_PARAMS')]) { 
-                                if (node == 'sriov') {
+                                def lisSuite = ''
+                                if (testNode == 'sriov') {
                                     lisSuite = 'lis_deploy_scenarios_sriov'
                                 } else {
                                     lisSuite = 'lis_deploy_scenarios'
@@ -122,17 +122,16 @@ stage ("Deploy stage") {
 stage("BVT stage") {
     def runs = [:]
     nodesMap.keySet().each {
-        testNode = it
-        mappedDistros = nodesMap[it]
+        def testNode = it
+        def mappedDistros = nodesMap[it]
         if (testNode == 'sriov') {
             testNode = 'ws2016'
         }
         DISTROS.each {
             if (mappedDistros.contains("${it},")) {
-                node = testNode
-                runs["${it}-${node}"] = {
-                    node("${node}") {
-                        stage("${it}-${node}") {
+                runs["${it}-${testNode}"] = {
+                    node("${testNode}") {
+                        stage("${it}-${testNode}") {
                             withCredentials(bindings: [string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                         string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) { 
