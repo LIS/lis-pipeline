@@ -1,0 +1,213 @@
+#!/usr/bin/env groovy
+
+String kernelTree;
+String pipelineName;
+
+upstreamLinuxTree = "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
+netNextTree = "https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
+buildDir = "/mnt/tmp/bisect"
+cloneDir = "kernel_tree"
+
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'bisect-commit-validator\nazure-pipeline\nupstream-pipeline\ndeveloper-pipeline',
+            name: 'JOB_TO_RUN',
+            description: 'Job to run bisect on'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'linux-next\nazure-kernel\nnet-next',
+            name: 'KERNEL_TREE',
+            description: 'What Kernel tree to be used (Available only for upstream and developer pipelines).'],
+        [$class: 'StringParameterDefinition',
+            name: 'KERNEL_GIT_BRANCH',
+            defaultValue: 'master',
+            description: 'Branch to be built'],
+        [$class: 'StringParameterDefinition',
+            name: 'GOOD_COMMIT',
+            defaultValue: '',
+            description: 'Good commit (this goes back)'],
+        [$class: 'StringParameterDefinition',
+            name: 'BAD_COMMIT',
+            defaultValue: 'HEAD',
+            description: 'Bad commit (can be HEAD)'],
+        [$class: 'StringParameterDefinition',
+            name: 'ENABLED_STAGES',
+            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test',
+            description: 'What stages to run. By default all stages are enabled']
+        ]
+    ]
+])
+
+node ("bisect_kernel_builder") {
+    resolveGitRepo(JOB_TO_RUN, KERNEL_TREE)
+
+    // we pull the code
+    initEnv()
+
+    // we make sure the good commit is good and the bad one bad, so we avoid
+    // a useless bisect
+    stage("validate_commits") {
+        validateCommit(BAD_COMMIT, "FAILURE")
+        println("Bad commit " + BAD_COMMIT + "has been validated to be bad")
+        validateCommit(GOOD_COMMIT, "SUCCESS")
+        println("Good commit " + GOOD_COMMIT + "has been validated to be good")
+    }
+
+    // start the bisect workflow
+    bisect()
+}
+
+def resolveGitRepo(String pipeline, String gitURL) {
+    switch (pipeline) {
+        case "azure-pipeline":
+            pipelineName = "lis-pipeline/master";
+            kernelTree = "azure-kernel"
+            return;
+        case "upstream-pipeline":
+            pipelineName = "upstream-kernel-pipeline/master";
+            break;
+        case "developer-pipeline":
+            pipelineName = "pipeline-developer-patch-validation/master";
+            break;
+        case "bisect-commit-validator":
+            pipelineName = "pipeline-kernel-bisect-commit-validator/master";
+    }
+
+    switch (gitURL) {
+        case "linux-next":
+            kernelTree = upstreamLinuxTree;
+            break;
+        case "net-next":
+            kernelTree = netNextTree;
+            break;
+    }
+}
+
+def initEnv() {
+    withCredentials([[$class: 'StringBinding', credentialsId: ' MSFT_KERNEL_GIT_URL', variable: 'AZURE_KERNEL']]) {
+        stage ("initialize_env") {
+            def scriptFetch = sh(
+                    script: """#!/bin/bash
+                        set -xe
+
+                        if [[ ${kernelTree} == "azure-kernel" ]]; then
+                            kernel_tree=${AZURE_KERNEL}
+                        else
+                            kernel_tree=${kernelTree}
+                        fi
+
+                        mkdir -p $buildDir
+                        pushd "$buildDir"
+                        if [[ ! -d "$cloneDir" ]];then
+                            git clone \$kernel_tree "$cloneDir"
+                        else
+                            pushd "$cloneDir"
+                            git remote set-url origin \$kernel_tree
+                            popd
+                        fi
+                        pushd "$cloneDir"
+                        git fetch
+                        git reset --hard origin/master
+                        popd
+                        popd
+                        """
+            )
+            println "Finished cloning Git repo."
+        }
+    }
+}
+
+def validateCommit (String commit, String expectedState) {
+    if (!commit) {
+        println("Commit " + commit + "is not valid.")
+        sh(script: "exit 1")
+    }
+    def buildResult = build job: pipelineName, parameters: [string(name: 'KERNEL_GIT_URL', value: kernelTree),
+                                                            string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
+                                                            string(name: 'KERNEL_GIT_COMMIT_ID', value: commit)],
+                                                            propagate: false,
+                                                            wait: true
+    if (buildResult.result != expectedState) {
+        currentBuild.result = 'FAILURE'
+        sh(script: "exit 1")
+    }
+}
+
+String getCommit (String passed) {
+    def commit = sh(
+        script: """#!/bin/bash
+                   set -xe
+                   pushd "$buildDir/$cloneDir" 2>&1 > /dev/null
+                   output=\$(git bisect $passed)
+                   popd 2>&1 > /dev/null
+                   final=\$(echo \$output | grep 'first bad commit' | wc -l)
+                   commit_id=\${output##*[}
+                   commit_id=\${commit_id%%]*}
+                   if [[ "\$final" != "0" ]]; then
+                       echo \$output
+                       exit 0
+                   fi
+                   echo \$commit_id
+                """,
+        returnStdout: true
+    )
+    if (commit.contains("first bad commit")) {
+        println("Bisect finished succesfully. Commit " + commit.split(" ")[0] + "is the bad commit")
+        return ""
+    }
+    return commit
+}
+
+def bisect () {
+    String commitId = ""
+    String passed = ""
+
+    sh(
+        script: """#!/bin/bash
+                   set -xe -o pipefail
+
+                   pushd "$buildDir/$cloneDir"
+                   printf "Bisect Graph is the following:"
+                   git rev-list --graph --oneline $BAD_COMMIT --not "${GOOD_COMMIT}"
+                   popd
+                """
+    )
+
+    def firstCommit = sh(
+        script: """#!/bin/bash
+                   set -xe
+                   pushd "$buildDir/$cloneDir" 2>&1 > /dev/null
+                   output=\$(git bisect start $BAD_COMMIT "$GOOD_COMMIT")
+                   output=\${output##*[}
+                   output=\${output%%]*}
+                   echo \$output
+                   popd 2>&1 > /dev/null
+                """,
+        returnStdout: true
+    )
+
+    commitId = firstCommit
+    println "First commit is : " + commitId
+
+    while (true) {
+        stage ("bisect_" + commitId.substring(0,7)) {
+        println "Current commit id is: " + commitId
+            def buildResult = build job: pipelineName, parameters: [string(name: 'KERNEL_GIT_URL', value: kernelTree),
+                                                                    string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
+                                                                    string(name: 'KERNEL_GIT_COMMIT_ID', value: commitId)],
+                                                                    propagate: false,
+                                                                    wait: true
+            if (buildResult.result == "SUCCESS") {
+                passed = "good"
+            } else {
+                passed = "bad"
+            }
+            println("Commit " + commitId + " is " + passed)
+        }
+        commitId = getCommit(passed)
+        if (commitId == "") {
+            break
+        }
+    }
+}
