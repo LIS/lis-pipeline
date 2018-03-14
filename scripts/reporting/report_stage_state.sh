@@ -64,7 +64,18 @@ function main {
         esac
     done
 
+    kernel_version="unknown"
+    kernel_commit_id="unknown"
     test_date=`date '+%m/%d/%Y %H:%M:%S'`;
+
+    if [[ -e "${KERNEL_INFO}" ]];then
+        kernel_version=$(crudini --get $KERNEL_INFO KERNEL_BUILT version \
+                         || echo $kernel_version)
+        kernel_commit_id=$(crudini --get $KERNEL_INFO KERNEL_BUILT git_tag \
+                           || echo $kernel_commit_id)
+    else
+        echo "${KERNEL_INFO} file does not exist."
+    fi
 
     cat << EOF > "./tests.json"
     [
@@ -75,7 +86,8 @@ function main {
         "DistroVersion": "${DISTRO_VERSION}",
         "PipelineName": "${PIPELINE_NAME}",
         "PipelineBuildNumber": ${PIPELINE_BUILD_NUMBER},
-        "KernelVersion": "unknown",
+        "KernelVersion": "${kernel_version}",
+        "KernelCommitId": "${kernel_commit_id}",
         "${PIPELINE_STAGE_NAME}": ${PIPELINE_STAGE_STATUS}
     }
 ]

@@ -13,6 +13,7 @@ def reportStageStatus(stageName, stageStatus) {
     withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
                                     variable: 'PERF_DB_CONFIG')]) {
         dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+              unstash 'kernel_version_ini'
               sh '''#!/bin/bash
                   KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
                   KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
@@ -75,6 +76,7 @@ pipeline {
                 }
               }
               steps {
+              stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
               sh '''#!/bin/bash
                 set -xe
                 echo "Building artifacts..."
@@ -136,6 +138,7 @@ pipeline {
                 }
               }
               steps {
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 sh '''#!/bin/bash
                 set -xe
                 echo "Building artifacts..."
