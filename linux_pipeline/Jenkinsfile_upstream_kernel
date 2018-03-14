@@ -212,7 +212,7 @@ pipeline {
         }
         failure {
           withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')]) {
-            dir('kernel_version_report_failure' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
               sh '''#!/bin/bash
                   KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
                   KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
@@ -231,14 +231,14 @@ pipeline {
         }
         success {
           withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')]) {
-            dir('kernel_version_report_failure' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
               sh '''#!/bin/bash
                   KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
                   KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
                   KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
                   bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
                       --pipeline_name "pipeline-linux-upstream-validation" \
-                      --pipeline_build_number "${BUILD_NUMBER}" --pipeline_stage_status 0 \
+                      --pipeline_build_number "${BUILD_NUMBER}" --pipeline_stage_status 1 \
                       --kernel_info "./scripts/package_building/kernel_versions.ini" \
                       --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
                       --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG}
