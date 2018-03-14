@@ -3,7 +3,7 @@ set -xe -o pipefail
 BASEDIR=$(dirname $0)
 
 function main {
-    TEMP=$(getopt -o n:s:i:k:b:d:c --long pipeline_name:,pipeline_build_number:,pipeline_stage_status:,kernel_info:,kernel_source:,kernel_branch:,distro_version:,db_config: -n 'report_stage_state.sh' -- "$@")
+    TEMP=$(getopt -o n:s:i:k:b:d:c:a --long pipeline_name:,pipeline_build_number:,pipeline_stage_status:,pipeline_stage_name:,kernel_info:,kernel_source:,kernel_branch:,distro_version:,db_config: -n 'report_stage_state.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -28,6 +28,11 @@ function main {
                 case "$2" in
                     "") shift 2 ;;
                     *) PIPELINE_STAGE_STATUS="$2" ; shift 2 ;;
+                esac ;;
+            --pipeline_stage_name)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) PIPELINE_STAGE_NAME="$2" ; shift 2 ;;
                 esac ;;
             --kernel_info)
                 case "$2" in
@@ -71,8 +76,7 @@ function main {
         "PipelineName": "${PIPELINE_NAME}",
         "PipelineBuildNumber": ${PIPELINE_BUILD_NUMBER},
         "KernelVersion": "unknown",
-        "BuildSucceeded": 1,
-        "BootOnAzure": ${PIPELINE_STAGE_STATUS}
+        "${PIPELINE_STAGE_NAME}": ${PIPELINE_STAGE_STATUS}
     }
 ]
 EOF
