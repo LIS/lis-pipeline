@@ -18,7 +18,7 @@ pipeline {
     environment {
         KERNEL_ARTIFACTS_PATH = 'dev-patch-kernels'
         UBUNTU_VERSION = '16'
-        BUILD_PATH = '/mnt/tmp/developer-kernel-build-folder-comparison'
+        BUILD_PATH = '/mnt/tmp/developer-kernel-build-folder'
         KERNEL_CONFIG = 'Microsoft/config-azure'
         CLEAN_ENV = 'True'
         USE_CCACHE = 'True'

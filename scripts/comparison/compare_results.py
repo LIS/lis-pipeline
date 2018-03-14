@@ -1,16 +1,22 @@
 #!/usr/bin/python3
 
-import sys, getopt, os
+import sys
+import getopt
+import os
 import xml.etree.ElementTree as ET
 from html_report import htmlReportSection, htmlReport
 import glob
 
+
 def getParameters(argv):
     outputFile = ''
     try:
-        opts, args = getopt.getopt(argv,"p:u:o:",["patchedresults=","unpatchedresults=","output="])
+        opts, args = getopt.getopt(argv, "p:u:o:",
+            ["patchedresults=", "unpatchedresults=", "output="])
     except getopt.GetoptError:
-        print ('compare_results.py --patchedtests <inputxml> --unpatchedtests <inputxml> --output <outputhtml>')
+        print('compare_results.py --patchedtests <inputxml> ',
+              '--unpatchedtests <inputxml> ',
+              '--output <outputhtml> ')
         sys.exit(2)
     for opt, arg in opts:
         if opt in ("-p", "--patchedresults"):
@@ -22,8 +28,10 @@ def getParameters(argv):
     patchedResultsPath = glob.glob(patchedResultsPath)
     unpatchedResultsPath = glob.glob(unpatchedResultsPath)
 
-    if (os.path.isfile(patchedResultsPath[0]) and os.path.isfile(unpatchedResultsPath[0])):
+    if (os.path.isfile(patchedResultsPath[0]) and
+            os.path.isfile(unpatchedResultsPath[0])):
         return patchedResultsPath[0], unpatchedResultsPath[0], outputFile
+
 
 def getFixedXml(xmlPath):
     fixedXml = ''
@@ -35,6 +43,7 @@ def getFixedXml(xmlPath):
     tree = ET.fromstring(fixedXml)
     return tree
 
+
 def cleanDuplicates(testList):
     for test in testList:
         nr = testList.count(test)
@@ -43,9 +52,10 @@ def cleanDuplicates(testList):
                 testList.remove(test)
     return testList
 
+
 def getSuiteData(testSuite):
     tests = []
-    
+
     for child in testSuite:
         if (child.tag == 'testcase'):
             testResult = dict()
@@ -65,6 +75,7 @@ def getSuiteData(testSuite):
             tests.append(testResult)
     return tests
 
+
 def getTestData(xmlPath):
     tests = []
     try:
@@ -79,9 +90,9 @@ def getTestData(xmlPath):
     else:
         tests = getSuiteData(root)
 
-        
     tests = cleanDuplicates(tests)
     return tests
+
 
 if __name__ == "__main__":
     patchedResultsPath, unpatchedResultsPath, outputFile = getParameters(sys.argv[1:])
@@ -92,21 +103,37 @@ if __name__ == "__main__":
     patchedResults = getTestData(patchedResultsPath)
     unpatchedResults = getTestData(unpatchedResultsPath)
 
-    newSection = htmlReportSection(wrapper=['<table cellpadding="0" cellspacing="0">','</table>'])
+    newSection = htmlReportSection(
+            wrapper=['<table cellpadding="0" cellspacing="0">', '</table>'])
     newSection.add(scriptPath + "/html/head.html")
 
     for index in range(0, len(patchedResults)):
-        if (patchedResults[index]['name'] == unpatchedResults[index]['name']):
-            if (patchedResults[index]['result'] == 'Fail' or unpatchedResults[index]['result'] == 'Fail'):
+        resultsFound = False
+        for ind in range(0, len(unpatchedResults)):
+            if (patchedResults[index]['name'] == unpatchedResults[ind]['name']):
+                patchedResult = patchedResults[index]
+                unpatchedResult = unpatchedResults[ind]
+                resultsFound = True
+                break
+        if (resultsFound):
+            if (patchedResult['result'] == 'Fail' or
+                    unpatchedResult['result'] == 'Fail'):
                 backColor = '#f75959'
             else:
                 backColor = '#8df972'
-            newSection.add(scriptPath + "/html/row.html", [{"name":"testName", "value":patchedResults[index]['name']}, \
-                                {"name":"patchedResult", "value":patchedResults[index]['result']}, \
-                                {"name":"patchedTime", "value":patchedResults[index]['time']}, \
-                                {"name":"unpatchedResult", "value":unpatchedResults[index]['result']}, \
-                                {"name":"unpatchedTime", "value":unpatchedResults[index]['time']}, \
-                                {"name":"backColor","value":backColor}])
+            newSection.add(scriptPath + "/html/row.html", [
+                {"name": "testName",
+                    "value": patchedResult['name']},
+                {"name": "patchedResult",
+                    "value": patchedResult['result']},
+                {"name": "patchedTime",
+                    "value": patchedResult['time']},
+                {"name": "unpatchedResult",
+                    "value": unpatchedResult['result']},
+                {"name": "unpatchedTime",
+                    "value": unpatchedResult['time']},
+                {"name": "backColor",
+                    "value": backColor}])
 
     newHtml.add(newSection.get())
     newHtml.create(outputFile)

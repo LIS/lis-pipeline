@@ -941,7 +941,7 @@ function main {
             --build_date)
                 case "$2" in
                     "") shift 2 ;;
-                    *) IDENTIFIER="$2" ; shift 2 ;;
+                    *) BUILD_DATE="$2" ; shift 2 ;;
                 esac ;;
             --custom_build_tag)
                 case "$2" in
