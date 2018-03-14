@@ -115,6 +115,14 @@ pipeline {
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+              }
           }
           stage('build_artifacts_centos') {
               when {
@@ -164,6 +172,14 @@ pipeline {
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
               }
     }
     stage('publish_temp_artifacts') {
@@ -225,7 +241,6 @@ pipeline {
                 --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
             '''
         }
-
       }
       post {
         always {
