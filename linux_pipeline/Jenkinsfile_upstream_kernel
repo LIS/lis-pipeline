@@ -19,7 +19,7 @@ def reportStageStatus(stageName, stageStatus) {
                   KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
                   KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
                   bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
-                      --pipeline_name "pipeline-linux-upstream-validation" \
+                      --pipeline_name "pipeline-linux-upstream-validation/${BRANCH_NAME}" \
                       --pipeline_build_number "${BUILD_NUMBER}" \
                       --pipeline_stage_status "${STAGE_STATUS_REPORT}" \
                       --pipeline_stage_name "${STAGE_NAME_REPORT}" \
