@@ -5,8 +5,30 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
-def RunPowershellCommand(psCmd) {
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+def reportStageStatus(stageName, stageStatus) {
+    script {
+        env.STAGE_NAME_REPORT = stageName
+        env.STAGE_STATUS_REPORT = stageStatus
+    }
+    withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
+                                    variable: 'PERF_DB_CONFIG')]) {
+        dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+              unstash 'kernel_version_ini'
+              sh '''#!/bin/bash
+                  KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
+                  KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
+                  KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
+                  bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
+                      --pipeline_name "pipeline-linux-upstream-validation/${BRANCH_NAME}" \
+                      --pipeline_build_number "${BUILD_NUMBER}" \
+                      --pipeline_stage_status "${STAGE_STATUS_REPORT}" \
+                      --pipeline_stage_name "${STAGE_NAME_REPORT}" \
+                      --kernel_info "./scripts/package_building/kernel_versions.ini" \
+                      --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
+                      --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG} || true
+              '''
+        }
+    }
 }
 
 pipeline {
@@ -54,6 +76,7 @@ pipeline {
                 }
               }
               steps {
+              stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
               sh '''#!/bin/bash
                 set -xe
                 echo "Building artifacts..."
@@ -94,6 +117,14 @@ pipeline {
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+              }
           }
           stage('build_artifacts_centos') {
               when {
@@ -107,6 +138,7 @@ pipeline {
                 }
               }
               steps {
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 sh '''#!/bin/bash
                 set -xe
                 echo "Building artifacts..."
@@ -143,6 +175,14 @@ pipeline {
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
               }
     }
     stage('publish_temp_artifacts') {
@@ -204,47 +244,18 @@ pipeline {
                 --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
             '''
         }
-
       }
       post {
         always {
           archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
         }
         failure {
-          withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')]) {
-            dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-              sh '''#!/bin/bash
-                  KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
-                  KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
-                  KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
-                  bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
-                      --pipeline_name "pipeline-linux-upstream-validation" \
-                      --pipeline_build_number "${BUILD_NUMBER}" --pipeline_stage_status 0 \
-                      --kernel_info "./scripts/package_building/kernel_versions.ini" \
-                      --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
-                      --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG}
-                  '''
-            }
-          }
+          reportStageStatus("BootOnAzure", 0)
           sh 'echo "Load failure test results."'
           nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
         }
         success {
-          withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')]) {
-            dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-              sh '''#!/bin/bash
-                  KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
-                  KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
-                  KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
-                  bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
-                      --pipeline_name "pipeline-linux-upstream-validation" \
-                      --pipeline_build_number "${BUILD_NUMBER}" --pipeline_stage_status 1 \
-                      --kernel_info "./scripts/package_building/kernel_versions.ini" \
-                      --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
-                      --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG}
-                  '''
-            }
-          }
+          reportStageStatus("BootOnAzure", 1)
           echo "Cleaning Azure resources up..."
           sh '''#!/bin/bash
             pushd ./scripts/azure_kernel_validation
