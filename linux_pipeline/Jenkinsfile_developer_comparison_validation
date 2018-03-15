@@ -33,7 +33,7 @@ node ("meta_slave") {
         
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "pipeline-developer-patch-validation", parameters: [
+                patchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
@@ -42,7 +42,7 @@ node ("meta_slave") {
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             runs["kernel_unpatched"] = {
-                unpatchedRun = build job: "pipeline-developer-patch-validation", parameters: [
+                unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
@@ -54,8 +54,8 @@ node ("meta_slave") {
     }
     stage ("aggregate_results") {
         dir ('comparison_results' + env.BUILD_NUMBER) {
-            copyArtifacts(projectName: 'master', selector: specific("${patchedRun.number}"), target: "patched_run");
-            copyArtifacts(projectName: 'master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+            copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
+            copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
 
             archiveArtifacts 'patched_run/**';
             archiveArtifacts 'unpatched_run/**';
@@ -70,9 +70,9 @@ node ("meta_slave") {
             unstash 'patchedReport'
             unstash 'unpatchedReport'
             sh '''
-                python3 scripts/comparison/compare_results.py 
-                    --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml 
-                    --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml 
+                python3 scripts/comparison/compare_results.py \\
+                    --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                    --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
                     --output results.html
             '''
             archiveArtifacts 'results.html'
