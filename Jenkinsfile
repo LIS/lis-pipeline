@@ -9,6 +9,29 @@ def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
+def reportStageStatus(stageName, stageStatus) {
+    script {
+        env.STAGE_NAME_REPORT = stageName
+        env.STAGE_STATUS_REPORT = stageStatus
+    }
+    withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
+                                    variable: 'PERF_DB_CONFIG')]) {
+        dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+              unstash 'kernel_version_ini'
+              sh '''#!/bin/bash
+                  bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
+                      --pipeline_name "pipeline-msft-kernel-validation/${BRANCH_NAME}" \
+                      --pipeline_build_number "${BUILD_NUMBER}" \
+                      --pipeline_stage_status "${STAGE_STATUS_REPORT}" \
+                      --pipeline_stage_name "${STAGE_NAME_REPORT}" \
+                      --kernel_info "./scripts/package_building/kernel_versions.ini" \
+                      --kernel_source "MSFT" --kernel_branch "${KERNEL_GIT_BRANCH}" \
+                      --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG} || true
+              '''
+        }
+    }
+}
+
 pipeline {
   parameters {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
@@ -54,6 +77,7 @@ pipeline {
               steps {
                 withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
                                                   variable: 'KERNEL_GIT_URL')]) {
+                  stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                   sh '''#!/bin/bash
                     set -xe
                     echo "Building artifacts..."
@@ -92,6 +116,14 @@ pipeline {
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
+              post {
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+              }
           }
           stage('build_artifacts_centos') {
               when {
@@ -106,6 +138,7 @@ pipeline {
               }
               steps {
                 withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL')]) {
+                  stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                   sh '''#!/bin/bash
                     set -xe
                     echo "Building artifacts..."
@@ -141,6 +174,14 @@ pipeline {
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
                 '''
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
+              post {
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
               }
     }
     stage('publish_temp_artifacts') {
@@ -202,17 +243,18 @@ pipeline {
                 --os_type $OS_TYPE
             '''
         }
-
       }
       post {
         always {
           archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
         }
         failure {
+          reportStageStatus("BootOnAzure", 0)
           sh 'echo "Load failure test results."'
           nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
         }
         success {
+          reportStageStatus("BootOnAzure", 1)
           echo "Cleaning Azure resources up..."
           sh '''#!/bin/bash
             pushd ./scripts/azure_kernel_validation
