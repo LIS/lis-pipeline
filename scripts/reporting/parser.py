@@ -102,7 +102,7 @@ def update_values(cursor, values_dict, composite_keys):
         END
         ELSE
         BEGIN
-            UPDATE $tableName SET $updateValues WHERE $compositeConditions
+            UPDATE TOP(1) $tableName SET $updateValues WHERE $compositeConditions
         END
     """
     )

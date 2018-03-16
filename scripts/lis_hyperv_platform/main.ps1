@@ -22,16 +22,25 @@ param(
     [String] $ShareUser,
     [String] $SharePassword,
     [String] $IdRSAPub,
-    [String] $LisaTestDependencies
+    [String] $LisaTestDependencies,
+    [String] $PipelineName,
+    [String] $DBConfigPath
 )
 
 $ErrorActionPreference = "Stop"
 
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
+
 $LISA_FOLDER = ".\lis-test"
 $LISA_REL_PATH = "${LISA_FOLDER}\WS2012R2\lisa"
-$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$LISA_TEST_RESULTS_REL_PATH = ".\TestResults\*\ica.log"
+$DB_CONFIG_REL_PATH = ".\db.config"
+$DB_RESULTS_REL_PATH = ".\tests.json"
+$PYTHON_PATH = Join-Path "${env:SystemDrive}" "Python27\python.exe"
+$RESULT_PARSER_PATH = Join-Path $scriptPathParent ".\reporting\parser.py"
+
 . "$scriptPath\retrieve_ip.ps1"
-$scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 . "$scriptPathParent\common_functions.ps1"
 . "$scriptPathParent\JobManager.ps1"
 
@@ -220,6 +229,52 @@ function Edit-TestXML {
     $xml.Save($xmlFullPath)
 }
 
+function Parse-IcaLog {
+    param(
+        [parameter(Mandatory=$true)]
+        [String] $IcaLogPath
+    )
+
+    try {
+        return (Get-Content $IcaLogPath | `
+            Where-Object {$_ -match '^\s\s\s\sTest\s' -and `
+                         ($_ -match '(:\sFailed$)|(:\sAborted$)')
+                         }).Count
+    } catch {
+        Write-Host "IcaLogPath $IcaLogPath could not be parsed"
+        throw $_
+    }
+}
+
+function Report-LisaResults {
+    param(
+        [parameter(Mandatory=$true)]
+        [String] $PipelineName,
+        [parameter(Mandatory=$true)]
+        [String] $PipelineBuildNumber,
+        [parameter(Mandatory=$true)]
+        [String] $DBConfigPath,
+        [parameter(Mandatory=$true)]
+        [String] $IcaLogPath
+    )
+    $pipelineStageStatus = Parse-IcaLog -IcaLogPath $IcaLogPath
+    $templateJSON = @'
+[{{
+        "PipelineName": "{0}",
+        "PipelineBuildNumber": {1},
+        "FuncTestsFailedOnLocal": {2}
+}}]
+'@
+    $templateJSON = $templateJSON -f @($PipelineName,
+           $PipelineBuildNumber, $pipelineStageStatus
+       )
+
+    Write-Host $templateJSON
+    Write-Output $templateJSON | Out-File -Encoding ascii $DB_RESULTS_REL_PATH
+    Copy-Item -Force $DBConfigPath $DB_CONFIG_REL_PATH
+    & $PYTHON_PATH $RESULT_PARSER_PATH
+}
+
 function Main {
     $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
     $kernelFolder = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
@@ -328,6 +383,12 @@ function Main {
         foreach ($child in $children) {
             Stop-Process -Force $child.Handle -Confirm:$false `
                          -ErrorAction SilentlyContinue
+        }
+        try {
+            Report-LisaResults -PipelineName $PipelineName -PipelineBuildNumber $env:BUILD_NUMBER `
+                -DBConfigPath $DBConfigPath -IcaLogPath (Resolve-Path $LISA_TEST_RESULTS_REL_PATH)
+        } catch {
+            Write-Host ("Failed to report stage state with error: {0}" -f @($_))
         }
         popd
     }
