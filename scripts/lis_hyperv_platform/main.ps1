@@ -230,6 +230,37 @@ function Edit-TestXML {
     $xml.Save($xmlFullPath)
 }
 
+function Remove-XmlVMs {
+    param (
+    [string] $Path,
+    [string] $Suite
+    )
+    
+    $xmlFullPath = Resolve-Path $Path
+    $xml = [xml](Get-Content $xmlFullPath)
+    if ($xml.config.VMs.vm -is [array]) {
+        foreach ($vmDef in $xml.config.VMs.vm) {
+            if ($vmDef.suite -eq $Suite){
+                $TestVM = $vmDef
+                $DependVMs = @($vmDef.vmName)
+            }
+        }
+        if ($TestVM.testParams) {
+            foreach ($param in $TestVM.testParams.param) {
+                if ($param -like "VM2Name*"){
+                    $DependVMs += @($param.split("=")[1])
+                }
+            }
+        }
+        foreach ($vmDef in $xml.config.VMs.vm) {
+            if (!($DependVMs.contains($vmDef.vmName))) {
+                $xml.config.VMs.removeChild($vmDef)
+            }
+        }
+        $xml.Save($xmlFullPath)
+    }
+}
+
 function Parse-IcaLog {
     param(
         [parameter(Mandatory=$true)]
@@ -296,6 +327,9 @@ function Main {
         pushd "${LISA_REL_PATH}\xml"
         try {
             Edit-TestXML -Path $XmlTest -VMSuffix $InstanceName
+            if ($LisaTestSuite) {
+                Remove-XmlVMs -Path $XmlTest -Suite $LisaTestSuite
+            }
         } catch {
             throw
         } finally {
