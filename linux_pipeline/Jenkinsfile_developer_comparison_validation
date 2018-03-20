@@ -12,9 +12,13 @@ properties ([
             defaultValue: 'master',
             description: 'Branch to be built'],
         [$class: 'StringParameterDefinition',
-            choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml",
+            defaultValue: "test_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
             description: 'Which tests should LISA run'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'all\nkernel_validation_minimal',
+            name: 'LISA_TEST_SUITE',
+            description: 'LISA test suite (all if blank)'],
         [$class: 'StringParameterDefinition',
             defaultValue: '',
             name: 'KERNEL_PATCH',
@@ -30,6 +34,10 @@ properties ([
 node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
+    
+    if (LISA_TEST_SUITE == 'all'){
+        LISA_TEST_SUITE = ''
+    }
         
     stage ("test_kernels") {
             runs["kernel_patched"] = {
@@ -39,6 +47,7 @@ node ("meta_slave") {
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
+                    string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             runs["kernel_unpatched"] = {
@@ -47,6 +56,7 @@ node ("meta_slave") {
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
+                    string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             parallel runs

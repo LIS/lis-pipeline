@@ -24,7 +24,8 @@ param(
     [String] $IdRSAPub,
     [String] $LisaTestDependencies,
     [String] $PipelineName,
-    [String] $DBConfigPath
+    [String] $DBConfigPath,
+    [String] $LisaTestSuite
 )
 
 $ErrorActionPreference = "Stop"
@@ -368,7 +369,11 @@ function Main {
         # Note(avladu): Lisa requires ErrorActionPreference = Continue, otherwise it will fail to
         # run all the tests.
         $ErrorActionPreference = "Continue"
-        & .\lisa.ps1 -cmdVerb run -cmdNoun ".\xml\${XmlTest}" -dbgLevel 6 -CLImageStorDir $imageFolder -testParams $lisaParams
+        $commandParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}";"dbgLevel" = "6";"CLImageStorDir" = $imageFolder;"testParams" = $lisaParams}
+        if ($LisaTestSuite) {
+            $commandParams += @{"suite" = $LisaTestSuite}
+        }
+        & .\lisa.ps1 @commandParams
         if ($LASTEXITCODE) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
         } else {
