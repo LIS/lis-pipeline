@@ -11,6 +11,10 @@ properties ([
             name: 'KERNEL_GIT_BRANCH',
             defaultValue: 'master',
             description: 'Branch to be built'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'no\nyes',
+            name: 'SKIP_UNPATCHED',
+            description: 'Skip build and test for the unpatched kernel'],
         [$class: 'StringParameterDefinition',
             defaultValue: "test_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
@@ -50,14 +54,16 @@ node ("meta_slave") {
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
-            runs["kernel_unpatched"] = {
-                unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
-                    string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
-                    string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
-                    string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
-                    string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
-                    string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
-                    string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
+            if (SKIP_UNPATCHED == 'no'){
+                runs["kernel_unpatched"] = {
+                    unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
+                        string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
+                        string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
+                        string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
+                        string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
+                        string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
+                        string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
+                }
             }
             parallel runs
     
@@ -65,27 +71,32 @@ node ("meta_slave") {
     stage ("aggregate_results") {
         dir ('comparison_results' + env.BUILD_NUMBER) {
             copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
-            copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
-
             archiveArtifacts 'patched_run/**';
-            archiveArtifacts 'unpatched_run/**';
             
-            stash includes: 'patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
-            stash includes: 'unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+            if (SKIP_UNPATCHED == 'no'){
+                copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                archiveArtifacts 'unpatched_run/**';
+                stash includes: 'patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
+                stash includes: 'unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+            }
         }
     }
     stage ("compare_results") {
-        dir('comparison_results' + env.BUILD_NUMBER) {
-            checkout scm
-            unstash 'patchedReport'
-            unstash 'unpatchedReport'
-            sh '''
-                python3 scripts/comparison/compare_results.py \\
-                    --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                    --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                    --output results.html
-            '''
-            archiveArtifacts 'results.html'
+        if (SKIP_UNPATCHED == 'no'){
+            dir('comparison_results' + env.BUILD_NUMBER) {
+                checkout scm
+                unstash 'patchedReport'
+                unstash 'unpatchedReport'
+                sh '''
+                    python3 scripts/comparison/compare_results.py \\
+                        --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --output results.html
+                '''
+                archiveArtifacts 'results.html'
+            }
+        } else {
+            println ("Comparison between patched/unpatched test results was skipped as no unpatched test results are available")
         }
     }
 }
