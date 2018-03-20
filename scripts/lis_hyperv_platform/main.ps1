@@ -236,12 +236,15 @@ function Parse-IcaLog {
     )
 
     try {
-        return (Get-Content $IcaLogPath | `
-            Where-Object {$_ -match '^\s\s\s\sTest\s' -and `
-                         ($_ -match '(:\sFailed$)|(:\sAborted$)')
-                         }).Count
+        $allTestLines = Get-Content $IcaLogPath | `
+            Where-Object {$_ -match '(^Test\sResults\sSummary$)|(^\s\s\s\sTest\s)'}
+        if ($allTestLines.Count -eq 0) {
+            throw "IcaLogPath $IcaLogPath does not contain test results summary."
+        }
+        return ($allTestLines | `
+            Where-Object{$_ -match '(:\sFailed$)|(:\sAborted$)'}).Count
     } catch {
-        Write-Host "IcaLogPath $IcaLogPath could not be parsed"
+        Write-Host "Failure to parse test results file."
         throw $_
     }
 }
