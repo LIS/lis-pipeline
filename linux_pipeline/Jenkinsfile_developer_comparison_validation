@@ -39,7 +39,7 @@ node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
     
-    if (LISA_TEST_SUITE == 'all'){
+    if (LISA_TEST_SUITE == 'all') {
         LISA_TEST_SUITE = ''
     } else {
         LISA_TEST_SUITE = LISA_TEST_SUITE.split(" ")[0].toLowerCase()
@@ -56,7 +56,7 @@ node ("meta_slave") {
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
-            if (SKIP_UNPATCHED == 'no'){
+            if (env.SKIP_UNPATCHED == 'no') {
                 runs["kernel_unpatched"] = {
                     unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
@@ -75,7 +75,7 @@ node ("meta_slave") {
             copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
             
-            if (SKIP_UNPATCHED == 'no'){
+            if (env.SKIP_UNPATCHED == 'no') {
                 copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
                 stash includes: 'patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
@@ -84,7 +84,7 @@ node ("meta_slave") {
         }
     }
     stage ("compare_results") {
-        if (SKIP_UNPATCHED == 'no'){
+        if (env.SKIP_UNPATCHED == 'no') {
             dir('comparison_results' + env.BUILD_NUMBER) {
                 checkout scm
                 unstash 'patchedReport'

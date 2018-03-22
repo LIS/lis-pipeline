@@ -15,7 +15,10 @@ properties ([
         [$class: 'StringParameterDefinition',
             name: 'LIS_OLD_ARCHIVE_LINK',
             defaultValue: "${LIS_OLD_ARCHIVE_VERSION}",
-            description: 'Link to the previous lis version']
+            description: 'Link to the previous lis version'],
+        [$class: 'ChoiceParameterDefinition', choices: 'no\nyes',
+            name: 'FULL_PERF_RUN',
+            description: 'Full run local Hyper-V perf switch.']
         ]
     ]
 ])
@@ -116,6 +119,29 @@ stage ("Deploy stage") {
         parallel runs
     } catch (exc) { 
         currentBuild.result = 'SUCCESS'
+    }
+}
+
+node("hyper-v") {
+    stage('Local Hyper-V performance') {
+            withCredentials(bindings:[ string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_JOB',
+                                       variable: 'LOCAL_JENKINS_LIS_PERF_JOB'),
+                                       string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_TOKEN',
+                                       variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
+                dir ("p${BUILD_NUMBER}") {
+                    checkout scm
+                    PowerShellWrapper("""
+                        & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
+                            -LocalJenkinsPerfURL '${LOCAL_JENKINS_LIS_PERF_JOB}'
+                            -LocalJenkinsPerfToken '${LOCAL_JENKINS_PERF_TOKEN}'
+                            -FullPerfRun "\${env:FULL_PERF_RUN}"
+                            -LisUrl "\${env:LIS_ARCHIVE_LINK}"
+                            -AzureToken "\${env:AZURE_SAS}"
+                    """)
+                    echo "Triggered LIS Local Hyper-V Performance tests."
+                }
+            }
     }
 }
 
