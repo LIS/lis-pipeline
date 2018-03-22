@@ -3,7 +3,7 @@ import os
 
 class htmlReport:
     htmlSections = []
-
+    
     def add(self, section):
         self.htmlSections += section
 
@@ -14,10 +14,10 @@ class htmlReport:
 
 
 class htmlReportSection:
-    nextIndex = 0
-    htmlParts = []
-
+    
     def __init__(self, **kwargs):
+        self.nextIndex = 0
+        self.htmlParts = []
         wrapper = kwargs['wrapper']
         for wrapp in wrapper:
             self.htmlParts.append(wrapp)
