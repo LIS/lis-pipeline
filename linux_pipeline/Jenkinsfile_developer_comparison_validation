@@ -68,32 +68,46 @@ node ("meta_slave") {
                 }
             }
             parallel runs
-    
     }
     stage ("aggregate_results") {
         dir ('comparison_results' + env.BUILD_NUMBER) {
             copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
-            
             if (env.SKIP_UNPATCHED == 'no') {
                 copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
-                stash includes: 'patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
-                stash includes: 'unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'patched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
+                stash includes: 'unpatched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'unpatched_run/**/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
             }
         }
     }
     stage ("compare_results") {
         if (env.SKIP_UNPATCHED == 'no') {
             dir('comparison_results' + env.BUILD_NUMBER) {
+                sh 'rm -rf *'
                 checkout scm
                 unstash 'patchedReport'
                 unstash 'unpatchedReport'
+                unstash 'unpatchedMetadata'
+                sh '''#!/bin/bash
+                    INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
+                    echo '[METADATA]' > ./metadata.ini       
+                    KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
+                    KERNEL="${KERNEL%-unpatched*}"
+                    echo "KERNEL_VERSION = $KERNEL" >> ./metadata.ini        
+                    BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
+                    echo "BRANCH = $BRANCH" >> ./metadata.ini
+                    echo "LISA_XML = ${LISA_TEST_XML}" >> ./metadata.ini
+                    if [[ ${LISA_TEST_SUITE} != "" ]];then
+                        echo "LISA_TEST_SUITE = ${LISA_TEST_SUITE}" >> ./metadata.ini
+                    fi
+                '''
                 sh '''
                     python3 scripts/comparison/compare_results.py \\
-                        --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --output results.html
+                        --patchedresults ./patched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --unpatchedresults ./unpatched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --output results.html --metadata ./metadata.ini
                 '''
                 archiveArtifacts 'results.html'
             }
