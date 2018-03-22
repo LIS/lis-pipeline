@@ -16,7 +16,10 @@ param(
     [String] $AzureToken,
     [String] $LisaSuite,
     [String] $LisOldUrl,
-    [String] $LisaOptionalParams
+    [String] $LisaOptionalParams,
+    [String] $TestType,
+    [String] $LogsPath,
+    [String] $Delay
 )
 
 $ErrorActionPreference = "Stop"
@@ -68,42 +71,46 @@ function Edit-TestXML {
 
     $xmlFullPath = Resolve-Path $Path
     $xml = [xml](Get-Content $xmlFullPath)
-    $index = 0
     if ($xml.config.VMs.vm -is [array]) {
         foreach ($vmDef in $xml.config.VMs.vm) {
-            $xml.config.VMS.vm[$index].vmName = $VMSuffix
-            if ($xml.config.VMs.vm.hardware.generation) {
-                $xml.config.VMs.vm.hardware.generation = $VMgen
-            }
-            $testParams = $vmDef.testParams
-            if ($testParams) {
-                $paramIndex = 0
-                foreach ($testParam in $testParams.param) {
-                    if ($testParam -like "VM2NAME=*") {
-                        $testParams.ChildNodes.Item($paramIndex)."#text" = `
-                            $testParam + $VMSuffix
-                    }
-                    $paramIndex = $paramIndex + 1
+            if ($VMSuffix) {
+                $vmDef.vmName = "{0}-{1}" -f @($VMSuffix, $vmDef.vmName)
+                if ($vmDef.testParams.param -like "VM2Name*") {
+                    $vmDef.testParams.param = "VM2Name={0}-{1}" -f @($VMSuffix, $vmDef.testParams.param.Split("=")[1])
                 }
             }
-            $index = $index + 1
+            if ($vmDef.hardware.generation) {
+                $vmDef.hardware.generation = $VMgen
+            }
         }
     } else {
+        if ($xml.config.VMs.vm.hardware.generation) {
+            $xml.config.VMs.vm.hardware.generation = $VMgen
+        }
         $xml.config.VMS.vm.vmName = $VMSuffix
     }
     $xml.Save($xmlFullPath)
 }
 
 function Main {
+    Start-Sleep $Delay
     if (!(Test-Path $WorkingDirectory)) {
         New-Item -ItemType directory -Path $WorkingDirectory
     }
     $jobPath = Join-Path -Path (Resolve-Path $WorkingDirectory) `
         -ChildPath $JobId
+    
     New-Item -Path $jobPath -Type "Directory" -Force
     $LISAPath = Join-Path $jobPath "lis-test"
     $LISARelPath = Join-Path $LISAPath "WS2012R2\lisa"
 
+    if ($LogsPath -and $TestType) {
+        $LogsPath = Join-Path $LogsPath $TestType
+        if (!(Test-Path $LogsPath)) {
+            New-Item -ItemType Directory -Path $LogsPath -Force
+        }
+    }
+    
     Write-Host "Getting the proper VHD folder name for LISA with $DistroVersion"
     $imageFolder = Join-Path $LISAImagesShareUrl $DistroVersion.split("_")[0]
     $imageFolder = Join-Path $imageFolder $DistroVersion
@@ -113,7 +120,7 @@ function Main {
 
     Write-Host "Copying lisa dependencies from share"
     Copy-LisaTestDependencies `
-        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh") `
+        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh","setupScripts") `
         -LISARelPath $LISARelPath
     
     $VMgeneration = "1"
@@ -139,9 +146,11 @@ function Main {
         # Note(avladu): Lisa requires ErrorActionPreference = Continue,
         # otherwise it will fail to run all the tests.
         $ErrorActionPreference = "Continue"
-        $commandParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}";"dbgLevel" = "5";"CLImageStorDir" = $imageFolder;"testParams" = $lisaParams}
+        $commandParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}";"hvServer" = "localhost"; `
+                "dbgLevel" = "5";"CLImageStorDir" = $imageFolder;"testParams" = $lisaParams}
         if ($LisaSuite) {
-            $commandParams += @{"suite" = $LisaSuite;"vmName" = $InstanceName;"hvServer" = "localhost";"sshKey" = "rhel5_id_rsa.ppk";"os" = "Linux"}
+            $commandParams += @{"suite" = $LisaSuite;"vmName" = $InstanceName;"sshKey" = "rhel5_id_rsa.ppk"; `
+                    "os" = "Linux"}
         }
         & .\lisa.ps1 @commandParams
         if ($LASTEXITCODE) {
@@ -154,6 +163,13 @@ function Main {
     } finally {
         Pop-Location
         Copy-Item -Recurse -Force $LISAPath .
+        if ($LogsPath) {
+            $LISAPathParent = (Get-Item $LISAPath).Parent.Name
+            $LogsPath = Join-Path ${LogsPath} ${LISAPathParent}
+            New-Item -ItemType Directory -Path $LogsPath -Force
+            $LisaLogPath = Join-Path $LISAPath "WS2012R2\lisa\TestResults\*"
+            Copy-Item -Recurse -Force $LisaLogPath $LogsPath
+        }
         $parentProcessPid = $PID
         $children = Get-WmiObject WIN32_Process | where `
             {$_.ParentProcessId -eq $parentProcessPid -and $_.Name -ne "conhost.exe"}
