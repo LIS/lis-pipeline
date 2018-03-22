@@ -1,5 +1,9 @@
 #!/usr/bin/env groovy
 
+properties properties: [
+  disableConcurrentBuilds()
+]
+
 withCredentials(bindings: [string(credentialsId: 'LIS_OLD_ARCHIVE_VERSION', variable: 'LIS_OLD_ARCHIVE_VERSION')]) {
 properties ([
     [$class: 'ParametersDefinitionProperty',
@@ -24,14 +28,22 @@ properties ([
 ])
 }
 
-def nodesMap = ["ws2012":"centos_6.8_32bit,centos_6.8_64bit,centos_6.9_32bit,rhel_6.7_gen2vm,rhel_6.8_x64,rhel_6.9,", \
+def nodesMap = ["sriov":"rhel_7.3,rhel_7.4,centos_7.4,centos_7.3,rhel_7.3_gen2vm,", \
+                "ws2012":"centos_6.8_32bit,centos_6.8_x64,centos_6.9_32bit,rhel_6.7_gen2vm,rhel_6.8_x64,", \
                 "ws2012r2":"rhel_6.4_32bit,rhel_6.4_x64,rhel_6.5,rhel_6.6_x64,rhel_6.6_32bit, \
                     centos_6.4_x64,centos_6.5_x64,", \
                 "ws2016":"oracle_6.5_rhck,oracle_6.9_rhck,oracle_7.4_rhck,oracle_7.0_rhck,centos_7.0_x64, \
-                    centos_7.0_gen2vm,centos_7.2,rhel_7.0,rhel_7.1,rhel_7.2,rhel_7.3_gen2vm,", \
-                "sriov":"rhel_7.3,rhel_7.4,centos_7.4,centos_7.3,"]
+                    centos_7.0_gen2vm,centos_7.2,rhel_7.0,rhel_7.1,rhel_7.2,rhel_6.9_x64,"]
+
+def validationNodesMap = ["ws2016":"rhel_6.9_x64,rhel_7.4,centos_6.8_x64,centos_7.3,", \
+                          "ws2012r2":"rhel_6.6_x64,centos_7.4_gen2vm,rhel_6.4_32bit,rhel_7.0,", \
+                          "ws2012":"centos_6.5_x64,centos_7.2_x64,centos_6.4_x64,rhel_7.1,"]
+                        
+def validationXmlMap = ["lis_pipeline_fvt.xml":"centos_6.5_x64,centos_7.2_x64,rhel_6.6_x64,centos_7.4_gen2vm,rhel_6.9_x64,rhel_7.4,", \
+                        "lis_pipeline_bvt.xml":"centos_6.4_x64,rhel_7.1,rhel_6.4_32bit,rhel_7.0,centos_6.8_x64,centos_7.3,"]
                     
 def supportedDistros = nodesMap["ws2012"] + nodesMap["ws2012r2"] + nodesMap["ws2016"] + nodesMap["sriov"]
+def supportedValidationDistros = validationNodesMap["ws2012"] + validationNodesMap["ws2012r2"] + validationNodesMap["ws2016"]
 
 def PowerShellWrapper (psCmd) {
     psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
@@ -62,9 +74,27 @@ def getDistros (distros, supportedDistros) {
     return validatedDistros
 }
 
+def getValidationXml (map, distro) {
+    def xmlName = ''
+    def testType = ''
+    for (key in map.keySet()) {
+        if (map[key].contains("${distro},")) {
+            xmlName = key
+            if(xmlName.contains("fvt")) {
+                testType = "fvt"
+            } else if (xmlName.contains("bvt")) {
+                testType = "bvt"
+            }
+            break
+        }
+    }
+    return [xmlName, testType]
+}
+
 DISTROS = getDistros (DISTRO_VERSIONS, supportedDistros)
 
 stage ("Deploy stage") {
+    def globalSleepTime = 0;
     def runs = [:]
     nodesMap.keySet().each {
         def testNode = it
@@ -77,10 +107,12 @@ stage ("Deploy stage") {
                 runs ["${it}-${testNode}"] = {
                     node ("${testNode}") {
                         stage ("${it}-${testNode}") {
-                            withCredentials(bindings: [string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                        string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
-                                        string(credentialsId: 'LIS_SECRET_PARAMS', variable: 'LIS_SECRET_PARAMS')]) { 
+                                        string(credentialsId: 'LIS_SECRET_PARAMS', variable: 'LIS_SECRET_PARAMS'),
+                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION')]) {
+                                def sleepTime = globalSleepTime
+                                globalSleepTime = globalSleepTime + 30
                                 def lisSuite = ''
                                 if (testNode == 'sriov') {
                                     lisSuite = 'lis_deploy_scenarios_sriov'
@@ -93,7 +125,7 @@ stage ("Deploy stage") {
                                     PowerShellWrapper("""
                                         & '.\\scripts\\lis_hyperv_platform\\main-lis-rpm.ps1'
                                             -JobId '${it}-d-${BUILD_NUMBER}'
-                                            -InstanceName '${it}-d-${BUILD_NUMBER}'
+                                            -InstanceName '${it}-deploy'
                                             -DistroVersion '${it}' -WorkingDirectory 'C:\\workspace'
                                             -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}' 
                                             -XmlTest 'lis_pipeline_deploy_scenarios.xml'
@@ -102,7 +134,9 @@ stage ("Deploy stage") {
                                             -LisOldUrl "\${env:LIS_OLD_ARCHIVE_LINK}"
                                             -LisaSuite '${lisSuite}'
                                             -LisaOptionalParams "\${env:LIS_SECRET_PARAMS}"
-                                            -AzureToken "\${env:AZURE_SAS}"
+                                            -TestType 'deploy_scenarios'
+                                            -LogsPath "\${env:LISA_LOG_DESTINATION}"
+                                            -Delay '${sleepTime}'
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
@@ -145,35 +179,38 @@ node("hyper-v") {
     }
 }
 
-stage("BVT stage") {
+DISTROS = getDistros (DISTRO_VERSIONS, supportedValidationDistros)
+
+stage("Validation stage") {
     def runs = [:]
-    nodesMap.keySet().each {
+    validationNodesMap.keySet().each {
         def testNode = it
-        def mappedDistros = nodesMap[it]
-        if (testNode == 'sriov') {
-            testNode = 'ws2016'
-        }
+        def mappedDistros = validationNodesMap[it]
         DISTROS.each {
-            if (mappedDistros.contains("${it},")) {
-                runs["${it}-${testNode}"] = {
+            def XML_NAME = ''
+            def TEST_TYPE = ''
+            (XML_NAME, TEST_TYPE) = getValidationXml(validationXmlMap, it)
+            if ((mappedDistros.contains("${it},")) && (XML_NAME) && (TEST_TYPE)) {
+                runs["${TEST_TYPE}-${it}-${testNode}"] = {
                     node("${testNode}") {
-                        stage("${it}-${testNode}") {
-                            withCredentials(bindings: [string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                        string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
-                                        string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) { 
+                        stage("${TEST_TYPE}-${it}-${testNode}") {
+                            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                        string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
+                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION')]) { 
                                 dir ("b${BUILD_NUMBER}") {
                                     checkout scm
                                     echo 'Running LISA...'
                                     PowerShellWrapper("""
                                         & '.\\scripts\\lis_hyperv_platform\\main-lis-rpm.ps1'
                                             -JobId '${it}-b-${BUILD_NUMBER}'
-                                            -InstanceName '${it}-b-${BUILD_NUMBER}'
+                                            -InstanceName '${it}-${TEST_TYPE}'
                                             -DistroVersion '${it}' -WorkingDirectory 'C:\\workspace'
                                             -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}' 
-                                            -XmlTest 'lis_pipeline_bvt.xml'
+                                            -XmlTest '${XML_NAME}'
                                             -LisaTestDependencies '${LISA_TEST_DEPENDENCIES}'
                                             -LisUrl "\${env:LIS_ARCHIVE_LINK}"
-                                            -AzureToken "\${env:AZURE_SAS}"
+                                            -TestType '${TEST_TYPE}'
+                                            -LogsPath "\${env:LISA_LOG_DESTINATION}"
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
