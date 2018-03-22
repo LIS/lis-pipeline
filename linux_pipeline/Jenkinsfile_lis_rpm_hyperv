@@ -1,11 +1,8 @@
 #!/usr/bin/env groovy
 
-properties properties: [
-  disableConcurrentBuilds()
-]
-
 withCredentials(bindings: [string(credentialsId: 'LIS_OLD_ARCHIVE_VERSION', variable: 'LIS_OLD_ARCHIVE_VERSION')]) {
 properties ([
+    disableConcurrentBuilds(),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
@@ -22,7 +19,11 @@ properties ([
             description: 'Link to the previous lis version'],
         [$class: 'ChoiceParameterDefinition', choices: 'no\nyes',
             name: 'FULL_PERF_RUN',
-            description: 'Full run local Hyper-V perf switch.']
+            description: 'Full run local Hyper-V perf switch.'],
+        [$class: 'StringParameterDefinition',
+            name: 'ENABLED_STAGES',
+            defaultValue: "deployment_scenarios,perf,validation",
+            description: 'What stages to run']
         ]
     ]
 ])
@@ -150,7 +151,9 @@ stage ("Deploy stage") {
     }
     
     try {
-        parallel runs
+        if(env.ENABLED_STAGES.contains("deployment_scenarios")) {
+            parallel runs
+        }
     } catch (exc) { 
         currentBuild.result = 'SUCCESS'
     }
@@ -163,20 +166,22 @@ node("hyper-v") {
                                        variable: 'LOCAL_JENKINS_LIS_PERF_JOB'),
                                        string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_TOKEN',
                                        variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
-                dir ("p${BUILD_NUMBER}") {
-                    checkout scm
-                    PowerShellWrapper("""
-                        & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
-                            -LocalJenkinsPerfURL '${LOCAL_JENKINS_LIS_PERF_JOB}'
-                            -LocalJenkinsPerfToken '${LOCAL_JENKINS_PERF_TOKEN}'
-                            -FullPerfRun "\${env:FULL_PERF_RUN}"
-                            -LisUrl "\${env:LIS_ARCHIVE_LINK}"
-                            -AzureToken "\${env:AZURE_SAS}"
-                    """)
-                    echo "Triggered LIS Local Hyper-V Performance tests."
+                if(env.ENABLED_STAGES.contains("deployment_scenarios")) {
+                    dir ("p${BUILD_NUMBER}") {
+                        checkout scm
+                        PowerShellWrapper("""
+                            & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
+                                -LocalJenkinsPerfURL '${LOCAL_JENKINS_LIS_PERF_JOB}'
+                                -LocalJenkinsPerfToken '${LOCAL_JENKINS_PERF_TOKEN}'
+                                -FullPerfRun "\${env:FULL_PERF_RUN}"
+                                -LisUrl "\${env:LIS_ARCHIVE_LINK}"
+                                -AzureToken "\${env:AZURE_SAS}"
+                        """)
+                        echo "Triggered LIS Local Hyper-V Performance tests."
+                    }
                 }
             }
-    }
+        }
 }
 
 DISTROS = getDistros (DISTRO_VERSIONS, supportedValidationDistros)
@@ -224,7 +229,9 @@ stage("Validation stage") {
     }
     
     try {
-        parallel runs
+        if(env.ENABLED_STAGES.contains("validation")) {
+            parallel runs
+        }
     } catch (exc) {
         currentBuild.result = 'SUCCESS'
     }
