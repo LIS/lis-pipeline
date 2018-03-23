@@ -174,11 +174,11 @@ function Main {
     if (!$kernelFolder) {
         throw "Kernel folder cannot be empty."
     }
-    $jobPath = Join-Path -Path (Resolve-Path $WorkingDirectory) -ChildPath $JobId
-    New-Item -Path $jobPath -Type "Directory" -Force
     if (!(Test-Path $WorkingDirectory)) {
         New-Item -ItemType "Directory" -Path $WorkingDirectory
     }
+    $jobPath = Join-Path -Path (Resolve-Path $WorkingDirectory) -ChildPath $JobId
+    New-Item -Path $jobPath -Type "Directory" -Force
     $LISAPath = Join-Path $jobPath "lis-test"
     $LISARelPath = Join-Path $LISAPath "WS2012R2\lisa"
 
@@ -237,7 +237,7 @@ function Main {
             Write-Host ("Failed to report stage state with error: {0}" -f @($_))
         }
         Pop-Location
-        Copy-Item -Recurse -Force $LISAPath .
+        Copy-Item -Recurse -Force $jobPath .
     }
 }
 
