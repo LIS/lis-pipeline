@@ -563,7 +563,7 @@ pipeline {
         stage('validation_perf_hyperv') {
           when {
             beforeAgent true
-            expression { params.OS_TYPE == 'centos' }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
           }
           agent {
