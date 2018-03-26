@@ -27,6 +27,22 @@ properties ([
             choices: 'all\nCore (fvt)\nStorage (fvt)\nNetwork_and_Stress (fvt)\nMemory (fvt)',
             name: 'LISA_TEST_SUITE',
             description: 'LISA test suite'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'TCP\nUDP\nFIO',
+            name: 'LISA_PERF_TEST',
+            description: 'Which perf test to run'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'v4\nv6',
+            name: 'PERF_IPV',
+            description: 'IP version to use.(Only used for networking perf test)'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
+            name: 'PERF_NET_THREADS',
+            description: 'TEST_THREADS for TCP. CONNECTION POOL for UDP'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
+            name: 'PERF_Q_DEPTH',
+            description: 'Q_DEPTH for FIO'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
             defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv',
@@ -35,16 +51,29 @@ properties ([
     ]
 ])
 
+def perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
+
+def getPerfOptions(perf_test) {
+    switch (perf_test) {
+        case ["TCP", "UDP"]:
+            return "IPV=" + PERF_IPV + ";NET_THREADS=" + PERF_NET_THREADS
+        case "FIO":
+            return "Q_DEPTH=" + PERF_Q_DEPTH
+    }
+}
+
 node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
-    
+
     if (LISA_TEST_SUITE == 'all') {
         LISA_TEST_SUITE = ''
     } else {
         LISA_TEST_SUITE = LISA_TEST_SUITE.split(" ")[0].toLowerCase()
     }
-        
+    
+    PERF_OPTIONS = getPerfOptions(LISA_PERF_TEST)
+
     stage ("test_kernels") {
             runs["kernel_patched"] = {
                 patchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
@@ -54,6 +83,8 @@ node ("meta_slave") {
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
+                    string(name: 'LISA_PERF_TEST_XML', value: "perfXml[LISA_PERF_TEST]"),
+                    string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             if (env.SKIP_UNPATCHED == 'no') {
@@ -64,11 +95,14 @@ node ("meta_slave") {
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
                         string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                         string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
+                        string(name: 'LISA_PERF_TEST_XML', value: "perfXml[LISA_PERF_TEST]"),
+                        string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                         string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
                 }
             }
             parallel runs
     }
+
     stage ("aggregate_results") {
         dir ('comparison_results' + env.BUILD_NUMBER) {
             copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
@@ -76,12 +110,13 @@ node ("meta_slave") {
             if (env.SKIP_UNPATCHED == 'no') {
                 copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
-                stash includes: 'patched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
-                stash includes: 'unpatched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
-                stash includes: 'unpatched_run/**/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
+                stash includes: 'patched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
+                stash includes: 'unpatched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'unpatched_run/*-functional/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
             }
         }
     }
+
     stage ("compare_results") {
         if (env.SKIP_UNPATCHED == 'no') {
             dir('comparison_results' + env.BUILD_NUMBER) {
@@ -92,10 +127,10 @@ node ("meta_slave") {
                 unstash 'unpatchedMetadata'
                 sh '''#!/bin/bash
                     INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
-                    echo '[METADATA]' > ./metadata.ini       
+                    echo '[METADATA]' > ./metadata.ini
                     KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
                     KERNEL="${KERNEL%-unpatched*}"
-                    echo "KERNEL_VERSION = $KERNEL" >> ./metadata.ini        
+                    echo "KERNEL_VERSION = $KERNEL" >> ./metadata.ini
                     BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
                     echo "BRANCH = $BRANCH" >> ./metadata.ini
                     echo "LISA_XML = ${LISA_TEST_XML}" >> ./metadata.ini
@@ -105,8 +140,8 @@ node ("meta_slave") {
                 '''
                 sh '''
                     python3 scripts/comparison/compare_results.py \\
-                        --patchedresults ./patched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --unpatchedresults ./unpatched_run/**/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --patchedresults ./patched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
+                        --unpatchedresults ./unpatched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
                         --output results.html --metadata ./metadata.ini
                 '''
                 archiveArtifacts 'results.html'
