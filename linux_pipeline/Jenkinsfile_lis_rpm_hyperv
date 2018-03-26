@@ -187,6 +187,7 @@ node("hyper-v") {
 DISTROS = getDistros (DISTRO_VERSIONS, supportedValidationDistros)
 
 stage("Validation stage") {
+    def globalSleepTime = 0;
     def runs = [:]
     validationNodesMap.keySet().each {
         def testNode = it
@@ -202,6 +203,8 @@ stage("Validation stage") {
                             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION')]) { 
+                                def sleepTime = globalSleepTime
+                                globalSleepTime = globalSleepTime + 30
                                 dir ("b${BUILD_NUMBER}") {
                                     checkout scm
                                     echo 'Running LISA...'
@@ -216,6 +219,7 @@ stage("Validation stage") {
                                             -LisUrl "\${env:LIS_ARCHIVE_LINK}"
                                             -TestType '${TEST_TYPE}'
                                             -LogsPath "\${env:LISA_LOG_DESTINATION}"
+                                            -Delay '${sleepTime}'
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
