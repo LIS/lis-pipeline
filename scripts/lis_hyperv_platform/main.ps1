@@ -24,7 +24,8 @@ param(
     [String] $IdRSAPub,
     [String] $LisaTestDependencies,
     [String] $PipelineName,
-    [String] $DBConfigPath
+    [String] $DBConfigPath,
+    [String] $LisaTestSuite
 )
 
 $ErrorActionPreference = "Stop"
@@ -118,6 +119,37 @@ function Edit-TestXML {
     $xml.Save($xmlFullPath)
 }
 
+function Remove-XmlVMs {
+    param (
+    [string] $Path,
+    [string] $Suite
+    )
+    
+    $xmlFullPath = Resolve-Path $Path
+    $xml = [xml](Get-Content $xmlFullPath)
+    if ($xml.config.VMs.vm -is [array]) {
+        foreach ($vmDef in $xml.config.VMs.vm) {
+            if ($vmDef.suite -eq $Suite){
+                $TestVM = $vmDef
+                $DependVMs = @($vmDef.vmName)
+            }
+        }
+        if ($TestVM.testParams) {
+            foreach ($param in $TestVM.testParams.param) {
+                if ($param -like "VM2Name*"){
+                    $DependVMs += @($param.split("=")[1])
+                }
+            }
+        }
+        foreach ($vmDef in $xml.config.VMs.vm) {
+            if (!($DependVMs.contains($vmDef.vmName))) {
+                $xml.config.VMs.removeChild($vmDef)
+            }
+        }
+        $xml.Save($xmlFullPath)
+    }
+}
+
 function Parse-IcaLog {
     param(
         [parameter(Mandatory=$true)]
@@ -195,6 +227,9 @@ function Main {
     Push-Location "${LISARelPath}\xml"
     try {
         Edit-TestXML -Path $XmlTest -VMSuffix $InstanceName
+        if ($LisaTestSuite) {
+            Remove-XmlVMs -Path $XmlTest -Suite $LisaTestSuite
+        }
     } catch {
         throw
     } finally {
@@ -209,8 +244,12 @@ function Main {
         # Note(avladu): Lisa requires ErrorActionPreference = Continue,
         # otherwise it will fail to run all the tests.
         $ErrorActionPreference = "Continue"
-        & .\lisa.ps1 -cmdVerb run -cmdNoun ".\xml\${XmlTest}" -dbgLevel 6 `
-            -CLImageStorDir $imageFolder -testParams $lisaParams
+        $commandParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
+            "dbgLevel" = "6";"CLImageStorDir" = $imageFolder;"testParams" = $lisaParams}
+        if ($LisaTestSuite) {
+            $commandParams += @{"suite" = $LisaTestSuite}
+        }
+        & .\lisa.ps1 @commandParams
         if ($LASTEXITCODE) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
         } else {
