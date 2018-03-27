@@ -2,7 +2,7 @@
 ##### For 2008 R2, run the .ps1 from: https://download.microsoft.com/download/6/F/5/6F5FF66C-6775-42B0-86C4-47D41F2DA187/Win7AndW2K8R2-KB3191566-x64.zip
 
 $ErrorActionPreference = "Stop"
-. "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)\common_functions.ps1"
+Import-Module "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)\helpers.psm1"
 
 class Instance {
     [Backend] $Backend

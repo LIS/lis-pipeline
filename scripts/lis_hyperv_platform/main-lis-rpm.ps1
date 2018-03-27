@@ -26,39 +26,8 @@ $ErrorActionPreference = "Stop"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
-. "$scriptPathParent\common_functions.ps1"
 
-function Get-LisaCode {
-    param(
-        [parameter(Mandatory=$true)]
-        [string] $LISAPath
-    )
-    if (Test-Path $LISAPath) {
-        rm -Recurse -Force $LISAPath
-    }
-    git clone https://github.com/LIS/lis-test.git $LISAPath
-}
-
-function Copy-LisaTestDependencies {
-    param(
-        [parameter(Mandatory=$true)]
-        [string[]] $TestDependenciesFolders,
-        [parameter(Mandatory=$true)]
-        [string] $LISARelPath
-    )
-
-    # This function copies test dependencies in lisa folder 
-    # from a given share
-    if (!(Test-Path $LisaTestDependencies)) {
-        throw "${LisaTestDependencies} path does not exist!"
-    }
-    foreach ($folder in $TestDependenciesFolders) {
-        $LisaDepPath = Join-Path $LisaTestDependencies $folder
-        Copy-Item -Force `
-            -Recurse -Path $LisaDepPath `
-            -Destination $LISARelPath
-    } 
-}
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 
 function Edit-TestXML {
     param(
@@ -120,8 +89,8 @@ function Main {
 
     Write-Host "Copying lisa dependencies from share"
     Copy-LisaTestDependencies `
-        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh","setupScripts") `
-        -LISARelPath $LISARelPath
+        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh") `
+        -LISARelPath $LISARelPath -LisaTestDependencies $LisaTestDependencies
     
     $VMgeneration = "1"
     if ($DistroVersion -like "*gen2vm*") {
