@@ -1,0 +1,92 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'KERNEL_FOLDER_PATH',
+            defaultValue: 'latest',
+            description: 'Kernel folder to be uploaded. Use latest for the last built version existent on the share.'],
+        [$class: 'ChoiceParameterDefinition', choices: 'testing\nstable\n',
+            name: 'REPO_TYPE',
+            description: 'The repo type where the kernel will be uploaded.']
+        ]
+    ],
+    pipelineTriggers([cron('H 12 * * 3')])
+])
+
+node("meta_slave") {
+    stage('get_kernel') {
+        withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                         usernamePassword(credentialsId: 'smb_share_user_pass',
+                                          passwordVariable: 'SMB_SHARE_PASSWORD',
+                                          usernameVariable: 'SMB_SHARE_USERNAME')]) {
+            checkout scm
+            echo "Get the kernel files from the repo."
+            sh '''
+              bash "${WORKSPACE}/scripts/kernel_repo_upload/get_kernel_folder.sh" --job_id "${BUILD_NUMBER}-${BRANCH_NAME}" \
+                  --kernel_folder_path "${KERNEL_FOLDER_PATH}" --smb_share_url "${SMB_SHARE_URL}" \
+                  --smb_share_username "${SMB_SHARE_USERNAME}" --smb_share_password "${SMB_SHARE_PASSWORD}"
+            '''
+            script {
+              env.KERNEL_TRANSLATED_FOLDER = readFile "${env.WORKSPACE}/${env.BUILD_NUMBER}-${env.BRANCH_NAME}/kernel_translated_folder"
+            }
+          }
+    }
+    stage('send_email') {
+      withCredentials([string(credentialsId: 'MAIL_CONFIRMATION_LIST', variable: 'MAIL_CONFIRMATION_LIST')]) {
+        checkout scm
+        echo "Send email to the people that need to confirm the upload."
+        emailext (
+          subject: "Required upload confirmation for kernel version: ${env.KERNEL_TRANSLATED_FOLDER}",
+          to: "${env.MAIL_CONFIRMATION_LIST}",
+          mimeType : "text/html",
+          body: """
+              Hello,<br/><br/>
+              Kernel version ${env.KERNEL_TRANSLATED_FOLDER} has been built.<br/>
+              Please verify the results and confirm the publishing to the repo ${env.REPO_TYPE} at the following link:<br>
+              <a href='${env.RUN_DISPLAY_URL}'>Confirm upload of ${env.KERNEL_TRANSLATED_FOLDER}</a><br/><br/>
+              Thank you,<br/>Jenkins CI
+          """
+        )
+      }
+    }
+    stage('confirm_kernel') {
+        checkout scm
+        echo "Ask for manual confirmation from the maintainer."
+        timeout(time: 3600, unit: 'SECONDS') {
+            input(message: "Are you sure you want to upload kernel folder ${KERNEL_TRANSLATED_FOLDER} to repo ${REPO_TYPE}?")
+        }
+    }
+}
+
+node("hyper-v") {
+    stage('upload_kernel') {
+      withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                       string(credentialsId: 'REPO_URL', variable: 'REPO_URL'),
+                       string(credentialsId: 'REPO_API_KEY', variable: 'REPO_API_KEY'),
+                       file(credentialsId: 'REPO_CERT', variable: 'REPO_CERT_PATH'),
+                       usernamePassword(credentialsId: 'smb_share_user_pass',
+                                        passwordVariable: 'SMB_SHARE_PASSWORD',
+                                        usernameVariable: 'SMB_SHARE_USERNAME')]) {
+        checkout scm
+        echo "Uploading kernel to repo."
+        PowerShellWrapper('''
+          & "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\upload_kernel_folder.ps1"
+              -KernelFolderPath ${env:KERNEL_TRANSLATED_FOLDER}
+              -RepoType ${env:Repo_TYPE}
+              -RepoUrl ${env:REPO_URL}
+              -RepoApiKey ${env:REPO_API_KEY}
+              -RepoCertPath ${env:REPO_CERT_PATH}
+              -SmbShareUrl ${env:SMB_SHARE_URL}
+              -SmbShareUsername ${env:SMB_SHARE_USERNAME}
+              -SmbSharePassword ${env:SMB_SHARE_PASSWORD}
+        ''')
+      }
+    }
+}
