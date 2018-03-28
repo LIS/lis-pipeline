@@ -8,6 +8,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Import-Module "$scriptPath\ini.psm1"
 
 function Trigger-LisPerfRun {
     Write-Host "Triggering performance jobs for LIS"
@@ -18,8 +20,6 @@ function Trigger-LisPerfRun {
 
 function Trigger-MsftPerfRun {
     Write-Host "Triggering performance jobs for kernel folder: ${KernelVersionPath}"
-    $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-    Import-Module "$scriptPath\ini.psm1"
     Write-Host $KernelVersionPath
     Write-Host (cat $KernelVersionPath)
     $kernelPath = Get-IniFileValue -Path $KernelVersionPath -Section "KERNEL_BUILT" -Key "folder"
@@ -30,8 +30,7 @@ function Trigger-MsftPerfRun {
 function Main {
     if ($LisUrl) {
         Trigger-LisPerfRun
-    }
-    elseif ($KernelVersionPath) {
+    } elseif ($KernelVersionPath) {
         Trigger-MsftPerfRun
     }
 }
