@@ -276,7 +276,8 @@ function Main {
             Write-Host ("Failed to report stage state with error: {0}" -f @($_))
         }
         Pop-Location
-        Copy-Item -Recurse -Force $jobPath .
+        New-Item -Type "Directory" -Force $JobId
+        Copy-Item -Recurse -Force (Join-Path $jobPath "lis-test\WS2012R2\lisa\TestResults") $JobId
     }
 }
 
