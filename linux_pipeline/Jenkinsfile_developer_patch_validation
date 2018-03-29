@@ -272,8 +272,8 @@ pipeline {
                     }
                     post {
                         always {
-                            archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*"
-                            junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml"
+                            archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*"
+                            junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*.xml"
                         }
                         success {
                             echo 'Cleaning up LISA environment...'
