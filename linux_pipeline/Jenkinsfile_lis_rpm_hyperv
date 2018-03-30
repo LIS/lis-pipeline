@@ -111,7 +111,8 @@ stage ("Deploy stage") {
                             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LIS_SECRET_PARAMS', variable: 'LIS_SECRET_PARAMS'),
-                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION')]) {
+                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION'),
+                                        string(credentialsId: 'DB_CONFIG_DEPLOY', variable: 'DB_CONFIG_DEPLOY')]) {
                                 def sleepTime = globalSleepTime
                                 globalSleepTime = globalSleepTime + 30
                                 def lisSuite = ''
@@ -138,6 +139,7 @@ stage ("Deploy stage") {
                                             -TestType 'deploy_scenarios'
                                             -LogsPath "\${env:LISA_LOG_DESTINATION}"
                                             -Delay '${sleepTime}'
+                                            -ConfigPath "\${env:DB_CONFIG_DEPLOY}"
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
@@ -202,7 +204,8 @@ stage("Validation stage") {
                         stage("${TEST_TYPE}-${it}-${testNode}") {
                             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
-                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION')]) { 
+                                        string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION'),
+                                        string(credentialsId: 'DB_CONFIG_VALIDATION', variable: 'DB_CONFIG_VALIDATION')]) { 
                                 def sleepTime = globalSleepTime
                                 globalSleepTime = globalSleepTime + 30
                                 dir ("b${BUILD_NUMBER}") {
@@ -220,6 +223,7 @@ stage("Validation stage") {
                                             -TestType '${TEST_TYPE}'
                                             -LogsPath "\${env:LISA_LOG_DESTINATION}"
                                             -Delay '${sleepTime}'
+                                            -ConfigPath "\${env:DB_CONFIG_VALIDATION}"
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
