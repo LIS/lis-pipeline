@@ -377,8 +377,9 @@ pipeline {
                         -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
-                        -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
-                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]" -LISAManageVMS:$true
+                        -WorkingDirectory "C:\\workspace"
+                        -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]"
+                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]"
                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
                         -AzureToken "${env:AZURE_SAS}"
                         -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"

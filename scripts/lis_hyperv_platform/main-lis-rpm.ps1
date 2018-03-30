@@ -9,8 +9,6 @@ param(
     [String] $XmlTest,
     [String] $WorkingDirectory = ".",
     [String] $LISAImagesShareUrl,
-    [String] $IdRSAPub,
-    [String] $LisaTestParams,
     [String] $LisaTestDependencies,
     [String] $LisUrl,
     [String] $AzureToken,

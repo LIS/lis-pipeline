@@ -326,7 +326,7 @@ pipeline {
                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                         -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
-                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]" -LISAManageVMS:$true
+                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]"
                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}"
                         -AzureToken "${env:AZURE_SAS}"
                         -AzureUrl "${env:UPSTREAM_AZURE_STORAGE_URL}/temp-kernel-artifacts"
