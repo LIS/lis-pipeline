@@ -59,7 +59,7 @@ node("meta_slave") {
     stage('confirm_kernel') {
         checkout scm
         echo "Ask for manual confirmation from the maintainer."
-        timeout(time: 3600, unit: 'SECONDS') {
+        timeout(time: 24, unit: 'HOURS') {
             input(message: "Are you sure you want to upload kernel folder ${KERNEL_TRANSLATED_FOLDER} to repo ${REPO_TYPE}?")
         }
     }
