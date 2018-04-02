@@ -19,7 +19,8 @@ param(
     [String] $LisaOptionalParams,
     [String] $TestType,
     [String] $LogsPath,
-    [String] $Delay
+    [String] $Delay,
+    [String] $ConfigPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +28,7 @@ $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 . "$scriptPathParent\common_functions.ps1"
+$pythonPath = Join-Path "${env:SystemDrive}" "Python27\python.exe"
 
 function Get-LisaCode {
     param(
@@ -92,6 +94,22 @@ function Edit-TestXML {
     $xml.Save($xmlFullPath)
 }
 
+function Parse-LisaLogs {
+    param(
+        [String] $LisUrl,
+        [String] $ConfigPath,
+        [String] $XmlTest
+    )
+    
+    $logDir = (Get-ChildItem '.\TestResults').Name
+    $lisVersion = $($LisUrl -split '(?=\d)',2)[1] -replace '.tar.gz',''
+    $icaLocation = ".\TestResults\${logDir}\ica.log"
+    $newIca = $(Get-Content $icaLocation) -replace "LIS Version : (.*$)","LIS Version : ${lisVersion}"
+    $newIca | Out-File $icaLocation -Encoding ASCII -Force
+    & $pythonPath .\Infrastructure\lisa-parser\lisa_parser\lisa_parser.py $XmlTest `
+        $icaLocation -c $ConfigPath -s ICABase
+}
+
 function Main {
     Start-Sleep $Delay
     if (!(Test-Path $WorkingDirectory)) {
@@ -120,7 +138,7 @@ function Main {
 
     Write-Host "Copying lisa dependencies from share"
     Copy-LisaTestDependencies `
-        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh","setupScripts") `
+        -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh", "setupScripts", "remote-scripts\ica" ) `
         -LISARelPath $LISARelPath
     
     $VMgeneration = "1"
@@ -161,6 +179,11 @@ function Main {
     } catch {
         throw $_
     } finally {
+        try {
+            Parse-LisaLogs -LisUrl $LisUrl -ConfigPath $ConfigPath -XmlTest ".\xml\${XmlTest}"
+        } catch {
+            Write-Host "Lisa logs parsing failed"
+        }
         Pop-Location
         Copy-Item -Recurse -Force $LISAPath .
         if ($LogsPath) {
