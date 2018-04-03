@@ -31,6 +31,10 @@ class htmlReportSection:
                                       variable["value"])
         self.htmlParts.insert(self.nextIndex, rawPart)
         self.nextIndex += 1
+    
+    def addrow(self, str):
+        self.htmlParts.insert(self.nextIndex, str)
+        self.nextIndex += 1
 
     def get(self):
         return self.htmlParts

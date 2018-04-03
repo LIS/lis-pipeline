@@ -152,7 +152,11 @@ function Main {
 
     $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
         "dbgLevel" = "6";"CLImageStorDir" = $NetPath}
-    Run-Lisa -LISARelPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
+    Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
+    
+    # Cleanup
+    Remove-Item -Recurse $VhdDestination
+    Remove-Item -Recurse $LocalKernelFolder
 
 }
 

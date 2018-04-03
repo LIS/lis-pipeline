@@ -20,7 +20,7 @@ properties ([
             name: 'SKIP_UNPATCHED',
             description: 'Skip unpatched kernel validation'],
         [$class: 'ChoiceParameterDefinition',
-            choices: "kernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml",
+            choices: "kernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
             description: 'Which tests should LISA run'],
         [$class: 'ChoiceParameterDefinition',
@@ -76,26 +76,26 @@ node ("meta_slave") {
 
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
+                patchedRun = build job: "pipeline-developer-patch-validation/PR-200", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
-                    string(name: 'LISA_PERF_TEST_XML', value: "perfXml[LISA_PERF_TEST]"),
+                    string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
                     string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             if (env.SKIP_UNPATCHED == 'no') {
                 runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
+                    unpatchedRun = build job: "pipeline-developer-patch-validation/PR-200", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                         string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
                         string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                         string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
-                        string(name: 'LISA_PERF_TEST_XML', value: "perfXml[LISA_PERF_TEST]"),
+                        string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
                         string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                         string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
                 }
@@ -105,14 +105,16 @@ node ("meta_slave") {
 
     stage ("aggregate_results") {
         dir ('comparison_results' + env.BUILD_NUMBER) {
-            copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
+            copyArtifacts(projectName: 'pipeline-developer-patch-validation/PR-200', selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
             if (env.SKIP_UNPATCHED == 'no') {
-                copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                copyArtifacts(projectName: 'pipeline-developer-patch-validation/PR-200', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
-                stash includes: 'patched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
-                stash includes: 'unpatched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
-                stash includes: 'unpatched_run/*-functional/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
+                stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
+                stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
+                stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
+                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
             }
         }
     }
@@ -124,6 +126,8 @@ node ("meta_slave") {
                 checkout scm
                 unstash 'patchedReport'
                 unstash 'unpatchedReport'
+                unstash 'patchedPerf'
+                unstash 'unpatchedPerf'
                 unstash 'unpatchedMetadata'
                 sh '''#!/bin/bash
                     INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
@@ -137,13 +141,23 @@ node ("meta_slave") {
                     if [[ ${LISA_TEST_SUITE} != "" ]];then
                         echo "LISA_TEST_SUITE = ${LISA_TEST_SUITE}" >> ./metadata.ini
                     fi
+                    if [[ ${LISA_PERF_TEST} != "" ]];then
+                        echo "LISA_PERF_TEST = ${LISA_PERF_TEST}" >> ./metadata.ini
+                    fi
                 '''
                 sh '''
                     python3 scripts/comparison/compare_results.py \\
-                        --patchedresults ./patched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --unpatchedresults ./unpatched_run/*-functional/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --output results.html --metadata ./metadata.ini
+                        --patchedresults ./patched_run/*-functional/TestResults/**/Report*.xml \\
+                        --unpatchedresults ./unpatched_run/*-functional/TestResults/**/Report*.xml \\
+                        --output results_func.html --metadata ./metadata.ini
                 '''
+                sh '''
+                    python2.7 scripts/comparison/parse_perf_results.py \\
+                        --logspath ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
+                        --comparewith ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
+                        --testtype "${LISA_PERF_TEST}" --output results_perf.html
+                '''
+                sh 'cat results_func.html results_perf.html > results.html'
                 archiveArtifacts 'results.html'
             }
         } else {
