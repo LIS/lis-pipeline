@@ -12,11 +12,13 @@ param(
     [String] $OsVersion,
     [String] $LISAImagesShareUrl,
     [String] $LisaTestDependencies,
-    [String] $LocalKernelFolder
+    [String] $LocalKernelFolder,
+    [String] $LisaPerfOptions
 )
 
 $ErrorActionPreference = "Stop"
 
+$gitPath = 'C:\Program Files\Git\bin\git.exe'
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 
@@ -25,6 +27,7 @@ $LISA_TEST_RESULTS_REL_PATH = ".\TestResults\*\ica.log"
 . "$scriptPath\retrieve_ip.ps1"
 . "$scriptPathParent\common_functions.ps1"
 . "$scriptPathParent\JobManager.ps1"
+. "$scriptPath\XMLParser.ps1"
 
 Import-Module "$scriptPath\ini.psm1"
 
@@ -36,10 +39,7 @@ function Get-LisaCode {
     if (Test-Path $LISAPath) {
         rm -Recurse -Force $LISAPath
     }
-    git clone https://github.com/mbivolan/lis-test.git $LISAPath
-    pushd $LISAPath
-    git checkout comparison
-    popd
+    & $gitPath clone https://github.com/LIS/lis-test.git $LISAPath
 }
 
 function Copy-LisaTestDependencies {
@@ -68,7 +68,7 @@ function Run-Lisa {
         [parameter(Mandatory=$true)]
         [String] $LisaPath,
         [parameter(Mandatory=$true)]
-        [Array] $LisaParams,
+        [hashtable] $LisaParams,
         [String] $LisaLogPath
     )
 
@@ -100,6 +100,20 @@ function Run-Lisa {
     }
 }
 
+function Edit-PerfXML{
+    param(
+        [String] $Path,
+        [String] $Options
+    )
+
+    $parser = [XMLParser]::new($Path)
+    foreach ($option in ($Options.Split(";"))) {
+        $parser.ChangeXML($option)
+    }
+    $parser.Save($Path)
+}
+
+
 function Main {
     if ($KernelVersionPath) {
         $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
@@ -111,7 +125,7 @@ function Main {
         $LocalKernelFolder = Join-Path $env:Workspace $kernelFolder
         $LocalKernelFolder = Join-Path $LocalKernelFolder $package
     }
-    if (!(Test-Path $LocalKernelFolder)) [
+    if (!(Test-Path $LocalKernelFolder)) {
         throw "Kernel folder does not exist"
     } else {
         $LocalKernelFolder = Resolve-Path $LocalKernelFolder
@@ -134,7 +148,16 @@ function Main {
         -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh") `
         -LISARelPath $LISARelPath
 
-    #Image Build
+    # Edit XML
+
+    Push-Location $LISARelPath
+    Write-Host "Editing XML for Perf"
+    $xmlPath = Resolve-Path -Path ".\xml\${XmlTest}"
+    Edit-PerfXML -Path $xmlPath -Options $LisaPerfOptions
+    Write-Host "Finished editing XML for Perf"    
+    Pop-Location
+
+    # Image Build
 
     $VhdDestination = Join-Path $jobPath "vhd-destination"
     New-Item -ItemType "Directory" -Path $VhdDestination
@@ -146,18 +169,17 @@ function Main {
         "dbgLevel" = "9";"CLImageStorDir" = $imageFolder;"testParams" = $testParams}
     Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams
 
-    #Perf Run
+    # Perf Run
 
-    $NetPath = ("\\{0}\{1}$\{2}" -f @($(hostname), $VhdDestination.split(":")[0], $VhdDestination.split(":")[1]))
-
+    $NetPath = ("\\{0}\{1}$\{2}" `
+        -f @($(hostname), $VhdDestination.split(":")[0], $VhdDestination.split(":")[1]))
     $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
         "dbgLevel" = "6";"CLImageStorDir" = $NetPath}
     Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
-    
-    # Cleanup
-    Remove-Item -Recurse $VhdDestination
-    Remove-Item -Recurse $LocalKernelFolder
 
+    # Cleanup
+
+    Remove-Item -Recurse -Force $jobPath
 }
 
 Main

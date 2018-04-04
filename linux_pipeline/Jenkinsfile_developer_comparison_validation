@@ -34,15 +34,23 @@ properties ([
         [$class: 'ChoiceParameterDefinition',
             choices: 'v4\nv6',
             name: 'PERF_IPV',
-            description: 'IP version to use.(Only used for networking perf test)'],
+            description: 'IP version to use for networking perf test'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
+            choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
             name: 'PERF_NET_THREADS',
             description: 'TEST_THREADS for TCP. CONNECTION POOL for UDP'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
             name: 'PERF_Q_DEPTH',
             description: 'Q_DEPTH for FIO'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n1024',
+            name: 'PERF_IO_SIZE',
+            description: 'IO_SIZE for FIO'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'read\nrandread\nwrite\nrandwrite',
+            name: 'PERF_IO_MODE',
+            description: 'IO_MODE for FIO'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
             defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv',
@@ -55,10 +63,19 @@ def perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_
 
 def getPerfOptions(perf_test) {
     switch (perf_test) {
-        case ["TCP", "UDP"]:
-            return "IPV=" + PERF_IPV + ";NET_THREADS=" + PERF_NET_THREADS
+        case "TCP":
+            testOptions = PERF_IPV
+            if (PERF_NET_THREADS != "all"){
+                testOptions += ";TEST_THREADS=" + PERF_NET_THREADS
+            }
+            return testOptions
+        case "UDP":
+            testOptions = PERF_IPV
+            if (PERF_NET_THREADS != "all"){
+                testOptions += ";IPERF3_TEST_CONNECTION_POOL=" + PERF_NET_THREADS
+            }
         case "FIO":
-            return "Q_DEPTH=" + PERF_Q_DEPTH
+            return "Q_DEPTH=" + PERF_Q_DEPTH + ";IO_SIZE=" + PERF_IO_SIZE + ";IO_MODE=" + PERF_IO_MODE
     }
 }
 
@@ -76,7 +93,7 @@ node ("meta_slave") {
 
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "pipeline-developer-patch-validation/PR-200", parameters: [
+                patchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
@@ -89,7 +106,7 @@ node ("meta_slave") {
             }
             if (env.SKIP_UNPATCHED == 'no') {
                 runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "pipeline-developer-patch-validation/PR-200", parameters: [
+                    unpatchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                         string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
@@ -104,11 +121,11 @@ node ("meta_slave") {
     }
 
     stage ("aggregate_results") {
-        dir ('comparison_results' + env.BUILD_NUMBER) {
-            copyArtifacts(projectName: 'pipeline-developer-patch-validation/PR-200', selector: specific("${patchedRun.number}"), target: "patched_run");
+        dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
             if (env.SKIP_UNPATCHED == 'no') {
-                copyArtifacts(projectName: 'pipeline-developer-patch-validation/PR-200', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
                 stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
                 stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
@@ -121,8 +138,7 @@ node ("meta_slave") {
 
     stage ("compare_results") {
         if (env.SKIP_UNPATCHED == 'no') {
-            dir('comparison_results' + env.BUILD_NUMBER) {
-                sh 'rm -rf *'
+            dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                 checkout scm
                 unstash 'patchedReport'
                 unstash 'unpatchedReport'
@@ -131,18 +147,18 @@ node ("meta_slave") {
                 unstash 'unpatchedMetadata'
                 sh '''#!/bin/bash
                     INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
-                    echo '[METADATA]' > ./metadata.ini
+                    META_PATH="./metadata.ini"
                     KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
                     KERNEL="${KERNEL%-unpatched*}"
-                    echo "KERNEL_VERSION = $KERNEL" >> ./metadata.ini
+                    crudini --set $META_PATH 'METADATA' KERNEL_VERSION $KERNEL
                     BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
-                    echo "BRANCH = $BRANCH" >> ./metadata.ini
-                    echo "LISA_XML = ${LISA_TEST_XML}" >> ./metadata.ini
+                    crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
+                    crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
                     if [[ ${LISA_TEST_SUITE} != "" ]];then
-                        echo "LISA_TEST_SUITE = ${LISA_TEST_SUITE}" >> ./metadata.ini
+                        crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
                     fi
                     if [[ ${LISA_PERF_TEST} != "" ]];then
-                        echo "LISA_PERF_TEST = ${LISA_PERF_TEST}" >> ./metadata.ini
+                        crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
                     fi
                 '''
                 sh '''

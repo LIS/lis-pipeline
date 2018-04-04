@@ -393,7 +393,7 @@ class NTTTCPLogsReader(BaseLogsReader):
         self.headers = ['NumberOfConnections', 'Throughput_Gbps',
                         'AverageLatency_ms', 'PacketSize_KBytes', 'SenderCyclesPerByte',
                         'ReceiverCyclesPerByte', 'IPVersion', 'Protocol']
-        self.log_matcher = 'ntttcp-sender-p([0-9X]+).log'
+        self.log_matcher = 'ntttcp-receiver-p([0-9X]+).log'
         self.eth_log_csv = dict()
         self.__get_eth_log_csv()
 

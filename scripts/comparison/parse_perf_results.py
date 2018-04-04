@@ -1,150 +1,146 @@
+#!/usr/bin/python2.7
+
 import sys
-import getopt
+import argparse
 import os
 import glob
 from html_report import HtmlReportSection, HtmlReport
-from perf_report import NTTTCPLogsReader
+from perf_report import NTTTCPLogsReader, IPERFLogsReader
 
 
-def get_arameters(argv):
-    outputFile = ''
-    iniFile = ''
-    testType = ''
-    comparePath = ''
-    try:
-        opts, args = getopt.getopt(argv, "l:o:m:t:c:",
-            ["logspath=", "output=", "metadata=", "testtype=", "comparewith="])
-    except getopt.GetoptError:
-        print('compare_results.py --logspath <path to logs>',
-              '--output <outputhtml> ',
-              '--metadata <ini>',
-              '--comparewith <path to logs>')
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt in ("-l", "--logspath"):
-            logsPath = arg
-        elif opt in ("-o", "--output"):
-            outputFile = arg
-        elif opt in ("-m", "--metadata"):
-            iniFile = arg
-        elif opt in ("-t", "--testtype"):
-            testType = arg
-        elif opt in ("-c", "--comparewith"):
-            comparePath = arg
-
-    iniFile = glob.glob(iniFile)
-
-    if (os.path.isdir(logsPath)):
-        return logsPath, outputFile, testType, comparePath
+def get_parameters():
+    logs_path = ''
+    output_file = ''
+    test_type = ''
+    compare_path = ''
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--logspath", help="--logspath <path>")
+    parser.add_argument("--comparewith", help="--unpatchedtests <path>")
+    parser.add_argument("--output", help="--output <outputhtml>")
+    parser.add_argument("--testtype", help="--testtype")
+    args = parser.parse_args()
+    
+    logs_path = args.logspath
+    compare_path = args.comparewith
+    output_file = args.output
+    test_type = args.testtype
+    
+    if os.path.isdir(logs_path):
+        return logs_path, output_file, test_type, compare_path
 
 
-def parse_logs(logsPath, testType):
-
-    if (testType.lower() == 'tcp'):
-        parsedPerfLog = NTTTCPLogsReader(logsPath).process_logs()
-        parsedPerfLog = order_table(parsedPerfLog, 'NumberOfConnections')
+def parse_logs(logs_path, test_type):
+    if test_type.lower() == 'tcp':
+        parsed_perf_log = NTTTCPLogsReader(logs_path).process_logs()
+        parsed_perf_log = order_table(parsed_perf_log, 'NumberOfConnections')
         tables = [['NumberOfConnections', 'Throughput_Gbps',
                    'AverageLatency_ms'],
                   ['NumberOfConnections', 'SenderCyclesPerByte',
                   'ReceiverCyclesPerByte', 'PacketSize_KBytes']]
+    elif test_type.lower() == 'udp':
+        parsed_perf_log = IPERFLogsReader(logs_path).process_logs()
+        parsed_perf_log = order_table(parsed_perf_log, 'NumberOfConnections')
+        tables = [['NumberOfConnections', 'TxThroughput_Gbps',
+                   'RxThroughput_Gbps', 'DatagramLoss']]
 
-    return parsedPerfLog, tables
+    return parsed_perf_log, tables
 
 
-def order_table(logTable, key):
-    orderedTable = []
+def order_table(log_table, key):
+    ordered_table = []
 
-    while (logTable):
-        min = logTable[0][key]
-        minObj = logTable[0]
-        for line in logTable:
-            if (line[key] < min):
+    while log_table:
+        min = log_table[0][key]
+        min_obj = log_table[0]
+        for line in log_table:
+            if line[key] < min:
                 min = line[key]
-                minObj = line
+                min_obj = line
 
-        orderedTable.append(minObj)
-        logTable.remove(minObj)
-    return orderedTable
+        ordered_table.append(min_obj)
+        log_table.remove(min_obj)
+    return ordered_table
 
 
 if __name__ == "__main__":
-    logsPath, outputFile, testType, comparePath = get_arameters(sys.argv[1:])
-    scriptPath = os.path.dirname(os.path.realpath(__file__))
+    logs_path, output_file, test_type, compare_path = get_parameters()
+    script_path = os.path.dirname(os.path.realpath(__file__))
 
-    newHtml = HtmlReport()
+    new_html = HtmlReport()
 
-    mainParsedLogs, tables = parse_logs(logsPath, testType)
-    if (os.path.isdir(comparePath)):
-        compareParsedLogs, tables = parse_logs(comparePath, testType)
+    main_parsed_logs, tables = parse_logs(logs_path, test_type)
+    if compare_path:
+        if os.path.isdir(compare_path):
+            compare_parsed_logs, tables = parse_logs(compare_path, test_type)
 
-    resultKeys = []
-    for line in mainParsedLogs:
+    result_keys = []
+    for line in main_parsed_logs:
         for key in line.keys():
-            if (key not in resultKeys):
-                resultKeys.append(key)
+            if key not in result_keys:
+                result_keys.append(key)
 
-    if (os.path.isdir(comparePath)):
+    if compare_path:
         for table in tables:
-            newHtml.add(['<table cellpadding="0" cellspacing="0"'
+            new_html.add(['<table cellpadding="0" cellspacing="0"'
                          'style="padding-top: 50px">\n'])
 
-            firstRow = HtmlReportSection(wrapper=
+            first_row = HtmlReportSection(wrapper=
                 ['<tr style="text-align:center">\n', '</tr>\n'])
-            firstRow.addrow('<td></td>\n')
+            first_row.addrow('<td></td>\n')
             for index in range(1, len(table)):
-                firstRow.addrow('<td colspan="2" style="border:1px solid">&nbsp;' +
+                first_row.addrow('<td colspan="2" style="border:1px solid">&nbsp;' +
                                 table[index] + '&nbsp;</td>\n')
-            newHtml.add(firstRow.get())
+            new_html.add(first_row.get())
 
-            firstRow = HtmlReportSection(
+            first_row = HtmlReportSection(
                 wrapper=['<tr style="text-align:center">\n', '</tr>\n'])
-            firstRow.addrow('<td style="border:1px solid">&nbsp;' +
+            first_row.addrow('<td style="border:1px solid">&nbsp;' +
                             table[0] + '&nbsp;</td>\n')
             for index in range(1, len(table)):
-                firstRow.addrow('<td style="border:1px solid">&nbsp;'
+                first_row.addrow('<td style="border:1px solid">&nbsp;'
                                 'Patched&nbsp;</td>\n')
-                firstRow.addrow('<td style="border:1px solid">&nbsp;'
+                first_row.addrow('<td style="border:1px solid">&nbsp;'
                                 'Unpatched&nbsp;</td>\n')
-            newHtml.add(firstRow.get())
+            new_html.add(first_row.get())
 
-            for index in range(0, len(mainParsedLogs)):
-                if (float(mainParsedLogs[index][table[1]]) < 
-                    float(compareParsedLogs[index][table[1]])) :
-                    backColor = '#f75959'
+            for index in range(0, len(main_parsed_logs)):
+                if (float(main_parsed_logs[index][table[1]]) < 
+                        float(compare_parsed_logs[index][table[1]])) :
+                    back_color = '#f75959'
                 else:
-                    backColor = '#8df972'
-                newRow = HtmlReportSection(
+                    back_color = '#8df972'
+                new_row = HtmlReportSection(
                     wrapper=['<tr style="text-align:center;background-color:' +
-                             backColor + '">\n', '</tr>\n'])
-                newRow.addrow('<td style="border:1px solid">' +
-                              str(mainParsedLogs[index][table[0]]) +
+                             back_color + '">\n', '</tr>\n'])
+                new_row.addrow('<td style="border:1px solid">' +
+                              str(main_parsed_logs[index][table[0]]) +
                               '</td>\n')
                 for i in range(1, len(table)):
-                    newRow.addrow('<td style="border:1px solid">&nbsp;' +
-                                  str(mainParsedLogs[index][table[i]]) +
+                    new_row.addrow('<td style="border:1px solid">&nbsp;' +
+                                   str(main_parsed_logs[index][table[i]]) +
+                                   '&nbsp;</td>\n')
+                    new_row.addrow('<td style="border:1px solid">&nbsp;' +
+                                  str(compare_parsed_logs[index][table[i]]) +
                                   '&nbsp;</td>\n')
-                    newRow.addrow('<td style="border:1px solid">&nbsp;' +
-                                  str(compareParsedLogs[index][table[i]]) +
-                                  '&nbsp;</td>\n')
-                newHtml.add(newRow.get())
-            newHtml.add(['</table>'])
+                new_html.add(new_row.get())
+            new_html.add(['</table>'])
     else:
         for table in tables:
-            newHtml.add(['<table cellpadding="0" cellspacing="0"'
+            new_html.add(['<table cellpadding="0" cellspacing="0"'
                          'style="padding-top: 50px">\n'])
-            firstRow = HtmlReportSection(wrapper=['<tr>\n', '</tr>\n'])
+            first_row = HtmlReportSection(wrapper=['<tr>\n', '</tr>\n'])
             for key in table:
-                firstRow.addrow('<td style="border:1px solid">&nbsp;' +
+                first_row.addrow('<td style="border:1px solid">&nbsp;' +
                                 key + '&nbsp;</td>\n')
-            newHtml.add(firstRow.get())
+            new_html.add(first_row.get())
 
-            for line in mainParsedLogs:
-                newRow = HtmlReportSection(
+            for line in main_parsed_logs:
+                new_row = HtmlReportSection(
                     wrapper=['<tr style="text-align:center">\n', '</tr>\n'])
                 for key in table:
-                    newRow.addrow('<td style="border:1px solid">' +
-                                  str(line[key]) + '</td>\n')
-                newHtml.add(newRow.get())
-            newHtml.add(['</table>'])
+                    new_row.addrow('<td style="border:1px solid">' +
+                                   str(line[key]) + '</td>\n')
+                new_html.add(new_row.get())
+            new_html.add(['</table>'])
 
-    newHtml.create(outputFile)
+    new_html.create(output_file)
