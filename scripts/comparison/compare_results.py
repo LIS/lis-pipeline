@@ -4,12 +4,12 @@ import sys
 import getopt
 import os
 import xml.etree.ElementTree as ET
-from html_report import htmlReportSection, htmlReport
+from html_report import HtmlReportSection, HtmlReport
 import glob
 import configparser
 
 
-def getParameters(argv):
+def get_parameters(argv):
     outputFile = ''
     iniFile = ''
     try:
@@ -30,7 +30,7 @@ def getParameters(argv):
             outputFile = arg
         elif opt in ("-m", "--metadata"):
             iniFile = arg
-    
+
     iniFile = glob.glob(iniFile)
     patchedResultsPath = glob.glob(patchedResultsPath)
     unpatchedResultsPath = glob.glob(unpatchedResultsPath)
@@ -40,7 +40,7 @@ def getParameters(argv):
         return patchedResultsPath[0], unpatchedResultsPath[0], iniFile, outputFile
 
 
-def getFixedXml(xmlPath):
+def get_fixed_xml(xmlPath):
     fixedXml = ''
     with open(xmlPath, 'r') as file:
         xmlLines = file.readlines()
@@ -51,7 +51,7 @@ def getFixedXml(xmlPath):
     return tree
 
 
-def cleanDuplicates(testList):
+def clean_duplicates(testList):
     for test in testList:
         nr = testList.count(test)
         if nr > 1:
@@ -60,7 +60,7 @@ def cleanDuplicates(testList):
     return testList
 
 
-def getSuiteData(testSuite):
+def get_suite_data(testSuite):
     tests = []
 
     for child in testSuite:
@@ -82,14 +82,15 @@ def getSuiteData(testSuite):
             tests.append(testResult)
     return tests
 
-def getMetadataFromIni(iniPath):
+
+def get_metadata_from_ini(iniPath):
     entries = []
     try:
         config = configparser.ConfigParser()
         config.read(iniPath)
-    except:
-        print ('Cannot read ini file')
-        
+    except Exception:
+        print('Cannot read ini file')
+
     if (config['METADATA']):
         for key in config['METADATA']:
             configEntry = dict()
@@ -97,46 +98,49 @@ def getMetadataFromIni(iniPath):
             configEntry['value'] = config['METADATA'][key]
             entries.append(configEntry)
     return entries
-    
-def getTestData(xmlPath):
+
+
+def get_test_data(xmlPath):
     tests = []
     try:
         tree = ET.parse(xmlPath)
         root = tree.getroot()
     except ET.ParseError:
-        root = getFixedXml(xmlPath)
+        root = get_fixed_xml(xmlPath)
 
     if (root.tag == 'testsuites'):
         for testSuite in root:
-            tests += getSuiteData(testSuite)
+            tests += get_suite_data(testSuite)
     else:
-        tests = getSuiteData(root)
+        tests = get_suite_data(root)
 
-    tests = cleanDuplicates(tests)
+    tests = clean_duplicates(tests)
     return tests
 
 
 if __name__ == "__main__":
-    patchedResultsPath, unpatchedResultsPath, iniFile, outputFile = getParameters(sys.argv[1:])
+    patchedResultsPath, unpatchedResultsPath, iniFile, outputFile = get_parameters(sys.argv[1:])
     scriptPath = os.path.dirname(os.path.realpath(__file__))
 
-    newHtml = htmlReport()
+    newHtml = HtmlReport()
 
     if (iniFile):
-        metadata = getMetadataFromIni(iniFile)
-        metaSection = htmlReportSection(
-            wrapper=['<table cellpadding="0" cellspacing="0">\n', '</table>\n'])
+        metadata = get_metadata_from_ini(iniFile)
+        metaSection = HtmlReportSection(
+            wrapper=['<table cellpadding="0" cellspacing="0">\n',
+                     '</table>\n'])
         for entry in metadata:
             metaSection.add(scriptPath + "/html/metarow.html", [
                 {"name": "keyName", "value": entry['name']},
                 {"name": "keyValue", "value": entry['value']}])
         newHtml.add(metaSection.get())
 
-    patchedResults = getTestData(patchedResultsPath)
-    unpatchedResults = getTestData(unpatchedResultsPath)
-    
-    newSection = htmlReportSection(
-            wrapper=['<table cellpadding="0" cellspacing="0" style="padding-top: 50px">', '</table>'])
+    patchedResults = get_test_data(patchedResultsPath)
+    unpatchedResults = get_test_data(unpatchedResultsPath)
+
+    newSection = HtmlReportSection(
+            wrapper=['<table cellpadding="0" cellspacing="0" style="padding-top: 50px">',
+                     '</table>'])
     newSection.add(scriptPath + "/html/head.html")
 
     for index in range(0, len(patchedResults)):

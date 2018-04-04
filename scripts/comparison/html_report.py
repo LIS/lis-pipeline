@@ -1,9 +1,9 @@
 import os
 
 
-class htmlReport:
+class HtmlReport:
     htmlSections = []
-    
+
     def add(self, section):
         self.htmlSections += section
 
@@ -13,8 +13,8 @@ class htmlReport:
                 file.write(section)
 
 
-class htmlReportSection:
-    
+class HtmlReportSection:
+
     def __init__(self, **kwargs):
         self.nextIndex = 0
         self.htmlParts = []
@@ -31,7 +31,7 @@ class htmlReportSection:
                                       variable["value"])
         self.htmlParts.insert(self.nextIndex, rawPart)
         self.nextIndex += 1
-    
+
     def addrow(self, str):
         self.htmlParts.insert(self.nextIndex, str)
         self.nextIndex += 1
