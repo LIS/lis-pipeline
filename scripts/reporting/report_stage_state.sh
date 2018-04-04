@@ -66,6 +66,7 @@ function main {
 
     kernel_version="unknown"
     kernel_commit_id="unknown"
+    kernel_folder="unknown"
     test_date=`date '+%m/%d/%Y %H:%M:%S'`;
 
     if [[ -e "${KERNEL_INFO}" ]];then
@@ -73,6 +74,8 @@ function main {
                          || echo $kernel_version)
         kernel_commit_id=$(crudini --get $KERNEL_INFO KERNEL_BUILT git_tag \
                            || echo $kernel_commit_id)
+        kernel_folder=$(crudini --get $KERNEL_INFO KERNEL_BUILT folder \
+                           || echo $kernel_folder)
     else
         echo "${KERNEL_INFO} file does not exist."
     fi
@@ -87,6 +90,7 @@ function main {
         "PipelineName": "${PIPELINE_NAME}",
         "PipelineBuildNumber": ${PIPELINE_BUILD_NUMBER},
         "KernelVersion": "${kernel_version}",
+        "KernelFolder": "${kernel_folder}",
         "KernelCommitId": "${kernel_commit_id}",
         "${PIPELINE_STAGE_NAME}": ${PIPELINE_STAGE_STATUS}
     }
