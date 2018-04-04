@@ -108,8 +108,14 @@ if __name__ == "__main__":
             newHtml.add(firstRow.get())
 
             for index in range(0, len(mainParsedLogs)):
+                if (float(mainParsedLogs[index][table[1]]) < 
+                    float(compareParsedLogs[index][table[1]])) :
+                    backColor = '#f75959'
+                else:
+                    backColor = '#8df972'
                 newRow = HtmlReportSection(
-                    wrapper=['<tr style="text-align:center">\n', '</tr>\n'])
+                    wrapper=['<tr style="text-align:center;background-color:' +
+                             backColor + '">\n', '</tr>\n'])
                 newRow.addrow('<td style="border:1px solid">' +
                               str(mainParsedLogs[index][table[0]]) +
                               '</td>\n')
