@@ -168,7 +168,7 @@ node("hyper-v") {
                                        variable: 'LOCAL_JENKINS_LIS_PERF_JOB'),
                                        string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_TOKEN',
                                        variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
-                if(env.ENABLED_STAGES.contains("deployment_scenarios")) {
+                if(env.ENABLED_STAGES.contains("perf")) {
                     dir ("p${BUILD_NUMBER}") {
                         checkout scm
                         PowerShellWrapper("""
