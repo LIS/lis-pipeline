@@ -524,6 +524,19 @@ pipeline {
               )
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -OsVHD '${ARM_OSVHD_NAME}'" +
               " -testLocation 'westus2'" +
@@ -556,6 +569,18 @@ pipeline {
               " -StorageAccount 'ExistingStorage_Standard'" +
               " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
               " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -OsVHD '${ARM_OSVHD_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_MsftKernel'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
               " -ExitWithZero"
               )
               junit "report\\*-junit.xml"
