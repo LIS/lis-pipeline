@@ -107,7 +107,8 @@ def initEnv() {
                             popd
                         fi
                         pushd "$cloneDir"
-                        git fetch
+                        git fetch --all
+                        git pull
                         git reset --hard origin/master
                         popd
                         popd

@@ -100,7 +100,7 @@ function get_sources_git () {
         popd
     fi
     pushd "$git_folder"
-    git fetch
+    git fetch --all
     git reset --hard origin/master
     git checkout -f "$git_branch" && git checkout -f "$git_commit_id"
     if [[ $? -ne 0 ]];then
