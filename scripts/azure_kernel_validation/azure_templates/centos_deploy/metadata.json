@@ -1,7 +1,7 @@
 {
   "itemDisplayName": "LIS Pipeline Test VM",
-  "description": "This template is used to create an Azure Ubuntu VM for kernel boot validation pipeline step.",
-  "summary": "Deploy an Ubuntu VM",
+  "description": "This template is used to create an Azure CentOS VM for kernel boot validation pipeline step.",
+  "summary": "Deploy a CentOS VM",
   "githubUsername": "LIS",
   "dateUpdated": "2017-12-07"
 }

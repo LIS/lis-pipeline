@@ -49,10 +49,11 @@ function change_vm_params(){
     build_number=$(echo "$2" | tr "[:upper:]" "[:lower:]")
     os_type="$3"
     base_dir="$4"
+    flavor="$5"
     
     parse_vm_params "$params" "$base_dir" "$os_type"
-    
     sed -i -e "s/%number%/$build_number/g" ./azuredeploy.parameters.json
+    sed -i -e "s/%flavor_name%/$flavor/g" ./azuredeploy.parameters.json
 }
 
 function create_vm(){
@@ -73,6 +74,7 @@ function main(){
     BASE_DIR="$(pwd)"
     OS_TYPE=""
     INSTALL_DEPS="n"
+    FLAVOR="Standard_A2"
 
     while true;do
         case "$1" in
@@ -94,6 +96,9 @@ function main(){
             --resource_location)
                 RESOURCE_LOCATION="$2"
                 shift 2;;
+            --flavor)
+                FLAVOR="$2"
+                shift 2;;
             --) shift; break ;;
             *) break ;;
         esac
@@ -104,12 +109,13 @@ function main(){
     fi
     if [[ "$OS_TYPE" != "" ]];then
         if [[ -d "${TEMPLATE_FOLDER}/${OS_TYPE}_deploy" ]];then
-            if [[ -d "${TEMPLATE_FOLDER}/temp" ]];then
-                rm -rf "${TEMPLATE_FOLDER}/temp"
+            template_folder_temp="${TEMPLATE_FOLDER}/temp${OS_TYPE}${FLAVOR}"
+            if [[ -d "${template_folder_temp}" ]];then
+                rm -f "${template_folder_temp}/"*
             fi
-            mkdir "${TEMPLATE_FOLDER}/temp"
-            cp "${TEMPLATE_FOLDER}/${OS_TYPE}_deploy/"* "${TEMPLATE_FOLDER}/temp"
-            TEMPLATE_FOLDER="${TEMPLATE_FOLDER}/temp"
+            mkdir -p "${template_folder_temp}"
+            cp "${TEMPLATE_FOLDER}/${OS_TYPE}_deploy/"* "${template_folder_temp}"
+            TEMPLATE_FOLDER=${template_folder_temp}
         else
             echo "Cannot find templates for os type: $OS_TYPE"
             exit 1
@@ -120,7 +126,7 @@ function main(){
 
     echo "Azure image type used: $OS_TYPE"
     pushd "$TEMPLATE_FOLDER"
-    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR"
+    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR" "$FLAVOR"
     popd
     pushd "$BASE_DIR"
     create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER" "$RESOURCE_LOCATION"

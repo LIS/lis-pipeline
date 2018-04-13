@@ -28,6 +28,7 @@ validate_azure_vm_boot() {
     RESOURCE_GROUP="${11}"
     RESOURCE_LOCATION="${12}"
     LOCAL_PATH="${13}"
+    FLAVOR="${14}"
     VM_USER_NAME=$OS_TYPE
     FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
 
@@ -47,7 +48,7 @@ validate_azure_vm_boot() {
     bash create_azure_vm.sh --build_number "$FULL_BUILD_NAME" \
         --vm_params "username=$USERNAME,password=$PASSWORD,samba_path=$SMB_SHARE_URL/temp-kernel-artifacts,kernel_path=$KERNEL_FOLDER" \
         --resource_group $RESOURCE_GROUP --os_type $OS_TYPE \
-        --resource_location "$RESOURCE_LOCATION"
+        --resource_location "$RESOURCE_LOCATION" --flavor $FLAVOR
     popd
 
     INTERVAL=5
@@ -120,6 +121,7 @@ main() {
     VM_USER_NAME="ubuntu"
     RESOURCE_GROUP="kernel-validation"
     RESOURCE_LOCATION="northeurope"
+    FLAVOR="Standard_A2"
 
     while true;do
         case "$1" in
@@ -153,13 +155,16 @@ main() {
             --local_path)
                 LOCAL_PATH="$2"
                 shift 2;;
+            --flavor)
+                FLAVOR="$2"
+                shift 2;;
             *) break ;;
         esac
     done
 
     validate_azure_vm_boot "$BASEDIR" "$BUILD_NAME" "$BUILD_NUMBER" "$USERNAME" \
         "$PASSWORD" "$SMB_SHARE_URL" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$OS_TYPE" \
-        "$WORKDIR" "$RESOURCE_GROUP" "$RESOURCE_LOCATION" "$LOCAL_PATH"
+        "$WORKDIR" "$RESOURCE_GROUP" "$RESOURCE_LOCATION" "$LOCAL_PATH" "$FLAVOR"
     
 }
 main $@

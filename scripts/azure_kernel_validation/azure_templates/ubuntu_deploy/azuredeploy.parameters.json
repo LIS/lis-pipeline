@@ -13,6 +13,9 @@
     },
     "buildNumber": {
       "value": "%number%"
+    },
+    "flavor": {
+      "value": "%flavor_name%"
     }
   }
 }
