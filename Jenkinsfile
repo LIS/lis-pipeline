@@ -619,7 +619,6 @@ pipeline {
               " -ARMImageName '${ARM_IMAGE_NAME}'" +
               " -testLocation 'centralus'" +
               " -testCycle 'PERF-FIO'" +
-              " -RunSelectedTests 'ICA-PERF-FIO-TEST-4K'" +
               " -OverrideVMSize 'Standard_DS14_v2'" +
               " -ResultDBTable 'Perf_Storage_Azure_MsftKernel'" +
               " -ResultDBTestTag 'FIO-12DISKS'" +

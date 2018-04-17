@@ -4,7 +4,9 @@ def PowerShellWrapper(psCmd) {
     psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
-
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
 def reportStageStatus(stageName, stageStatus) {
     script {
         env.STAGE_NAME_REPORT = stageName
@@ -38,7 +40,7 @@ pipeline {
     choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -162,10 +164,10 @@ pipeline {
                 script {
                   currentBuild.displayName = readFile "./build_name"
                 }
-                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
-                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
+                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.4 latest'
+                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.4-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
                 writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
-                
+
                 stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
@@ -296,6 +298,53 @@ pipeline {
         }
       }
     }
+    stage('publish_azure_vhd') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
+      }
+      agent {
+        node {
+          label 'azure'
+        }
+      }
+      steps {
+        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+          cleanWs()
+          git "https://github.com/iamshital/azure-linux-automation.git"
+          stash includes: '**' , name: 'azure-linux-automation'
+          unstash "${env.KERNEL_ARTIFACTS_PATH}"
+          unstash 'kernel_version_ini'
+          unstash 'azure.env'
+          script {
+              env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+              env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+          }
+          RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+          RunPowershellCommand(".\\RunAzureTests.ps1" +
+          " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+          " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+          " -testLocation 'northeurope'" +
+          " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+          " -testCycle 'PUBLISH-VHD'" +
+          " -OverrideVMSize 'Standard_D2_v2'" +
+          " -ARMImageName '${ARM_IMAGE_NAME}'" +
+          " -StorageAccount 'ExistingStorage_Standard'" +
+          " -ExitWithZero"
+          )
+          script {
+              env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+          }
+          RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" +
+          " -sourceLocation northeurope " +
+          " -destinationLocations 'westus,westus2,northeurope'" +
+          " -destinationAccountType Standard" +
+          " -sourceVHDName '${ARM_OSVHD_NAME}'" +
+          " -destinationVHDName '${ARM_OSVHD_NAME}'"
+          )
+        }
+      }
+    }
     stage('validation') {
      parallel {
       stage('validation_functional_hyperv') {
@@ -359,11 +408,213 @@ pipeline {
           }
           agent {
             node {
-              label 'meta_slave'
+              label 'azure'
             }
           }
           steps {
-            echo "NOOP Azure test."
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -testLocation 'northeurope'" +
+              " -testCycle 'BVTMK'" +
+              " -OverrideVMSize 'Standard_D1_v2'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('validation_perf_azure_net') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -ResultDBTable 'Perf_Network_Latency_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -ResultDBTable 'Perf_Network_Latency_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('validation_perf_azure_stor') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'centralus'" +
+              " -testCycle 'PERF-FIO'" +
+              " -OverrideVMSize 'Standard_DS14_v2'" +
+              " -ResultDBTable 'Perf_Storage_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'FIO-12DISKS'" +
+              " -StorageAccount 'NewStorage_Premium'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
           }
         }
         stage('validation_perf_hyperv') {
