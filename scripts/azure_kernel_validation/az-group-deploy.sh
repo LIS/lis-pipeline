@@ -1,4 +1,7 @@
 #!/bin/bash -e
+
+set -xe
+
 while getopts "a:n:l:g:s:f:e:uvd" opt; do
     case $opt in
         a)
@@ -114,7 +117,7 @@ then
     do
         relFilePath=${filepath:$artifactsStagingDirectoryLen}
         echo "Uploading file $relFilePath..."
-        az storage blob upload -f $filepath --container $artifactsStorageContainerName -n $relFilePath --account-name "$artifactsStorageAccountName" --account-key "$artifactsStorageAccountKey" --verbose
+        az storage blob upload -f $filepath --container $artifactsStorageContainerName -n $relFilePath --account-name "$artifactsStorageAccountName" --account-key "$artifactsStorageAccountKey" --verbose --debug
     done
 
     templateUri=$blobEndpoint$artifactsStorageContainerName/$(basename $templateFile)?$sasToken
@@ -130,15 +133,15 @@ if [[ $validateOnly ]]
 then
     if [[ $uploadArtifacts ]]
     then
-        az group deployment validate -g "$resourceGroupName" --template-uri $templateUri --parameters "$parameterJson" --verbose
+        az group deployment validate -g "$resourceGroupName" --template-uri $templateUri --parameters "$parameterJson" --verbose --debug
     else
-        az group deployment validate -g "$resourceGroupName" --template-file $templateFile --parameters "$parameterJson" --verbose
+        az group deployment validate -g "$resourceGroupName" --template-file $templateFile --parameters "$parameterJson" --verbose --debug
     fi
 else
     if [[ $uploadArtifacts ]]
     then
-        az group deployment create -g "$resourceGroupName" -n "$depl" --template-uri $templateUri --parameters "$parameterJson" --verbose
+        az group deployment create -g "$resourceGroupName" -n "$depl" --template-uri $templateUri --parameters "$parameterJson" --verbose --debug
     else
-        az group deployment create -g "$resourceGroupName" -n "$depl" --template-file $templateFile --parameters "$parameterJson" --verbose
+        az group deployment create -g "$resourceGroupName" -n "$depl" --template-file $templateFile --parameters "$parameterJson" --verbose --debug
     fi
 fi
