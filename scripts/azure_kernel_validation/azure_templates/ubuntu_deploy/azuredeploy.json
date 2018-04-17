@@ -35,7 +35,14 @@
       "defaultValue": "default",
       "metadata": {
         "description": "Build number"
-      }      
+      }
+    },
+    "flavor": {
+      "type": "string",
+      "defaultValue": "default",
+      "metadata": {
+        "description": "Build flavor"
+      }
     }
   },
   "variables": {
@@ -51,7 +58,7 @@
     "publicIPAddressType": "Dynamic",
     "vmStorageAccountContainerName": "vhds",
     "vmName": "[concat(parameters('buildNumber'),'-Kernel-Validation')]",
-    "vmSize": "Standard_A2",
+    "vmSize": "[parameters('flavor')]",
     "virtualNetworkName": "[concat(parameters('buildNumber'),'-VNET')]",
     "vnetID": "[resourceId('Microsoft.Network/virtualNetworks',variables('virtualNetworkName'))]",
     "sshKeyPath": "[concat('/home/',parameters('adminUsername'),'/.ssh/authorized_keys')]",

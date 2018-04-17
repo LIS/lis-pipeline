@@ -56,6 +56,7 @@ pipeline {
     INSTALL_DEPS = 'True'
     USE_KERNEL_FOLDER_PREFIX = 'True'
     THREAD_NUMBER = 'x3'
+    AZURE_BOOT_LARGE_FLAVOR = 'Standard_E64_v3'
   }
   options {
     overrideIndexTriggers(false)
@@ -223,48 +224,103 @@ pipeline {
         beforeAgent true
         expression { params.ENABLED_STAGES.contains('boot_test') }
       }
-      agent {
-        node {
-          label 'meta_slave'
-        }
-      }
-      steps {
-        withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                   usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
-                                   file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
-                                   ]) {
-          dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            unstash 'kernel_version_ini'
-            sh 'cat scripts/package_building/kernel_versions.ini'
-          }
-          sh '''#!/bin/bash
-            OS_TYPE=${DISTRO_VERSION%_*}
-            OS_TYPE=${OS_TYPE,,}
-            bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
-                --smb_share_username $USERNAME --smb_share_password $PASSWORD \
-                --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
-            '''
-        }
-      }
       post {
-        always {
-          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
-        }
         failure {
           reportStageStatus("BootOnAzure", 0)
-          sh 'echo "Load failure test results."'
-          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
         }
         success {
           reportStageStatus("BootOnAzure", 1)
-          echo "Cleaning Azure resources up..."
-          sh '''#!/bin/bash
-            pushd ./scripts/azure_kernel_validation
-            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
-            popd
-            '''
-          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+        }
+      }
+      parallel {
+        stage('boot_test_small') {
+            agent {
+              node {
+                label 'meta_slave'
+              }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
+                                           file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
+                                           ]) {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    sh 'cat scripts/package_building/kernel_versions.ini'
+                  }
+                  sh '''#!/bin/bash
+                    OS_TYPE=${DISTRO_VERSION%_*}
+                    OS_TYPE=${OS_TYPE,,}
+                    bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                        --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                        --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                    '''
+                }
+            }
+            post {
+              always {
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+              }
+              failure {
+                sh 'echo "Load failure test results."'
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+              }
+              success {
+                echo "Cleaning Azure resources up..."
+                sh '''#!/bin/bash
+                  pushd ./scripts/azure_kernel_validation
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                  popd
+                  '''
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+              }
+            }
+        }
+        stage('boot_test_large') {
+            agent {
+              node {
+                label 'meta_slave'
+              }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
+                                           file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
+                                           ]) {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME + 'l') {
+                    unstash 'kernel_version_ini'
+                    sh 'cat scripts/package_building/kernel_versions.ini'
+                  }
+                  sh '''#!/bin/bash
+                    OS_TYPE=${DISTRO_VERSION%_*}
+                    OS_TYPE=${OS_TYPE,,}
+                    bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}l" \
+                        --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                        --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                        --flavor $AZURE_BOOT_LARGE_FLAVOR
+                    '''
+                }
+            }
+            post {
+              always {
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}l-boot-diagnostics/*.log"
+              }
+              failure {
+                sh 'echo "Load failure test results."'
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+              }
+              success {
+                echo "Cleaning Azure resources up..."
+                sh '''#!/bin/bash
+                  pushd ./scripts/azure_kernel_validation
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}l"
+                  popd
+                  '''
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+              }
+            }
         }
       }
     }
