@@ -1,0 +1,78 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: 'LIS_ARCHIVE_LINK')]) {
+    properties ([
+        [$class: 'ParametersDefinitionProperty',
+            parameterDefinitions: [
+            [$class: 'StringParameterDefinition',
+                name: 'LIS_LINK',
+                defaultValue: '${LIS_ARCHIVE_LINK}',
+                description: 'Link to the lis package to be tested']
+            ]
+        ]
+    ])
+}
+
+stage ("Check for kernel") {
+    node ("monitor-hyperv") {
+        withCredentials(bindings: [string(credentialsId: 'REDHAT_KERNELS_FILE', variable: 'REDHAT_KERNELS_FILE'),
+                                   string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR')]) {
+            dir ("check_versions-" + "env.BUILD_NUMBER" + "env.BRANCH_NAME") { 
+                checkout scm
+                echo 'Cheking if there is a new kernel version'
+                PowerShellWrapper('''
+                    & ".\\scripts\\rhel_kernel_validation\\take_kernel_version.ps1
+                        -UtilsDir "${env:UTILS_DIR}"
+                        -LatestVersionFile "${env:REDHAT_KERNELS_FILE}"
+                        -WorkDir '.\\temp'
+                        -KernelVersionsPath '.\\kernel_versions.txt'
+                ''')
+                stash includes: 'kernel_versions.txt', name: 'kernel_versions'
+                echo 'Kernel versions checked'
+            }
+        } 
+    }
+}
+
+stage ("Test kernel") {
+    node ("jenkins-meta-slave"){
+        def runs = [:]
+        dir ("rhel_versions-" + "env.BUILD_NUMBER" + "env.BRANCH_NAME") {
+            unstash 'kernel_versions'
+        }
+        kernelVersions = readFile("./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt")
+        kernelVersions = kernelVersions.split(";")
+        kernelVersions.each() {
+            def distro = it.split("=")[0]
+            def version = it.split("=")[1]
+            runs["${distro}-${version}"] = {
+                stage ("${distro}-${version}) {
+                    dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                        checkout scm
+                        echo "Deploy azure vm with distro: ${distro}"
+                        def exitCode = sh (returnStatus: true, script: """
+                            scripts/rhel_validation/validate_rhel_vm.sh \
+                                --build_name "${BUILD_NAME}" --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                                --os_type "${distro}" --kernel_version "${version}" \
+                                --lis_link "${LIS_LINK}" \
+                                --log_destination ".\"
+                        """)
+                        if (exitCode == 0) {
+                            sh """
+                                scripts/azure_kernel_validation/remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                            """
+                        } else {
+                            currentBuild.result = 'FAILURE'
+                        }
+                        archiveArtifacts: '.\lis_install_result'
+                    }
+                }
+            }
+        }
+    }
+}
