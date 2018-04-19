@@ -101,10 +101,14 @@ main() {
     
     pushd "$BASEDIR"
     
+    IFS='_'; OS_TYPE=($OS_TYPE); unset IFS;
+    OS_VERSION="${OS_TYPE[1]}"
+    OS_TYPE="${OS_TYPE[0]}"
+
     # Create azure vm
     FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
     bash create_azure_vm.sh --build_number "$FULL_BUILD_NAME" \
-        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE
+        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE --os_version $OS_VERSION
         --resource_location $RESOURCE_LOCATION --flavor $FLAVOUR
     PUBLIC_IP="$(wait_for_ip $FULL_BUILD_NAME $RESOURCE_GROUP | ret_val)"
     
