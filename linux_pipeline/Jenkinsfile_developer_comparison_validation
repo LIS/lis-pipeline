@@ -20,13 +20,37 @@ properties ([
             name: 'SKIP_UNPATCHED',
             description: 'Skip unpatched kernel validation'],
         [$class: 'ChoiceParameterDefinition',
-            choices: "kernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml",
+            choices: "kernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
             description: 'Which tests should LISA run'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'all\nCore (fvt)\nStorage (fvt)\nNetwork_and_Stress (fvt)\nMemory (fvt)',
             name: 'LISA_TEST_SUITE',
             description: 'LISA test suite'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'TCP\nUDP\nFIO',
+            name: 'LISA_PERF_TEST',
+            description: 'Which perf test to run'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'v4\nv6',
+            name: 'PERF_IPV',
+            description: 'IP version to use for networking perf test'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
+            name: 'PERF_NET_THREADS',
+            description: 'TEST_THREADS for TCP. CONNECTION POOL for UDP'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
+            name: 'PERF_Q_DEPTH',
+            description: 'Q_DEPTH for FIO'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n1024',
+            name: 'PERF_IO_SIZE',
+            description: 'IO_SIZE for FIO'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'read\nrandread\nwrite\nrandwrite',
+            name: 'PERF_IO_MODE',
+            description: 'IO_MODE for FIO'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
             defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv',
@@ -35,66 +59,121 @@ properties ([
     ]
 ])
 
+def perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
+
+def getPerfOptions(perf_test) {
+    switch (perf_test) {
+        case "TCP":
+            testOptions = PERF_IPV
+            if (PERF_NET_THREADS != "all"){
+                testOptions += ";TEST_THREADS=" + PERF_NET_THREADS
+            }
+            return testOptions
+        case "UDP":
+            testOptions = PERF_IPV
+            if (PERF_NET_THREADS != "all"){
+                testOptions += ";IPERF3_TEST_CONNECTION_POOL=" + PERF_NET_THREADS
+            }
+        case "FIO":
+            return "Q_DEPTH=" + PERF_Q_DEPTH + ";IO_SIZE=" + PERF_IO_SIZE + ";IO_MODE=" + PERF_IO_MODE
+    }
+}
+
 node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
-    
+
     if (LISA_TEST_SUITE == 'all') {
         LISA_TEST_SUITE = ''
     } else {
         LISA_TEST_SUITE = LISA_TEST_SUITE.split(" ")[0].toLowerCase()
     }
-        
+    
+    PERF_OPTIONS = getPerfOptions(LISA_PERF_TEST)
+
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
+                patchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
+                    string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
+                    string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
             if (env.SKIP_UNPATCHED == 'no') {
                 runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "pipeline-developer-patch-validation/master", parameters: [
+                    unpatchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                         string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
                         string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                         string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
+                        string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
+                        string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                         string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
                 }
             }
             parallel runs
-    
     }
+
     stage ("aggregate_results") {
-        dir ('comparison_results' + env.BUILD_NUMBER) {
-            copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${patchedRun.number}"), target: "patched_run");
+        dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
-            
             if (env.SKIP_UNPATCHED == 'no') {
-                copyArtifacts(projectName: 'pipeline-developer-patch-validation/master', selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
-                stash includes: 'patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'patchedReport'
-                stash includes: 'unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
+                stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
+                stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
+                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
             }
         }
     }
+
     stage ("compare_results") {
         if (env.SKIP_UNPATCHED == 'no') {
-            dir('comparison_results' + env.BUILD_NUMBER) {
+            dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                 checkout scm
                 unstash 'patchedReport'
                 unstash 'unpatchedReport'
+                unstash 'patchedPerf'
+                unstash 'unpatchedPerf'
+                unstash 'unpatchedMetadata'
+                sh '''#!/bin/bash
+                    INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
+                    META_PATH="./metadata.ini"
+                    KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
+                    KERNEL="${KERNEL%-unpatched*}"
+                    crudini --set $META_PATH 'METADATA' KERNEL_VERSION $KERNEL
+                    BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
+                    crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
+                    crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
+                    if [[ ${LISA_TEST_SUITE} != "" ]];then
+                        crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
+                    fi
+                    if [[ ${LISA_PERF_TEST} != "" ]];then
+                        crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
+                    fi
+                '''
                 sh '''
                     python3 scripts/comparison/compare_results.py \\
-                        --patchedresults ./patched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --unpatchedresults ./unpatched_run/lis-test/WS2012R2/lisa/TestResults/**/Report*.xml \\
-                        --output results.html
+                        --patchedresults ./patched_run/*-functional/TestResults/**/Report*.xml \\
+                        --unpatchedresults ./unpatched_run/*-functional/TestResults/**/Report*.xml \\
+                        --output results_func.html --metadata ./metadata.ini
                 '''
+                sh '''
+                    python2.7 scripts/comparison/parse_perf_results.py \\
+                        --logspath ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
+                        --comparewith ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
+                        --testtype "${LISA_PERF_TEST}" --output results_perf.html
+                '''
+                sh 'cat results_func.html results_perf.html > results.html'
                 archiveArtifacts 'results.html'
             }
         } else {
