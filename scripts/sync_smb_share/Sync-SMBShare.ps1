@@ -16,7 +16,6 @@ $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 
 $LOCAL_TO_REMOTE_FOLDER_MAPPINGS = @{
     "stable-kernels" = "stable-kernels";
-    "unstable-kernels" = "temp-kernel-artifacts";
     "linux-next-kernels" = "upstream-kernel/linux-next";
     "net-next-kernels" = "upstream-kernel/net-next";
 }
@@ -35,14 +34,14 @@ function Mount-SMBShare {
         -ErrorAction SilentlyContinue | `
         Where-Object {$_.Status -ne "Ok"}
     if ($smbMappingsUnavailable) {
-        Write-Host "Removing $smbMappingsUnavailable"
         foreach ($smbMappingUnavailable in $smbMappingsUnavailable) {
-            net use /delete $smbMappingUnavailable.LocalPath
+            $output = net use /delete $smbMappingUnavailable.LocalPath 2>&1
         }
     }
 
     $mountPoint = $null
-    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
+    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath `
+        -ErrorAction SilentlyContinue
     if ($smbMapping) {
         if ($smbMapping.LocalPath -is [array]){
             return $smbMapping.LocalPath[0]
@@ -53,20 +52,16 @@ function Mount-SMBShare {
     for ([byte]$c = [char]'G'; $c -le [char]'Z'; $c++) {
         $mountPoint = [char]$c + ":"
         try {
-            Write-Host "Trying mount point: $mountPoint"
             $netOutput = net.exe use $mountPoint $SharedStoragePath /u:"AZURE\$ShareUser" "$SharePassword" 2>&1
             if ($LASTEXITCODE) {
                 throw "Failed to mount share $SharedStoragePath to $mountPoint with error $netOutput"
             } else {
-                Write-Host "Successfully mounted SMB share on $mountPoint"
                 return $mountPoint
             }
         } catch {
-            Write-Output $_.ErrorMessage
             if ($_ -like "*System error 67 has occurred.*") {
                 throw $_
             }
-            Write-Host $_
         }
     }
     if (!$mountPoint) {
@@ -92,10 +87,14 @@ function Sync-SMBShare {
         Write-Output "Share could not be mounted"
         return
     } else {
-        Write-Output "Share has been mounted at mount point: $shareLocalPath"
+        $shareLocalPath = $shareLocalPath.Trim()
+        Write-Output "Share has been mounted at mount point: >>>$shareLocalPath<<<"
+        Get-PSDrive | Out-Null
+        Get-SmbMapping | Out-Null
     }
-    $foldersToSync = Get-ChildItem -Path $shareLocalPath -Directory `
-        | Where-Object {$_.CreationTime -gt $DateLimit}
+    $shareLocalPath = Resolve-Path "${shareLocalPath}\"
+    $foldersToSync = Get-ChildItem -Path $shareLocalPath `
+        | Where-Object { $_.PSIsContainer -and $_.CreationTime -gt $DateLimit}
     if ($foldersToSync) {
         foreach ($folderToSync in $foldersToSync) {
             $fullFolderToSyncPath = Join-Path $shareLocalPath $folderToSync
@@ -118,7 +117,9 @@ function Sync-SMBShare {
 }
 
 function Main {
+    # Note(avladu): Sync only folders that are max 2 months old
     $dateLimit = (Get-Date).AddMonths(-2)
+
     foreach ($localFolderToSync in $LOCAL_TO_REMOTE_FOLDER_MAPPINGS.keys) {
         try {
             $mappedFolder = $LOCAL_TO_REMOTE_FOLDER_MAPPINGS[$localFolderToSync]

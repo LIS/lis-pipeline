@@ -1,0 +1,30 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    pipelineTriggers([cron('H 12 * * *')])
+])
+
+node("windows_share_sync") {
+    stage('sync_shares') {
+      withCredentials([string(credentialsId: 'REMOTE_SMB_SHARE_URL', variable: 'REMOTE_SMB_SHARE_URL'),
+                       string(credentialsId: 'LOCAL_SMB_SHARE_URL', variable: 'LOCAL_SMB_SHARE_URL'),
+                       usernamePassword(credentialsId: 'smb_share_user_pass',
+                                        passwordVariable: 'SMB_SHARE_PASSWORD',
+                                        usernameVariable: 'SMB_SHARE_USERNAME')]) {
+        checkout scm
+        echo "Syncing shares."
+        PowerShellWrapper('''
+          & "${env:WORKSPACE}\\scripts\\sync_smb_share\\Sync-SMBShare.ps1"
+              -LocalSharedStoragePath ${env:LOCAL_SMB_SHARE_URL}
+              -BaseSharedStoragePath ${env:REMOTE_SMB_SHARE_URL}
+              -ShareUser ${env:SMB_SHARE_USERNAME}
+              -SharePassword ${env:SMB_SHARE_PASSWORD}
+        ''')
+      }
+    }
+}
