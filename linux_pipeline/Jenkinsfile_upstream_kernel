@@ -278,6 +278,10 @@ pipeline {
             }
         }
         stage('boot_test_large') {
+            when {
+              beforeAgent true
+              expression { params.ENABLED_STAGES.contains('boot_test_large') }
+            }
             agent {
               node {
                 label 'meta_slave'
