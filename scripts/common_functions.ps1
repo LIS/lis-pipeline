@@ -563,3 +563,63 @@ function Execute-WithRetry {
         }
     }
 }
+
+
+function Mount-SMBShare {
+    param(
+        [String] $SharedStoragePath,
+        [String] $ShareUser,
+        [String] $SharePassword
+    )
+
+    # Note(avladu): Replace backslashes with forward slashes
+    # for Windows compat
+    $SharedStoragePath = $SharedStoragePath.replace('/', '\')
+
+    # Note(avladu): Sometimes, SMB mappings enter into an
+    # "Unavailable" state and need to be removed, as they cannot be
+    # accessed anymore.
+    $smbMappingsUnavailable = Get-SmbMapping -RemotePath $SharedStoragePath `
+        -ErrorAction SilentlyContinue | `
+        Where-Object {$_.Status -ne "Ok"}
+    if ($smbMappingsUnavailable) {
+        foreach ($smbMappingUnavailable in $smbMappingsUnavailable) {
+            $output = net use /delete $smbMappingUnavailable.LocalPath 2>&1
+        }
+    }
+
+    $mountPoint = $null
+    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath `
+        -ErrorAction SilentlyContinue
+    if ($smbMapping) {
+        if ($smbMapping.LocalPath -is [array]){
+            return $smbMapping.LocalPath[0]
+        } else {
+            return $smbMapping.LocalPath
+        }
+    }
+    for ([byte]$c = [char]'G'; $c -le [char]'Z'; $c++) {
+        $mountPoint = [char]$c + ":"
+        try {
+            $netOutput = net.exe use $mountPoint $SharedStoragePath `
+                /u:"AZURE\$ShareUser" "$SharePassword" 2>&1
+            if ($LASTEXITCODE) {
+                throw ("Failed to mount share {0} to {1} with error {2}" `
+                    -f @($SharedStoragePath, $mountPoint, $netOutput))
+            } else {
+                Get-PSDrive | Out-Null
+                Get-SmbMapping | Out-Null
+                return $mountPoint
+            }
+        } catch {
+            if ($_ -like "*System error 67 has occurred.*") {
+                throw $_
+            }
+        }
+    }
+    if (!$mountPoint) {
+        Write-Host $Error[0]
+        throw "Failed to mount $SharedStoragePath to $mountPoint"
+    }
+}
+
