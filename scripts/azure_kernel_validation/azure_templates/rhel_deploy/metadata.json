@@ -1,0 +1,7 @@
+{
+  "itemDisplayName": "LIS Pipeline Test VM",
+  "description": "This template is used to create an Azure Redhat Enterprise Linux VM.",
+  "summary": "Deploy an RHEL VM",
+  "githubUsername": "LIS",
+  "dateUpdated": "2017-12-07"
+}
