@@ -40,126 +40,147 @@
 
 param (
     [String] $WorkDir,
-    [String] $LatestVersionFile,
-    [String] $KernelVersionsPath,
+    [String] $LatestVersionsFile,
+    [String] $OutputFile,
+    [String] $RemoteHtmlLocation,
     [String] $UtilsDir
 )
 
-if (!(Test-Path $WorkDir)) {
-    New-Item -Type Directory -Path $WorkDir
-}
-if (Test-Path "$WorkDir\package.html") {
-    Remove-Item  "$WorkDir\package.html"
-}
-New-Item -Path $KernelVersionsPath -Force
-$KernelVersionsPath = Resolve-Path $KernelVersionsPath
-
-if (Test-Path $LatestVersionFile) {
-    $LatestVersions = Get-Content $LatestVersionFile
-    $LatestVersions = $LatestVersions.Split(";")
-    foreach ($entry in $LatestVersions) {
-        if ($entry) {
-            $distro = $entry.split("=")[0]
-            $kernel = $entry.split("=")[1]
-            $LatestVersionsHash += @{$distro = $kernel}
-        }
-    }
-} else {
-    Write-Host "No versions file found. Creating a new one"
-    New-Item -Path $LatestVersionFile -Force
-}
-Copy-Item "$UtilsDir\cookies_redhat.json" $WorkDir
-
 # generate hash table with list of kernels for each version of rhel
-$hash = @{"rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()}; 
-    "rhel_7.3" = @{"baseVer" = "3.10.0-514", "newVer" = @()}; 
-    "rhel_7.2" = @{"baseVer" = "3.10.0-327", "newVer" = @()}; 
-    "rhel_7.1" = @{"baseVer" = "3.10.0-229", "newVer" = @()}; 
-    "rhel_7.0" = @{"baseVer" = "3.10.0-123", "newVer" = @()}; 
-    "rhel_6.9" = @{"baseVer" = "2.6.32-696", "newVer" = @()}; 
-    "rhel_6.8" = @{"baseVer" = "2.6.32-642", "newVer" = @()}; 
-    "rhel_6.7" = @{"baseVer" = "2.6.32-573", "newVer" = @()}; 
-    "rhel_6.6" = @{"baseVer" = "2.6.32-504", "newVer" = @()}; 
-    "rhel_6.5" = @{"baseVer" = "2.6.32-431", "newVer" = @()}; 
-    "rhel_6.4" = @{"baseVer" = "2.6.32-358", "newVer" = @()}; 
-    "rhel_6.3" = @{"baseVer" = "2.6.32-279", "newVer" = @()}; 
-    "rhel_6.2" = @{"baseVer" = "2.6.32-220", "newVer" = @()}; 
-    "rhel_6.1" = @{"baseVer" = "2.6.32-131", "newVer" = @()}; 
-    "rhel_6.0" = @{"baseVer" = "2.6.32-71", "newVer" = @()};
+$hash = @{"rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
+          "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()}}
+
+function Get-StoredVersions {
+    param (
+        [String] $LatestVersionsFile
+    )
+    
+    if (Test-Path $LatestVersionsFile) {
+        $LatestVersions = Get-Content $LatestVersionsFile
+        $LatestVersions = $LatestVersions.Split(";")
+        foreach ($entry in $LatestVersions) {
+            if ($entry) {
+                $distro = $entry.split("=")[0].Trim()
+                $kernel = $entry.split("=")[1].Trim()
+                $LatestVersionsHash += @{$distro = $kernel}
+            }
+        }
+    } else {
+        New-Item -Path $LatestVersionsFile -Force | Out-Null
+        $LatestVersionsHash = @{}
+    }
+    
+    return $LatestVersionsHash
 }
 
-pushd $WorkDir
-$downloadToPath = "package.html"
-$remoteFileLocation = "https://access.redhat.com/downloads/content/kernel/2.6.32-642.15.1.el6/x86_64/fd431d51/package"
-$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$content_cookies=(Get-Content -Raw .\cookies_redhat.json | ConvertFrom-Json)
-
-# add cookies for our session
-foreach($cook in $content_cookies) { 
-    $cookie = New-Object System.Net.Cookie 
-    $cookie.Name=$cook.name
-    $cookie.Domain = $cook.domain
-    $cookie.Value = $cook.value
-    $cookie.Expires = '1/12/2050 12:04:12 AM' 
-    $session.Cookies.Add($cookie);
+function Get-VersionsHtml {
+    param (
+        [String] $HtmlPath,
+        [String] $RemoteHtml,
+        [String] $CookiePath
+    )
+    
+    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $content_cookies=(Get-Content -Raw $CookiePath | ConvertFrom-Json)
+    # add cookies for our session
+    foreach($cook in $content_cookies) { 
+        $cookie = New-Object System.Net.Cookie 
+        $cookie.Name=$cook.name
+        $cookie.Domain = $cook.domain
+        $cookie.Value = $cook.value
+        $cookie.Expires = '1/12/2050 12:04:12 AM' 
+        $session.Cookies.Add($cookie);
+    }
+    # downloading page
+    Write-Host "Downloading.."
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest $RemoteHtml -WebSession $session -UseBasicParsing -TimeoutSec 900 -OutFile $HtmlPath
+    Start-Sleep 20
 }
 
-# downloading page
-Write-Host "Downloading.."
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest $remoteFileLocation -WebSession $session -UseBasicParsing -TimeoutSec 900 -OutFile $downloadToPath
-Start-Sleep 20
+function Parse-Html {
+    param (
+        [Hashtable] $BaseHash,
+        [String] $HtmlPath
+    )
+    
+    # get list of kernel version rhel
+    Write-Host "Generating list.."
+    $html = New-Object -ComObject "HTMLFile"
+    $source = Get-Content -Path $HtmlPath -Raw
+    $source = [System.Text.Encoding]::Unicode.GetBytes($source)
+    $html.write($source)
+    $content=$html.body.getElementsByTagName('select')
+    $content = $content[1].textContent.Split()
 
-# testing
-Get-Content -Path ".\package.html" -Raw
-
-# get list of kernel version rhel
-Write-Host "Generating list.."
-$html = New-Object -ComObject "HTMLFile"
-$source = Get-Content -Path ".\package.html" -Raw
-$source = [System.Text.Encoding]::Unicode.GetBytes($source)
-$html.write($source)
-$content=$html.body.getElementsByTagName('select')
-$content = $content[1].textContent.Split()
-
-# testing
-Write-Host $content
-
-foreach ($entry in $content) {
-    for ($key in $hash.Keys) {
-        $baseVer = $hash[$key]["baseVer"] 
-        if ($entry -match "$baseVer*") {
-            $hash[$key]["newVer"] += $entry
+    foreach ($entry in $content) {
+        foreach ($key in $BaseHash.Keys) {
+            $baseVer = $BaseHash[$key]["baseVer"] 
+            if ($entry -match "$baseVer*") {
+                $BaseHash[$key]["newVer"] += $entry
+            }
         }
     }
+    
+    return $BaseHash
 }
 
-foreach ($key in $hash.Keys) {
-    if ($hash[$key]["newVer"] -and ($hash[$key]["newVer"][0] -nomatch $LatestVersionsHash[$key])){
-        Write-Output ("New kernel {0}: {1}`nPrevious kernel {0}: {2}" -f
-            @($key, $hash[$key]["newVer"][0], $LatestVersionsHash[$key]))
-        $resultList += @("{0}={1};" -f @($key, hash[$key]["newVer"][0]))
-        $LatestVersionsHash[$key] = $hash[$key]["newVer"][0]
+function Get-UpdatedVersionsList {
+    param (
+        [Hashtable] $NewHash,
+        [Hashtable] $LatestHash
+    )
+    
+    foreach ($key in $NewHash.Keys) {
+        if ($NewHash[$key]["newVer"] -and ($NewHash[$key]["newVer"][0] -ne $LatestHash[$key])){
+            $resultList += @("{0}={1};" -f @($key, $NewHash[$key]["newVer"][0]))
+            $LatestHash[$key] = $NewHash[$key]["newVer"][0]
+        }
+        $latestVersionsList += @("{0}={1};" -f @($key, $LatestHash[$key]))
     }
-    $latestVersionsList += @("{0}={1};" -f @($key, $LatestVersionsHash[$key]))
+    
+    return $resultList, $latestVersionsList
 }
 
-# testing
-$resultList = "rhel_7.4=3.10.0-693.21.1.el7;rhel_7.3=3.10.0-693.21.1.el7"
-$latestVersionsList = "rhel_7.4=3.10.0-693.21.1.el7;rhel_7.3=3.10.0-693.21.1.el7"
+function Main {
+    if (!(Test-Path $WorkDir)) {
+        New-Item -Type Directory -Path $WorkDir
+    }
+    if (Test-Path "$WorkDir\package.html") {
+        Remove-Item  "$WorkDir\package.html"
+    }
+    New-Item -Path $OutputFile -Force
+    $OutputFile = Resolve-Path $OutputFile
+    
+    $LatestVersionsHash = Get-StoredVersions -LatestVersionsFile $LatestVersionsFile
+    
+    pushd $WorkDir
+    $CookiePath = Join-Path $UtilsDir "cookies_redhat.json"
+    Get-VersionsHtml -HtmlPath ".\package.html" -RemoteHtml $RemoteHtmlLocation -CookiePath $CookiePath
 
-if ($resultList) {
-    Write-Output $resultList | Out-File $KernelVersionsPath
-} else {
-    Write-Output "Error writing resultList"
-    exit 1
-}
-if ($latestVersionsList) {
-    Write-Output $latestVersionsList | Out-File $LatestVersionFile
-} else {
-    Write-Output "Error writing latestVersionsList"
-    exit 1
+    $hash = Parse-Html -BaseHash $hash -HtmlPath ".\package.html"
+    $resultList, $latestVersionsList = Get-UpdatedVersionsList -NewHash $hash -LatestHash $LatestVersionsHash
+
+    if ($resultList) {
+        Write-Output "${resultList}" | Out-File $OutputFile
+    } else {
+        Write-Output "No new kernel versions were found"
+    }
+    if ($latestVersionsList) {
+        Write-Output "${latestVersionsList}" | Out-File $LatestVersionsFile
+    } else {
+        Write-Output "Error saving the list with latest kernel versions"
+        exit 1
+    }
+    
+    Write-Host "Completed!"
+    return $True
 }
 
-Write-Host "Completed!"
-return $True
+Main
+
+
+
+
+
+

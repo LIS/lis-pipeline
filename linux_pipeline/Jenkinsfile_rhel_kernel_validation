@@ -11,7 +11,7 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: '
             parameterDefinitions: [
             [$class: 'StringParameterDefinition',
                 name: 'LIS_LINK',
-                defaultValue: '${LIS_ARCHIVE_LINK}',
+                defaultValue: "${LIS_ARCHIVE_LINK}",
                 description: 'Link to the lis package to be tested']
             ]
         ]
@@ -20,18 +20,19 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: '
 
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
-        withCredentials(bindings: [string(credentialsId: 'REDHAT_KERNELS_FILE', variable: 'REDHAT_KERNELS_FILE'),
-                                   string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR')]) {
-            dir ("check_versions-" + "env.BUILD_NUMBER" + "env.BRANCH_NAME") { 
+        withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'), 
+                                   string(credentialsId: 'REMOTE_HTML_LOCATION', variable: 'REMOTE_HTML_LOCATION')]) {
+            dir ("check_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) { 
                 checkout scm
                 echo 'Cheking if there is a new kernel version'
                 PowerShellWrapper('''
-                    & ".\\scripts\\rhel_kernel_validation\\take_kernel_version.ps1
-                        -UtilsDir "${env:UTILS_DIR}"
-                        -LatestVersionFile "${env:REDHAT_KERNELS_FILE}"
+                    & ".\\scripts\\rhel_validation\\take_kernel_version.ps1"
                         -WorkDir '.\\temp'
-                        -KernelVersionsPath '.\\kernel_versions.txt'
-                ''')
+                        -UtilsDir "${env:UTILS_DIR}"
+                        -LatestVersionsFile ".\\latest_tested_versions.txt"
+                        -RemoteHtmlLocation "${env:REMOTE_HTML_LOCATION}"
+                        -OutputFile "kernel_versions.txt"
+                ''') // LatestVersionsFile changed
                 stash includes: 'kernel_versions.txt', name: 'kernel_versions'
                 echo 'Kernel versions checked'
             }
@@ -41,38 +42,50 @@ stage ("Check for kernel") {
 
 stage ("Test kernel") {
     node ("jenkins-meta-slave"){
+        def runNumber = 1
         def runs = [:]
-        dir ("rhel_versions-" + "env.BUILD_NUMBER" + "env.BRANCH_NAME") {
+        dir ("rhel_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) {
             unstash 'kernel_versions'
         }
         kernelVersions = readFile("./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt")
-        kernelVersions = kernelVersions.split(";")
+        kernelVersions = kernelVersions.replaceAll("[^A-Za-z0-9.=_;\\-]", "").split(";")
         kernelVersions.each() {
             def distro = it.split("=")[0]
             def version = it.split("=")[1]
             runs["${distro}-${version}"] = {
-                stage ("${distro}-${version}) {
+                stage ("${distro}-${version}") {
+                withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',
+                                                            passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
                     dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                        def vmNumber = runNumber
+                        runNumber = runNumber + 1
                         checkout scm
-                        echo "Deploy azure vm with distro: ${distro}"
+                        echo "Testing kernel: ${version} on distro: ${distro}"
                         def exitCode = sh (returnStatus: true, script: """
-                            scripts/rhel_validation/validate_rhel_vm.sh \
-                                --build_name "${BUILD_NAME}" --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                            bash scripts/rhel_validation/validate_rhel_vm.sh \
+                                --workdir "r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}" \
+                                --build_name "rpm-lis" --build_number "${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}" \
                                 --os_type "${distro}" --kernel_version "${version}" \
                                 --lis_link "${LIS_LINK}" \
-                                --log_destination ".\"
+                                --log_destination "${distro}" \
+                                --rhel_username '${USERNAME}' \
+                                --rhel_password '${PASSWORD}'
                         """)
+                        archiveArtifacts artifacts: "${distro}/lis_install.log"
+                        archiveArtifacts artifacts: "${distro}/lis_check.log"
                         if (exitCode == 0) {
-                            sh """
-                                scripts/azure_kernel_validation/remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
-                            """
+                            sh (returnStatus: true, script: """
+                                bash scripts/azure_kernel_validation/remove_azure_vm_resources.sh "rpm-lis${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}"
+                            """)
                         } else {
                             currentBuild.result = 'FAILURE'
                         }
-                        archiveArtifacts: '.\lis_install_result'
+                        deleteDir()
                     }
+                }
                 }
             }
         }
+        parallel runs
     }
 }
