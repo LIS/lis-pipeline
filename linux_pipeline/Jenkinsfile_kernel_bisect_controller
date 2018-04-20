@@ -130,6 +130,7 @@ def validateCommit (String commit, String expectedState) {
                                                             propagate: false,
                                                             wait: true
     if (buildResult.result != expectedState) {
+        println("Commit " + commit + " was expected to be " + expectedState + " instead of " + buildResult.result )
         currentBuild.result = 'FAILURE'
         sh(script: "exit 1")
     }
