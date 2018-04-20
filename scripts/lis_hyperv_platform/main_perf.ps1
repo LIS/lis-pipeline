@@ -24,12 +24,9 @@ $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 
 $LISA_TEST_RESULTS_REL_PATH = ".\TestResults\*\ica.log"
 
-. "$scriptPath\retrieve_ip.ps1"
-. "$scriptPathParent\common_functions.ps1"
-. "$scriptPathParent\JobManager.ps1"
 . "$scriptPath\XMLParser.ps1"
-
-Import-Module "$scriptPath\ini.psm1"
+Import-Module "$scriptPathParent\utils\powershell\ini.psm1"
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 
 function Get-LisaCode {
     param(

@@ -27,7 +27,7 @@ $ErrorActionPreference = "Stop"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
-. "$scriptPathParent\common_functions.ps1"
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 $pythonPath = Join-Path "${env:SystemDrive}" "Python27\python.exe"
 
 function Get-LisaCode {

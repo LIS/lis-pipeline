@@ -1,6 +1,6 @@
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $parentPath = Split-Path -Parent $here
-. "$parentPath\Backend.ps1"
+. "$parentPath\utils\powershell\Backend.ps1"
 
 function Get-VMHardDiskDrive {}
 
