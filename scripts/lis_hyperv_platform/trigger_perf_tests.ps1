@@ -9,7 +9,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-Import-Module "$scriptPath\ini.psm1"
+$scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
+Import-Module "$scriptPathParent\utils\powershell\ini.psm1"
 
 function Trigger-LisPerfRun {
     Write-Host "Triggering performance jobs for LIS"

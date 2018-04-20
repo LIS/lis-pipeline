@@ -39,11 +39,8 @@ $DB_RESULTS_REL_PATH = ".\tests.json"
 $PYTHON_PATH = Join-Path "${env:SystemDrive}" "Python27\python.exe"
 $RESULT_PARSER_PATH = Join-Path $scriptPathParent ".\reporting\parser.py"
 
-. "$scriptPath\retrieve_ip.ps1"
-. "$scriptPathParent\common_functions.ps1"
-. "$scriptPathParent\JobManager.ps1"
-
-Import-Module "$scriptPath\ini.psm1"
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
+Import-Module "$scriptPathParent\utils\powershell\ini.psm1"
 
 function Get-LisaCode {
     param(
@@ -147,26 +144,6 @@ function Remove-XmlVMs {
             }
         }
         $xml.Save($xmlFullPath)
-    }
-}
-
-function Parse-IcaLog {
-    param(
-        [parameter(Mandatory=$true)]
-        [String] $IcaLogPath
-    )
-
-    try {
-        $allTestLines = Get-Content $IcaLogPath | `
-            Where-Object {$_ -match '(^Test\sResults\sSummary$)|(^\s\s\s\sTest\s)'}
-        if ($allTestLines.Count -eq 0) {
-            throw "IcaLogPath $IcaLogPath does not contain test results summary."
-        }
-        return ($allTestLines | `
-            Where-Object{$_ -match '(:\sFailed$)|(:\sAborted$)'}).Count
-    } catch {
-        Write-Host "Failure to parse test results file."
-        throw $_
     }
 }
 

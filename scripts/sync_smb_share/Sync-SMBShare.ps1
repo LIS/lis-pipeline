@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 
-. "$scriptPathParent\common_functions.ps1"
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 
 $LOCAL_TO_REMOTE_FOLDER_MAPPINGS = @{
     "stable-kernels" = "stable-kernels";

@@ -22,7 +22,7 @@ $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
 $CURL_PATH = Join-Path $env:ProgramFiles "Git\mingw64\bin\curl.exe"
 
-. "$scriptPathParent\common_functions.ps1"
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 
 function Upload-FileToKernelRepo {
     param(

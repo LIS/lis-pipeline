@@ -1,6 +1,6 @@
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $parentPath = Split-Path -Parent $here
-. "$parentPath\JobManager.ps1"
+. "$parentPath\utils\powershell\JobManager.ps1"
 
 Describe "Test Job Manager Success" {
 
