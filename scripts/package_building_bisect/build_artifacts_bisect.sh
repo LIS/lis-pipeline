@@ -211,7 +211,15 @@ function build_rhel {
 
     artifacts_dir="${base_dir}/kernel/rpmbuild/RPMS/x86_64/"
     source_package_dir="${base_dir}/kernel/rpmbuild/SRPMS/"
-    
+
+    if [[ -d "$artifacts_dir" ]]; then
+        rm -f $artifacts_dir/*
+    fi
+
+    if [[ -d "$source_package_dir" ]]; then
+        rm -f $source_package_dir/*
+    fi
+
     pushd "$repository"
     make rpm -j"$thread_number"
     sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"

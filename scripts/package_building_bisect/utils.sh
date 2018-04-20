@@ -33,6 +33,6 @@ function get_job_number (){
     #
     multi="$1"
     cores="$(cat /proc/cpuinfo | grep -c processor)"
-    result="$(expr $cores*$multi | bc)"
+    result="$(($cores * $multi))"
     echo ${result%.*}
 }
