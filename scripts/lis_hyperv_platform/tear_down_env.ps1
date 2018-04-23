@@ -3,11 +3,9 @@ param(
 )
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-
-$scriptPath1 = (get-item $scriptPath ).parent.FullName
-. "$scriptPath1\backend.ps1"
-. "$scriptPath1\common_functions.ps1"
-
+$scriptPathParent = (Get-Item $scriptPath ).Parent.FullName
+Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
+. "$scriptPathParent\utils\powershell\backend.ps1"
 
 $WORKING_DIRECTORY = "C:\workspace"
 
