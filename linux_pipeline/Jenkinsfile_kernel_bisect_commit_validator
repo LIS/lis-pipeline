@@ -76,7 +76,10 @@ THREAD_NUMBER = 'x3'
 perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
 isPerf = ENABLED_STAGES.contains('perf')
 isBootTest = ENABLED_STAGES.contains('boot')
+perfServer = GetPerfServer(PERF_TEST)
+ioMode = GetKeyForFIO(PERF_IO_MODE)
 env.DISTRO_VERSION = DISTRO_VERSION
+env.KERNEL_GIT_URL = KERNEL_GIT_URL
 
 // this is the main logic
 build_kernel(DISTRO_VERSION)
@@ -88,7 +91,7 @@ if (isBootTest) {
 }
 
 if (isPerf) {
-    node ('net_perf') {
+    node (perfServer) {
         perf()
     }
     node ('meta_slave') {
@@ -96,6 +99,33 @@ if (isPerf) {
     }
 }
 
+def GetPerfServer(xmlName) {
+    switch(xmlName) {
+        case "TCP":
+            return "net_perf"
+        case "UDP":
+            return "net_perf"
+        case "FIO":
+            return "stor_perf"
+        default:
+            currentBuild.result = 'FAILURE'
+    }
+}
+
+def GetKeyForFIO(ioMode) {
+     switch(ioMode) {
+        case "read":
+            return "seq-read:"
+        case "randread":
+            return "rand-read:"
+        case "write":
+            return "seq-write:"
+        case "randwrite":
+            return "rand-write:"
+        default:
+            currentBuild.result = 'FAILURE'
+    }
+}
 
 def getPerfOptions(perf_test) {
     switch (perf_test) {
@@ -267,7 +297,8 @@ def parse_perf_data() {
         sh """
             #!/bin/bash
             scripts/comparison/parse_perf_data.py --logspath "results/$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME/lis-test/WS2012R2/lisa/TestResults/$PERF_TEST"* \
-                --testtype $PERF_TEST > "$WORKSPACE/perf_result"
+                --testtype $PERF_TEST > "$WORKSPACE/perf_result" \
+                --key $ioMode
           """
         archiveArtifacts "perf_result"
     }
