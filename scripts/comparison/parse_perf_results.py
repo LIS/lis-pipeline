@@ -5,7 +5,7 @@ import argparse
 import os
 import glob
 from html_report import HtmlReportSection, HtmlReport
-from perf_report import NTTTCPLogsReader, IPERFLogsReader
+from perf_report import NTTTCPLogsReader, IPERFLogsReader, FIOLogsReaderRaid
 
 
 def get_parameters():
@@ -42,6 +42,18 @@ def parse_logs(logs_path, test_type):
         parsed_perf_log = order_table(parsed_perf_log, 'NumberOfConnections')
         tables = [['NumberOfConnections', 'TxThroughput_Gbps',
                    'RxThroughput_Gbps', 'DatagramLoss']]
+    elif test_type.lower() == 'fio':
+        parsed_perf_log = FIOLogsReaderRaid(logs_path).process_logs()
+        parsed_perf_log = order_table(parsed_perf_log, 'QDepth')
+        parsed_perf_log = order_table(parsed_perf_log, 'BlockSize_KB')
+        tables = [['QDepth', 'rand-read:', 'BlockSize_KB'], 
+                  ['QDepth', 'rand-write:', 'BlockSize_KB'],
+                  ['QDepth', 'seq-read:', 'BlockSize_KB'],
+                  ['QDepth', 'seq-write:', 'BlockSize_KB'],
+                  ['QDepth', 'rand-read: latency', 'BlockSize_KB'],
+                  ['QDepth', 'rand-write: latency', 'BlockSize_KB'],
+                  ['QDepth', 'seq-read: latency', 'BlockSize_KB'],
+                  ['QDepth', 'seq-write: latency','BlockSize_KB']]
 
     return parsed_perf_log, tables
 

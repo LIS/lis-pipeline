@@ -40,15 +40,15 @@ properties ([
             name: 'PERF_NET_THREADS',
             description: 'TEST_THREADS for TCP. CONNECTION POOL for UDP'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
+            choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256',
             name: 'PERF_Q_DEPTH',
             description: 'Q_DEPTH for FIO'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n1024',
+            choices: 'all\n4\n1024',
             name: 'PERF_IO_SIZE',
             description: 'IO_SIZE for FIO'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'read\nrandread\nwrite\nrandwrite',
+            choices: 'all\nread\nrandread\nwrite\nrandwrite',
             name: 'PERF_IO_MODE',
             description: 'IO_MODE for FIO'],
         [$class: 'StringParameterDefinition',
@@ -74,8 +74,19 @@ def getPerfOptions(perf_test) {
             if (PERF_NET_THREADS != "all"){
                 testOptions += ";IPERF3_TEST_CONNECTION_POOL=" + PERF_NET_THREADS
             }
+            return testOptions
         case "FIO":
-            return "Q_DEPTH=" + PERF_Q_DEPTH + ";IO_SIZE=" + PERF_IO_SIZE + ";IO_MODE=" + PERF_IO_MODE
+            testOptions = ""
+            if (PERF_Q_DEPTH != "all") {
+                testOptions += "Q_DEPTH=" + PERF_Q_DEPTH + ";"
+            }
+            if (PERF_IO_SIZE != "all") {
+                testOptions += "IO_SIZE=" + PERF_IO_SIZE + ";"
+            }
+            if (PERF_IO_MODE != "all") {
+                testOptions += "IO_MODE=" + PERF_IO_MODE + ";"
+            }
+            return testOptions
     }
 }
 

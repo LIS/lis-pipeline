@@ -5,6 +5,19 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
+def GetPerfServer(xmlName) {
+    switch(xmlName) {
+        case ~/TCP.*/:
+            return "net_perf"
+        case ~/UDP.*/:
+            return "net_perf"
+        case ~/FIO.*/:
+            return "stor_perf"
+         default:
+            currentBuild.result = 'FAILURE'
+    }
+}
+
 pipeline {
     parameters {
         choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
@@ -12,7 +25,7 @@ pipeline {
         string(defaultValue: "", description: 'Valid examples: \n scp://my-scp-hostname:/home/my-username/patch.p1 \n scp://my-username@my-scp-hostname:/home/my-username/patch.p1 \n http://my-website.com/patch.p1 \n Use the space separator for multiple patches.' , name: 'KERNEL_PATCH')
         string(defaultValue: "", description: 'Lisa test suite', name: 'LISA_TEST_SUITE')
         choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which xml should LISA run for functional test', name: 'LISA_TEST_XML')
-        choice(choices: "TCP_SRIOV_v4.xml", description: 'Which xml should LISA run for performance test', name: 'LISA_PERF_TEST_XML')
+        choice(choices: "TCP_SRIOV_v4.xml\nUDP_SRIOV_v4.xml\nFIO_RAID0_Pipeline.xml", description: 'Which xml should LISA run for performance test', name: 'LISA_PERF_TEST_XML')
         string(defaultValue: "", description: 'Options for perf test.', name: 'LISA_PERF_OPTIONS')
         string(defaultValue: "", description: 'Custom build tag for artifacts', name: 'CUSTOM_BUILD_TAG')
         string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_perf_hyperv",
@@ -287,7 +300,7 @@ pipeline {
                     }
                     agent {
                         node {
-                            label 'net_perf'
+                            label GetPerfServer(LISA_PERF_TEST_XML)
                         }
                     }
                     steps {
