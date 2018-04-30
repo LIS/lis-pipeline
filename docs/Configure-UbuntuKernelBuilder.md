@@ -1,71 +1,56 @@
-# How to optimize the Linux kernel build
-
+# How to configure Ubuntu 16.04 kernel builder
 The kernel build script which this tutorial addresses is found here:
 https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_artifacts.sh
 
 
 ## Environment minimum requirements
-  - Build OSes: Ubuntu Xenial 16.04 or CentOS 7.
+  - Build OS: Ubuntu Xenial 16.04
   - CPU: minimum 16 cores, more the better.
   - RAM: minimum 4GB, as one kernel build does not use more than 1 or 2 GB of RAM.
   - IO: SSD required, minimum of 5k IOPS. On an Azure VM you can add 12 disks of premium storage and configure them into RAID 0 and you can achieve 60k IOPS. More the better.
 
 ## Required packages
-### Debian
   - Packages required:
   ```bash
     set -xe
     deb_packages=(libncurses5-dev xz-utils libssl-dev libelf-dev bc ccache kernel-package \
-        devscripts build-essential lintian debhelper git wget bc fakeroot flex bison asciidoc \
-        pigz pbzip2)
-    DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
-  ```
-
-### CentOS
-  - Packages required:
-  ```bash
-    set -xe
-    rpm_packages=(rpm-build rpmdevtools yum-utils ncurses-devel hmaccalc zlib-devel \ 
-        binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot \
-        asciidoc audit-devel binutils-devel xmlto bison flex gtk2-devel libdw-devel libelf-devel \
-        xz-devel libnuma-devel newt-devel openssl-devel xmlto zlib-devel pigz pbzip2)
-    sudo yum -y install epel-release #required for pigz and pbzip2
-    sudo yum groups mark install "Development Tools"
-    sudo yum -y groupinstall "Development Tools"
-    sudo yum -y install ${rpm_packages[@]}
+        devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison \
+        asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
+        libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
+        libbabeltrace-ctf-dev libbabeltrace-dev pigz pbzip2)
+    sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
   ```
 
 ## Optimizations
-### Generic optimizations
   - Configure the number of cores for the make command to be times 2 or 3 the number of physical cores.
     This will speed up the build process and the only bottleneck will be the IOPS.
   - Use ccache: https://ccache.samba.org/
       ```bash
       PATH="/usr/lib/ccache:"$PATH
       ```
-  - Make tar use parallel archivers
+  - Make tar use parallel archivers. Run this script as root!
     ```bash
+    #!/bin/bash
     set -xe
-    sudo pushd /usr/local/bin
-    sudo ln -s /usr/bin/pbzip2 bzip2
-    sudo ln -s /usr/bin/pbzip2 bunzip2
-    sudo ln -s /usr/bin/pbzip2 bzcat
-    sudo ln -s /usr/bin/pigz gzip
-    sudo ln -s /usr/bin/pigz gunzip
-    sudo ln -s /usr/bin/pigz gzcat
-    sudo ln -s /usr/bin/pigz zcat
+    pushd /usr/local/bin
+    ln -s /usr/bin/pbzip2 bzip2
+    ln -s /usr/bin/pbzip2 bunzip2
+    ln -s /usr/bin/pbzip2 bzcat
+    ln -s /usr/bin/pigz gzip
+    ln -s /usr/bin/pigz gunzip
+    ln -s /usr/bin/pigz gzcat
+    ln -s /usr/bin/pigz zcat
     popd
     ```
-
-### Debian
   - Force a lower compression level on dpkg-deb \-\-build.
     By default, dpkg-deb uses single threaded xz as compression and 9 as a compression level,
     which takes a very long time (5-7 minutes).
     By creating a wrapper to force a parallel compression (gz) and a lower compression level (3 or 4),
     the full process will shorten to orders of a few seconds.
     Before running the script, make sure you create a copy of dpkg-deb.
-    Run this script as root!
+    Run this script as root and do this only once!
     ```bash
+    #!/bin/bash
     set -xe
 
     dpkg_deb_path=$(which dpkg-deb)
@@ -81,6 +66,3 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     EOM
     chmod 777 $dpkg_deb_path
     ```
-
-### RHEL
-TBD.
