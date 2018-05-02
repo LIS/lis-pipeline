@@ -365,6 +365,8 @@ pipeline {
                                        string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                        string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
                                        string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
+                                       string(credentialsId: 'DB_CONFIG_KERNEL', variable: 'DB_CONFIG_KERNEL'),
+                                       string(credentialsId: 'LISA_KERNEL_LOG_DESTINATION', variable: 'LISA_KERNEL_LOG_DESTINATION'),
                                        file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
                                             variable: 'DBConfigPath')]) {
                 echo 'Running LISA...'
@@ -385,6 +387,8 @@ pipeline {
                         -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
                         -PipelineName "pipeline-msft-kernel-validation/${env:BRANCH_NAME}"
                         -DBConfigPath "${env:DBConfigPath}"
+                        -LisaLogDBConfigPath "${env:DB_CONFIG_KERNEL}"
+                        -LogsPath "${env:LISA_KERNEL_LOG_DESTINATION}"
                   ''')
                 echo 'Finished running LISA.'
               }
