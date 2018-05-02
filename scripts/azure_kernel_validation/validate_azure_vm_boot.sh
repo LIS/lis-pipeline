@@ -120,7 +120,7 @@ main() {
     PRIVATE_KEY_PATH="${HOME}/azure_priv_key.pem"
     VM_USER_NAME="ubuntu"
     RESOURCE_GROUP="kernel-validation"
-    RESOURCE_LOCATION="northeurope"
+    RESOURCE_LOCATION="westus2"
     FLAVOR="Standard_A2"
 
     while true;do

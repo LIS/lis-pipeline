@@ -323,7 +323,7 @@ pipeline {
           RunPowershellCommand(".\\RunAzureTests.ps1" +
           " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
           " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-          " -testLocation 'northeurope'" +
+          " -testLocation 'westus2'" +
           " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
           " -testCycle 'PUBLISH-VHD'" +
           " -OverrideVMSize 'Standard_D2_v2'" +
@@ -335,7 +335,7 @@ pipeline {
               env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
           }
           RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" + 
-          " -sourceLocation northeurope " +
+          " -sourceLocation westus2 " +
           " -destinationLocations 'westus,westus2,northeurope'" +
           " -destinationAccountType Standard" + 
           " -sourceVHDName '${ARM_OSVHD_NAME}'" +
@@ -428,7 +428,7 @@ pipeline {
               RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
               RunPowershellCommand(".\\RunAzureTests.ps1" +
               " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -testLocation 'northeurope'" +
+              " -testLocation 'westus2'" +
               " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
               " -testCycle 'BVTMK'" +
               " -OverrideVMSize 'Standard_D1_v2'" +
