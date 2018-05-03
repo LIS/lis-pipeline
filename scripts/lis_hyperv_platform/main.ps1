@@ -25,7 +25,9 @@ param(
     [String] $LisaTestDependencies,
     [String] $PipelineName,
     [String] $DBConfigPath,
-    [String] $LisaTestSuite
+    [String] $LisaTestSuite,
+    [String] $LisaLogDBConfigPath,
+    [String] $LogsPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -176,6 +178,35 @@ function Report-LisaResults {
     & $PYTHON_PATH $RESULT_PARSER_PATH
 }
 
+function Parse-LisaLogs {
+    param(
+        [String] $LisaLogDBConfigPath,
+        [String] $XmlTest
+    )
+    
+    $logDir = (Get-ChildItem '.\TestResults').Name
+    $icaLocation = ".\TestResults\${logDir}\ica.log"
+
+    Write-Host "LisaLogDBConfigPath - $LisaLogDBConfigPath"
+    Write-Host "XmlTest - $XmlTest"
+    Write-Host "icaLocation - $icaLocation"
+    & $PYTHON_PATH .\Infrastructure\lisa-parser\lisa_parser\lisa_parser.py $XmlTest `
+        $icaLocation -c $LisaLogDBConfigPath -s ICABase
+}
+
+function Copy-TestResults {
+    param (
+        [String] $LogsPath,
+        [String] $LISAPath
+    )
+
+    $LISAParentPath = (Get-Item $LISAPath).Parent.Name
+    $logsFullPath = Join-Path $LogsPath $LISAParentPath
+    New-Item -ItemType Directory -Path $logsFullPath -Force
+    $LISALogPath = Join-Path $LISAPath "WS2012R2\lisa\TestResults\*"
+    Copy-Item -Recurse -Force $LISALogPath $logsFullPath
+}
+
 function Main {
     $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
     $kernelFolder = Get-IniFileValue -Path $KernelVersionPath `
@@ -252,6 +283,21 @@ function Main {
         } catch {
             Write-Host ("Failed to report stage state with error: {0}" -f @($_))
         }
+
+        try {
+            Parse-LisaLogs -LisaLogDBConfigPath $LisaLogDBConfigPath -XmlTest ".\xml\${XmlTest}"
+        } catch {
+            Write-Host ("Lisa logs parsing failed with error: {0}" -f @($_))
+        }
+
+        if ($LogsPath) {
+            try {
+                Copy-TestResults -LogsPath $LogsPath -LISAPath $LISAPath
+            } catch {
+                Write-Host ("Copying files to given path failed with error: {0}" -f @($_)) 
+            }
+        }
+
         Pop-Location
         New-Item -Type "Directory" -Force $JobId
         Copy-Item -Recurse -Force (Join-Path $jobPath "lis-test\WS2012R2\lisa\TestResults") $JobId
