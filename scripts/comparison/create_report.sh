@@ -2,8 +2,9 @@
 
 set -xe
 
-HTML_REP_SCRIPT="$(pwd)/scripts/comparison/html_parser.py"
-MANUAL_PARSER="$(pwd)/lis-test/WS2012/lisa/Infrastructure/lisa-parser/lisa_parser/manual_parser.py"
+BASE_DIR=$(dirname $0)
+
+HTML_REP_SCRIPT="${BASE_DIR}/html_parser.py"
 
 parse_logs() {
     base_logs="$1"
@@ -11,13 +12,17 @@ parse_logs() {
     metadata="$3"
     test_type="$4"
     
+    if [[ "$test_type" == "" ]];then
+        test_type="functional"
+    fi
+    
     python2 "${MANUAL_PARSER}" --logs_path "$base_logs" \
-        --test_type "$test_type"
+        --test_type "$test_type" \
         --output "./Patched.csv"
     parser_parameters="--test_results ./Patched.csv"
     if [[ "$comp_logs" != "" ]];then
         python2 "${MANUAL_PARSER}" --logs_path "$comp_logs" \
-            --test_type "$test_type"
+            --test_type "$test_type" \
             --output "./Unpatched.csv"
             parser_parameters+=" --comparison_results ./Unpatched.csv"
     fi
@@ -29,12 +34,10 @@ parse_logs() {
         parser_parameters+=" --test_type ${test_type}"
     fi
     
-    python3 "$HTML_REP_SCRIPT" "$parser_parameters" --output "results.html"
+    python3 "$HTML_REP_SCRIPT" $parser_parameters --output temp_results.html
 }
 
 main() {
-    WORKDIR="$(pwd)"
-
     while true;do
         case "$1" in
             --func_path)
@@ -62,28 +65,25 @@ main() {
         esac
     done
     
-    git clone https://github.com/mbivolan/lis-test.git
+    git clone https://github.com/LIS/lis-test.git
+    MANUAL_PARSER="./lis-test/WS2012R2/lisa/Infrastructure/lisa-parser/lisa_parser/manual_parser.py"
     
-    # test
-    pushd "./lis-test"
-    git checkout comparison
-    podp
     
     if [[ -e "$OUTPUT" ]];then
-        rm "$OUTPUT"
+        rm -f "$OUTPUT"
     fi
     
-    if [[ "$func_path" != "" ]];then
+    if [[ "$FUNC_PATH" != "" ]];then
         parse_logs "$FUNC_PATH" "$FUNC_COMP_PATH" "$META_PATH"
-        cat "results.html" > "$OUTPUT"
-        if [[ "$perf_path" != "" ]];then
+        cat "temp_results.html" > "$OUTPUT"
+        if [[ "$PERF_PATH" != "" ]];then
             parse_logs "$PERF_PATH" "$PERF_COMP_PATH" "" "$TEST_TYPE"
-            cat "results.html" >> "$OUTPUT"
+            cat "temp_results.html" >> "$OUTPUT"
         fi
-    elif [[ "$perf_path" != "" ]];then
+    elif [[ "$PERF_PATH" != "" ]];then
         parse_logs "$PERF_PATH" "$PERF_COMP_PATH" "$META_PATH" \
                    "$TEST_TYPE"
-        cat "results.html" > "$OUTPUT"
+        cat "temp_results.html" > "$OUTPUT"
     fi
 }
 

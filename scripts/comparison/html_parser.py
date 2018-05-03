@@ -1,9 +1,10 @@
-from classes import fileStructure, htmlTag, htmlFile, htmlTable, comparisonTable
 import argparse
-import os
-import configparser
-import sys
 import csv
+import configparser
+import os
+import sys
+from html_utils import *
+
 
 functional_comparison = 'Patched == "Pass"'
 perf_comparison = 'Patched > Unpatched'
@@ -38,9 +39,10 @@ def get_params():
 
 
 def get_structure_from_ini(ini_path):
-    structure = fileStructure(comp_keys=[],
+    structure = FileStructure(comp_keys=[],
                               comp_sub_keys=[],
-                              sections=dict())
+                              sections=dict(),
+                              sections_order=[])
     config = configparser.ConfigParser()
     config.read(ini_path)
 
@@ -49,6 +51,7 @@ def get_structure_from_ini(ini_path):
         structure.comp_sub_keys = config['Keys']['comparison_sub_keys'].split(";")
     sections = list(config.keys())
     for section in sections[2:]:
+        structure.sections_order.append(section)
         structure.sections[section] = dict()
         for table in config[section]:
             structure.sections[section][table] = config[section][table].split(";")
@@ -89,16 +92,16 @@ if __name__ == "__main__":
     structure = get_structure_from_ini(script_path + '/ini_configs/' +
                                        params.test_type.lower() + '.ini')
 
-    new_file = htmlFile()
+    new_file = HtmlFile()
 
     if params.metadata:
         metadata = get_metadata_from_ini(params.metadata)
-        meta_table = htmlTable(cellspacing="0")
-        for key in metadata.keys():
+        meta_table = HtmlTable(cellspacing="0", style="padding: 30px")
+        for key in metadata:
             cell_style = "border: 1px solid"
             new_row = meta_table.add_row()
-            meta_table.add_cell_to_row(new_row, key, style=cell_style)
-            meta_table.add_cell_to_row(new_row, metadata[key],
+            meta_table.add_cell_to_row(new_row, key["name"], style=cell_style)
+            meta_table.add_cell_to_row(new_row, key["value"],
                                        style=cell_style)
         new_file.add_section(title=None, section=meta_table.get_table())
 
@@ -118,12 +121,12 @@ if __name__ == "__main__":
             data_sets.append({None: test_results[index]})
             sub_keys = None
 
-    for section in structure.sections.keys():
-        new_section = htmlTag("div", style="padding: 5px")
+    for section in structure.sections_order:
+        new_section = HtmlTag("div", style="padding: 5px")
         tables = structure.sections[section]
         for table in tables.keys():
             table_style = 'display: inline-table; padding: 20px'
-            new_table = comparisonTable(tables[table], cellspacing="0",
+            new_table = ComparisonTable(tables[table], cellspacing="0",
                                         style=table_style)
             new_table.add_sub_keys(structure.comp_keys, sub_keys)
             new_table.create_key_cells()

@@ -53,7 +53,7 @@ properties ([
             description: 'IO_MODE for FIO'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv',
+            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_perf_hyperv',
             description: 'What stages to run. By default all stages are enabled']
         ]
     ]
@@ -146,7 +146,7 @@ node ("meta_slave") {
                     stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
                     stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
                 }
-                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
+                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
             } else {
                 if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
                     stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
@@ -154,6 +154,7 @@ node ("meta_slave") {
                 if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
                     stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
                 }
+                stash includes: 'patched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
             }
         }
     }
@@ -161,9 +162,19 @@ node ("meta_slave") {
     stage ("compare_results") {
         dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             checkout scm
-            unstash 'unpatchedMetadata'
+            unstash 'Metadata'
+            if (env.ENABLED_STAGES.contains("validation_perf_hyperv")){
+                env.PERF_RUN = "true"
+                env.LISA_PARAMS = getPerfOptions(LISA_PERF_TEST)
+            }
+            if (env.ENABLED_STAGES.contains("validation_functional_hyperv")){
+                env.FUNC_RUN = "true"
+            } 
             sh '''#!/bin/bash
                 INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
+                if [[ ! -e "$INI_PATH" ]];then
+                    INI_PATH="./patched_run/scripts/package_building/kernel_versions.ini"
+                fi
                 META_PATH="./metadata.ini"
                 KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
                 KERNEL="${KERNEL%-unpatched*}"
@@ -171,11 +182,17 @@ node ("meta_slave") {
                 BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
                 crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
                 crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
-                if [[ ${LISA_TEST_SUITE} != "" ]];then
+                if [[ ${FUNC_RUN} == "true" ]];then
                     crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
                 fi
-                if [[ ${LISA_PERF_TEST} != "" ]];then
-                    crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
+                if [[ ${PERF_RUN} == "true" ]];then
+                    if [[ ${LISA_PERF_TEST} != "" ]];then
+                        crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
+                    fi
+                    if [[ ${LISA_PERF_TEST} == *"SR-IOV"* ]];then
+                        crudini --set $META_PATH 'METADATA' IP_VERSION $PERF_IPV
+                    fi
+                    crudini --set $META_PATH 'METADATA' LISA_PERF_PARAMS $LISA_PARAMS
                 fi
             '''
 
@@ -205,9 +222,9 @@ node ("meta_slave") {
                 }
             }
             println (PARSE_PARAMS)
-            sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./arch_results.html"
+            sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
 
-            archiveArtifacts 'arch_results.html'
+            archiveArtifacts 'results.html'
         }
     }
 }

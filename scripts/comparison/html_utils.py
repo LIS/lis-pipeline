@@ -1,14 +1,7 @@
 import os
 
 
-def create_tag_style(**attr):
-    style = ""
-    for key in attr:
-        style += key + ': ' + attr[key] + ';'
-    return style
-
-
-def add_identation(tag_list):
+def add_indentation(tag_list):
     idented_tag_list = []
     for line in tag_list:
         line = "\n    " + line[1:]
@@ -16,12 +9,12 @@ def add_identation(tag_list):
     return idented_tag_list
 
 
-class fileStructure:
+class FileStructure:
     def __init__(self, **entries):
         self.__dict__.update(entries)
 
 
-class htmlTag:
+class HtmlTag:
     def __init__(self, tag, **attributes):
         self.tag = tag
         self.attributes = attributes
@@ -75,17 +68,17 @@ class htmlTag:
         elif type(self.data) is list:
             self.section.append(self.build_tag())
             for inner_tag in self.data:
-                self.section += add_identation(inner_tag.get_section())
+                self.section += add_indentation(inner_tag.get_section())
             self.section.append("\n</" + self.tag + ">")
         return self.section
 
 
-class htmlFile(htmlTag):
+class HtmlFile(HtmlTag):
     def __init__(self):
         super().__init__("div")
 
     def add_section(self, **sec):
-        section_title = htmlTag("b")
+        section_title = HtmlTag("b")
         section_title.add_inner_text(sec['title'])
         self.add_inner_tag(section_title)
         self.add_inner_tag(sec['section'])
@@ -96,17 +89,17 @@ class htmlFile(htmlTag):
                 output_file.write(section)
 
 
-class htmlTable:
+class HtmlTable:
     def __init__(self, **table_attributes):
-        self.main_tag = htmlTag("table", **table_attributes)
+        self.main_tag = HtmlTag("table", **table_attributes)
 
     def add_cell_to_row(self, row, text=None, **cell_attributes):
-        new_cell = htmlTag("td", **cell_attributes)
+        new_cell = HtmlTag("td", **cell_attributes)
         new_cell.add_inner_text(text)
         row.add_inner_tag(new_cell)
 
     def add_row(self, **row_attributes):
-        new_row = htmlTag("tr", **row_attributes)
+        new_row = HtmlTag("tr", **row_attributes)
         self.main_tag.add_inner_tag(new_row)
         return new_row
 
@@ -121,7 +114,7 @@ class htmlTable:
         return self.main_tag
 
 
-class comparisonTable(htmlTable):
+class ComparisonTable(HtmlTable):
     def __init__(self, table_keys, **table_attributes):
         super().__init__(**table_attributes)
         self.table_keys = table_keys
