@@ -16,7 +16,8 @@ def reportStageStatus(stageName, stageStatus) {
                                     variable: 'PERF_DB_CONFIG')]) {
         dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
               unstash 'kernel_version_ini'
-              sh '''#!/bin/bash
+              sh returnStatus: true, script: '''
+                  #!/bin/bash
                   KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
                   KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
                   KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
@@ -27,7 +28,7 @@ def reportStageStatus(stageName, stageStatus) {
                       --pipeline_stage_name "${STAGE_NAME_REPORT}" \
                       --kernel_info "./scripts/package_building/kernel_versions.ini" \
                       --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
-                      --distro_version "${DISTRO_VERSION}" --db_config ${PERF_DB_CONFIG} || true
+                      --distro_version "${DISTRO_VERSION}" --db_config "${PERF_DB_CONFIG}" || true
               '''
         }
     }
