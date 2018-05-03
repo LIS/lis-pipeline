@@ -10,15 +10,15 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
   - IO: SSD required, minimum of 5k IOPS. On an Azure VM you can add 12 disks of premium storage and configure them into RAID 0 and you can achieve 60k IOPS. More the better.
 
 ## Required packages
-  - Packages required:
   ```bash
     set -xe
     deb_packages=(libncurses5-dev xz-utils libssl-dev libelf-dev bc ccache kernel-package \
         devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison \
         asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
         libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
-        libbabeltrace-ctf-dev libbabeltrace-dev pigz pbzip2)
+        libbabeltrace-ctf-dev libbabeltrace-dev pigz pbzip2 python-pip)
     sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
+    sudo pip install envparse
   ```
 
 ## Optimizations
@@ -66,3 +66,24 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     EOM
     chmod 777 $dpkg_deb_path
     ```
+
+# Configure MSSQL Python driver
+  - Install odbc driver:
+  ```bash
+     sudo apt install -y unixodbc-dev
+
+     sudo -- curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+     sudo curl -o /etc/apt/sources.list.d/mssql-release.list https://packages.microsoft.com/config/ubuntu/16.04/prod.list
+     sudo apt-get update
+     sudo ACCEPT_EULA=Y apt-get install msodbcsql17
+
+     sudo pip install pyodbc
+  ```
+
+  - Change in the '/etc/odbcinst.ini'
+  ```bash
+     [SQL Server]
+     Description=Microsoft ODBC Driver 17 for SQL Server
+     Driver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.1.so.0.1
+     UsageCount=1
+  ```
