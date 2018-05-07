@@ -1,4 +1,4 @@
-# How to configure RHEL /CentOS 7.x kernel builder
+# How to configure RHEL / CentOS 7.x kernel builder
 The kernel build script which this tutorial addresses is found here:
 https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_artifacts.sh
 
@@ -10,13 +10,12 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
   - IO: SSD required, minimum of 5k IOPS. On an Azure VM you can add 12 disks of premium storage and configure them into RAID 0 and you can achieve 60k IOPS. More the better.
 
 ## Required packages
-  - Packages required:
   ```bash
     set -xe
     rpm_packages=(rpm-build rpmdevtools yum-utils ncurses-devel hmaccalc zlib-devel \ 
         binutils-devel elfutils-libelf-devel openssl-devel wget git ccache bc fakeroot \
         asciidoc binutils-devel xmlto bison flex gtk2-devel xz-devel numactl-devel \
-        newt-devel openssl-devel xmlto zlib-devel crudini pigz pbzip2)
+        newt-devel openssl-devel xmlto zlib-devel crudini pigz pbzip2 unixODBC-devel)
 
     # epel repo required for crudini, pigz and pbzip2
     sudo rpm -ivh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
@@ -24,6 +23,8 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
+
+    sudo pip install envparse
   ```
 
 ## Optimizations
@@ -46,3 +47,19 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     ln -sf /usr/bin/pigz zcat
     popd
     ```
+
+# Configure MSSQL Python driver
+  - Install odbc driver:
+  ```bash
+     sudo -- curl https://packages.microsoft.com/config/rhel/6/prod.repo > /etc/yum.repos.d/mssql-release.repo
+     sudo ACCEPT_EULA=Y yum install msodbcsql
+     sudo pip install pyodbc
+  ```
+
+  - Change in the '/etc/odbcinst.ini'
+  ```bash
+     [SQL Server]
+     Description=Microsoft ODBC Driver 13 for SQL Server
+     Driver=/opt/microsoft/msodbcsql/lib64/libmsodbcsql-13.1.so.9.2
+     UsageCount=1
+  ```
