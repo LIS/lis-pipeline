@@ -28,7 +28,7 @@ properties ([
             name: 'LISA_TEST_SUITE',
             description: 'LISA test suite'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'TCP\nUDP\nFIO',
+            choices: 'SR-IOV_TCP\nSR-IOV_UDP\nFIO_RAID',
             name: 'LISA_PERF_TEST',
             description: 'Which perf test to run'],
         [$class: 'ChoiceParameterDefinition',
@@ -53,29 +53,29 @@ properties ([
             description: 'IO_MODE for FIO'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_functional_azure, validation_perf_hyperv',
+            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_perf_hyperv',
             description: 'What stages to run. By default all stages are enabled']
         ]
     ]
 ])
 
-def perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
+def perfXml = ["SR-IOV_TCP": "TCP_SRIOV_v4.xml", "SR-IOV_UDP":"UDP_SRIOV_v4.xml", "FIO_RAID": "FIO_RAID0_Pipeline.xml"]
 
 def getPerfOptions(perf_test) {
     switch (perf_test) {
-        case "TCP":
+        case "SR-IOV_TCP":
             testOptions = PERF_IPV
             if (PERF_NET_THREADS != "all"){
                 testOptions += ";TEST_THREADS=" + PERF_NET_THREADS
             }
             return testOptions
-        case "UDP":
+        case "SR-IOV_UDP":
             testOptions = PERF_IPV
             if (PERF_NET_THREADS != "all"){
                 testOptions += ";IPERF3_TEST_CONNECTION_POOL=" + PERF_NET_THREADS
             }
             return testOptions
-        case "FIO":
+        case "FIO_RAID":
             testOptions = ""
             if (PERF_Q_DEPTH != "all") {
                 testOptions += "Q_DEPTH=" + PERF_Q_DEPTH + ";"
@@ -138,57 +138,93 @@ node ("meta_slave") {
             if (env.SKIP_UNPATCHED == 'no') {
                 copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
-                stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
-                stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
-                stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
-                stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
-                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'unpatchedMetadata'
+                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
+                    stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
+                    stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
+                }
+                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
+                    stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
+                    stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
+                }
+                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
+            } else {
+                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
+                    stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
+                }
+                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
+                    stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
+                }
+                stash includes: 'patched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
             }
         }
     }
 
     stage ("compare_results") {
-        if (env.SKIP_UNPATCHED == 'no') {
-            dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-                checkout scm
-                unstash 'patchedReport'
-                unstash 'unpatchedReport'
-                unstash 'patchedPerf'
-                unstash 'unpatchedPerf'
-                unstash 'unpatchedMetadata'
-                sh '''#!/bin/bash
-                    INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
-                    META_PATH="./metadata.ini"
-                    KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
-                    KERNEL="${KERNEL%-unpatched*}"
-                    crudini --set $META_PATH 'METADATA' KERNEL_VERSION $KERNEL
-                    BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
-                    crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
-                    crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
-                    if [[ ${LISA_TEST_SUITE} != "" ]];then
-                        crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
-                    fi
+        dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            checkout scm
+            unstash 'Metadata'
+            if (env.ENABLED_STAGES.contains("validation_perf_hyperv")){
+                env.PERF_RUN = "true"
+                env.LISA_PARAMS = getPerfOptions(LISA_PERF_TEST)
+            }
+            if (env.ENABLED_STAGES.contains("validation_functional_hyperv")){
+                env.FUNC_RUN = "true"
+            } 
+            sh '''#!/bin/bash
+                INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
+                if [[ ! -e "$INI_PATH" ]];then
+                    INI_PATH="./patched_run/scripts/package_building/kernel_versions.ini"
+                fi
+                META_PATH="./metadata.ini"
+                KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
+                KERNEL="${KERNEL%-unpatched*}"
+                crudini --set $META_PATH 'METADATA' KERNEL_VERSION $KERNEL
+                BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
+                crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
+                crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
+                if [[ ${FUNC_RUN} == "true" ]];then
+                    crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
+                fi
+                if [[ ${PERF_RUN} == "true" ]];then
                     if [[ ${LISA_PERF_TEST} != "" ]];then
                         crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
                     fi
-                '''
-                sh '''
-                    python3 scripts/comparison/compare_results.py \\
-                        --patchedresults ./patched_run/*-functional/TestResults/**/Report*.xml \\
-                        --unpatchedresults ./unpatched_run/*-functional/TestResults/**/Report*.xml \\
-                        --output results_func.html --metadata ./metadata.ini
-                '''
-                sh '''
-                    python2.7 scripts/comparison/parse_perf_results.py \\
-                        --logspath ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
-                        --comparewith ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/"${LISA_PERF_TEST}"* \\
-                        --testtype "${LISA_PERF_TEST}" --output results_perf.html
-                '''
-                sh 'cat results_func.html results_perf.html > results.html'
-                archiveArtifacts 'results.html'
+                    if [[ ${LISA_PERF_TEST} == *"SR-IOV"* ]];then
+                        crudini --set $META_PATH 'METADATA' IP_VERSION $PERF_IPV
+                    fi
+                    crudini --set $META_PATH 'METADATA' LISA_PERF_PARAMS $LISA_PARAMS
+                fi
+            '''
+
+            PARSE_PARAMS = ""
+            PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
+            if (env.SKIP_UNPATCHED == 'no') {
+                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
+                    unstash 'patchedReport'
+                    unstash 'unpatchedReport'
+                    PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
+                    PARSE_PARAMS += " --func_comp_path ./unpatched_run/*-functional/TestResults/**/Report*.xml"
+                }
+                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
+                    unstash 'patchedPerf'
+                    unstash 'unpatchedPerf'
+                    PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
+                    PARSE_PARAMS += " --perf_comp_path ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
+                }
+            } else {
+                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
+                    unstash 'patchedReport'
+                    PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
+                }
+                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
+                    unstash 'patchedPerf'
+                    PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
+                }
             }
-        } else {
-            println ("Comparison between patched/unpatched test results was skipped as no unpatched test results are available")
+            println (PARSE_PARAMS)
+            sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
+
+            archiveArtifacts 'results.html'
         }
     }
 }
