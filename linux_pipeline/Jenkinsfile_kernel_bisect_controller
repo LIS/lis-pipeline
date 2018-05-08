@@ -8,8 +8,7 @@ env.kernelTree;
 env.buildDir = "/mnt/tmp/bisect"
 env.cloneDir = "kernel_tree"
 
-env.branchName = "master"
-pipelineName = "pipeline-kernel-bisect-commit-validator/" + env.branchName
+pipelineName = "pipeline-kernel-bisect-commit-validator/" + env.BRANCH_NAME
 
 isPerf = false
 def float baseValue = 0
@@ -225,7 +224,7 @@ String getCommit (String passed) {
     )
     if (commit.contains("first bad commit")) {
         println("Bisect finished succesfully. Bad commit is " + commit.split(" ")[0])
-        currentBuild.displayName = "$BUILD_NUMBER-" + commit.substrin(0,7)
+        currentBuild.displayName = "$BUILD_NUMBER-" + commit.substring(0,7)
         return ""
     }
     return commit.trim()

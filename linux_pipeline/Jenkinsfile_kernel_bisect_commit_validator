@@ -64,22 +64,22 @@ properties ([
     ]
 ])
 
-UBUNTU_VERSION = '16'
-BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
-KERNEL_ARTIFACTS_PATH = 'bisect-kernel-artifacts'
-KERNEL_CONFIG = 'Microsoft/config-azure'
-AZURE_MAX_RETRIES = '10'
-BUILD_NAME = 'b'
-INSTALL_DEPS = 'True'
-USE_KERNEL_FOLDER_PREFIX = 'True'
-THREAD_NUMBER = 'x3'
 perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
+
+env.UBUNTU_VERSION = '16'
+env.BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
+env.KERNEL_ARTIFACTS_PATH = 'bisect-kernel-artifacts'
+env.KERNEL_CONFIG = 'Microsoft/config-azure'
+env.BUILD_NAME = 'b'
+env.INSTALL_DEPS = 'True'
+env.USE_KERNEL_FOLDER_PREFIX = 'True'
+env.THREAD_NUMBER = 'x3'
+env.AZURE_MAX_RETRIES = '10'
+
 isPerf = ENABLED_STAGES.contains('perf')
 isBootTest = ENABLED_STAGES.contains('boot')
 perfServer = GetPerfServer(PERF_TEST)
 ioMode = GetKeyForFIO(PERF_IO_MODE)
-env.DISTRO_VERSION = DISTRO_VERSION
-env.KERNEL_GIT_URL = KERNEL_GIT_URL
 
 // this is the main logic
 build_kernel(DISTRO_VERSION)
