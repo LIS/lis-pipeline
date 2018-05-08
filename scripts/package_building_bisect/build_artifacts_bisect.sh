@@ -94,6 +94,9 @@ function get_sources_git () {
     pushd "${base_dir}/kernel"
     if [[ ! -d "$repository" ]];then
         git clone $git_params "$source_path"
+        pushd "$git_folder"
+            git config --global gc.auto 0
+        popd
     else
         pushd "$git_folder"
         git remote set-url origin "$source_path"
@@ -211,7 +214,15 @@ function build_rhel {
 
     artifacts_dir="${base_dir}/kernel/rpmbuild/RPMS/x86_64/"
     source_package_dir="${base_dir}/kernel/rpmbuild/SRPMS/"
-    
+
+    if [[ -d "$artifacts_dir" ]]; then
+        rm -f $artifacts_dir/*
+    fi
+
+    if [[ -d "$source_package_dir" ]]; then
+        rm -f $source_package_dir/*
+    fi
+
     pushd "$repository"
     make rpm -j"$thread_number"
     sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"
@@ -394,9 +405,9 @@ function main () {
     fi
 
     repository=$(get_source "$BASE_DIR" "$SOURCE_PATH")
-    destination_path="$(get_destination_path "$repository" "$DESTINATION_PATH" "$os_PACKAGE" "${GIT_COMMIT_ID:0:7}" "$BUILD_DATE" "$FOLDER_PREFIX")"
 
     get_sources_git "$BASE_DIR" "$SOURCE_PATH" "$GIT_BRANCH" "$GIT_COMMIT_ID" "$repository"
+    destination_path="$(get_destination_path "$repository" "$DESTINATION_PATH" "$os_PACKAGE" "${GIT_COMMIT_ID:0:7}" "$BUILD_DATE" "$FOLDER_PREFIX")"
     prepare_kernel_"$os_FAMILY" "$BASE_DIR" "$repository" "$PACKAGE_PREFIX" "$DEP_PATH"
 
     build_"${os_FAMILY}" "$BASE_DIR" "$repository" "$kernel" "$THREAD_NUMBER" "$destination_path" \

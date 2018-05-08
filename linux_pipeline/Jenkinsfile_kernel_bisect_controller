@@ -1,24 +1,27 @@
 #!/usr/bin/env groovy
 
-String kernelTree;
-String pipelineName;
-
 upstreamLinuxTree = "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
 netNextTree = "https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
-buildDir = "/mnt/tmp/bisect"
-cloneDir = "kernel_tree"
+
+env.kernelTree;
+
+env.buildDir = "/mnt/tmp/bisect"
+env.cloneDir = "kernel_tree"
+
+env.branchName = "master"
+pipelineName = "pipeline-kernel-bisect-commit-validator/" + env.branchName
+
+isPerf = false
+def float baseValue = 0
+def float left = 0
 
 properties ([
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
-            choices: 'bisect-commit-validator\nazure-pipeline\nupstream-pipeline\ndeveloper-pipeline',
-            name: 'JOB_TO_RUN',
-            description: 'Job to run bisect on'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'linux-next\nazure-kernel\nnet-next',
+            choices: 'linux-next\nazure_kernel\nnet-next',
             name: 'KERNEL_TREE',
-            description: 'What Kernel tree to be used (Available only for upstream and developer pipelines).'],
+            description: 'What Kernel tree to be used.'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
             defaultValue: 'master',
@@ -31,134 +34,201 @@ properties ([
             name: 'BAD_COMMIT',
             defaultValue: 'HEAD',
             description: 'Bad commit (can be HEAD)'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'Ubuntu\nCentOS',
+            name: 'DISTRO',
+            description: 'Distro version to be tested'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n5\n10\n15\n20',
+            name: 'PERF_VARIATION',
+            description: 'If above this performance variation, the commit is bad'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'TCP\nUDP\nFIO',
+            name: 'PERF_TEST',
+            description: 'Which perf test to run'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'v4\nv6',
+            name: 'PERF_IPV',
+            description: '[TCP] [UDP] IP version to use.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1k\n8k',
+            name: 'PERF_K',
+            description: '[UDP] Buffer size to be used.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240',
+            name: 'PERF_TEST_THREADS_TCP',
+            description: '[TCP] TEST_THREADS.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
+            name: 'PERF_TEST_THREADS_UDP',
+            description: '[UDP] TEST_THREADS.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '4\n1024',
+            name: 'PERF_IO_SIZE',
+            description: '[FIO] IO_SIZE.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
+            name: 'PERF_Q_DEPTH',
+            description: '[FIO] Queue depth.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'read\nrandread\nwrite\nrandwrite',
+            name: 'PERF_IO_MODE',
+            description: '[FIO] IO_MODE'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test',
-            description: 'What stages to run. By default all stages are enabled']
+            defaultValue: 'build_artifacts, boot_test, perf_hyperv',
+            description: 'boot_validation: build_artifacts, boot_test\nperf_validation: build_artifacts, boot_test, perf_hyperv']
         ]
     ]
 ])
 
 node ("bisect_kernel_builder") {
-    resolveGitRepo(JOB_TO_RUN, KERNEL_TREE)
+    resolveGitRepo(KERNEL_TREE)
 
     // we pull the code
     initEnv()
+
+    // if the enabled stages also contain perf, we should set a base value for it
+    if (isPerf) {
+        setBase()
+    }
 
     // we make sure the good commit is good and the bad one bad, so we avoid
     // a useless bisect
     stage("validate_commits") {
         validateCommit(BAD_COMMIT, "FAILURE")
-        println("Bad commit " + BAD_COMMIT + "has been validated to be bad")
-        validateCommit(GOOD_COMMIT, "SUCCESS")
-        println("Good commit " + GOOD_COMMIT + "has been validated to be good")
+        println("Bad commit " + BAD_COMMIT + " has been validated to be bad")
+        if (!isPerf) {
+            validateCommit(GOOD_COMMIT, "SUCCESS")
+            println("Good commit " + GOOD_COMMIT + " has been validated to be good")
+        }
     }
 
     // start the bisect workflow
     bisect()
 }
 
-def resolveGitRepo(String pipeline, String gitURL) {
-    switch (pipeline) {
-        case "azure-pipeline":
-            pipelineName = "lis-pipeline/master";
-            kernelTree = "azure-kernel"
-            return;
-        case "upstream-pipeline":
-            pipelineName = "upstream-kernel-pipeline/master";
-            break;
-        case "developer-pipeline":
-            pipelineName = "pipeline-developer-patch-validation/master";
-            break;
-        case "bisect-commit-validator":
-            pipelineName = "pipeline-kernel-bisect-commit-validator/master";
-    }
-
+def resolveGitRepo(String gitURL) {
     switch (gitURL) {
         case "linux-next":
-            kernelTree = upstreamLinuxTree;
+            env.kernelTree = upstreamLinuxTree;
             break;
         case "net-next":
-            kernelTree = netNextTree;
+            env.kernelTree = netNextTree;
+            break;
+        default:
+            env.kernelTree = gitURL;
             break;
     }
 }
 
 def initEnv() {
+    isPerf = ENABLED_STAGES.contains('perf')
     withCredentials([[$class: 'StringBinding', credentialsId: ' MSFT_KERNEL_GIT_URL', variable: 'AZURE_KERNEL']]) {
         stage ("initialize_env") {
             def scriptFetch = sh(
-                    script: """#!/bin/bash
+                    script: '''#!/bin/bash
                         set -xe
 
-                        if [[ ${kernelTree} == "azure-kernel" ]]; then
-                            kernel_tree=${AZURE_KERNEL}
+                        if [[ $kernelTree == "azure_kernel" ]]; then
+                            kernel_tree=$AZURE_KERNEL
                         else
-                            kernel_tree=${kernelTree}
+                            kernel_tree=$kernelTree
                         fi
 
                         mkdir -p $buildDir
-                        pushd "$buildDir"
-                        if [[ ! -d "$cloneDir" ]];then
-                            git clone \$kernel_tree "$cloneDir"
+                        pushd $buildDir
+                        if [[ ! -d $cloneDir ]];then
+                            git clone $kernel_tree $cloneDir
+                            pushd $cloneDir
+                                git config --global gc.auto 0
+                            popd
                         else
-                            pushd "$cloneDir"
-                            git remote set-url origin \$kernel_tree
+                            pushd $cloneDir
+                            git remote set-url origin $kernel_tree
                             popd
                         fi
-                        pushd "$cloneDir"
+                        pushd $cloneDir
+                        git checkout -f $KERNEL_GIT_BRANCH
+                        git clean -x -f -d
+                        git reset --hard HEAD
                         git fetch --all
                         git pull
-                        git reset --hard origin/master
                         popd
                         popd
-                        """
+                        '''
             )
             println "Finished cloning Git repo."
         }
     }
 }
 
+def setBase() {
+    stage('set_base_value') {
+        job = buildJobWrapper(GOOD_COMMIT)
+        if (job.perfResult != 0) {
+            baseValue = job.perfResult
+            left = baseValue * (1 - (PERF_VARIATION.toInteger()) / 100)
+        } else {
+            println "Base perf value of the first good commit is 0, therefore the good commit is bad."
+            currentBuild.result = 'FAILURE'
+            sh(script: "exit 1")
+        }
+    }
+    println "Base value is : " + job.perfResult
+    println "Left value is : " + left
+}
+
+def checkVariation(value) {
+    return value >= left ? "good" : "bad"
+}
+
 def validateCommit (String commit, String expectedState) {
     if (!commit) {
-        println("Commit " + commit + "is not valid.")
+        println("Commit " + commit + " is not valid.")
         sh(script: "exit 1")
     }
-    def buildResult = build job: pipelineName, parameters: [string(name: 'KERNEL_GIT_URL', value: kernelTree),
-                                                            string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
-                                                            string(name: 'KERNEL_GIT_COMMIT_ID', value: commit)],
-                                                            propagate: false,
-                                                            wait: true
-    if (buildResult.result != expectedState) {
-        println("Commit " + commit + " was expected to be " + expectedState + " instead of " + buildResult.result )
+    job = buildJobWrapper(commit)
+    if (isPerf) {
+        res = checkVariation(job.perfResult)
+        if (res == "good" && expectedState == "FAILURE" ||
+            res == "bad" && expectedState == "FAILURE") {
+            currentBuild.result = 'FAILURE'
+            sh(script: "exit 1")
+        }
+    }
+    if (!isPerf && job.buildResult != expectedState) {
+        println "Commit " + commit + " was expected to be " + expectedState + " instead of " + buildResult.result
         currentBuild.result = 'FAILURE'
         sh(script: "exit 1")
     }
 }
 
 String getCommit (String passed) {
+    env.passed = passed
     def commit = sh(
-        script: """#!/bin/bash
+        script: '''#!/bin/bash
                    set -xe
                    pushd "$buildDir/$cloneDir" 2>&1 > /dev/null
-                   output=\$(git bisect $passed)
+                   output=$(git bisect $passed)
                    popd 2>&1 > /dev/null
-                   final=\$(echo \$output | grep 'first bad commit' | wc -l)
-                   commit_id=\${output##*[}
-                   commit_id=\${commit_id%%]*}
-                   if [[ "\$final" != "0" ]]; then
-                       echo \$output
+                   final=$(echo $output | grep 'first bad commit' | wc -l)
+                   commit_id=${output##*[}
+                   commit_id=${commit_id%%]*}
+                   if [[ "$final" != "0" ]]; then
+                       echo $output
                        exit 0
                    fi
-                   echo \$commit_id
-                """,
+                   echo $commit_id
+                ''',
         returnStdout: true
     )
     if (commit.contains("first bad commit")) {
-        println("Bisect finished succesfully. Commit " + commit.split(" ")[0] + "is the bad commit")
+        println("Bisect finished succesfully. Bad commit is " + commit.split(" ")[0])
+        currentBuild.displayName = "$BUILD_NUMBER-" + commit.substrin(0,7)
         return ""
     }
-    return commit
+    return commit.trim()
 }
 
 def bisect () {
@@ -166,46 +236,50 @@ def bisect () {
     String passed = ""
 
     sh(
-        script: """#!/bin/bash
+        script: '''#!/bin/bash
                    set -xe -o pipefail
 
                    pushd "$buildDir/$cloneDir"
                    printf "Bisect Graph is the following:"
                    git rev-list --graph --oneline $BAD_COMMIT --not "${GOOD_COMMIT}"
                    popd
-                """
+                '''
     )
 
     def firstCommit = sh(
-        script: """#!/bin/bash
+        script: '''#!/bin/bash
                    set -xe
                    pushd "$buildDir/$cloneDir" 2>&1 > /dev/null
-                   output=\$(git bisect start $BAD_COMMIT "$GOOD_COMMIT")
-                   output=\${output##*[}
-                   output=\${output%%]*}
-                   echo \$output
+                   output=$(git bisect start $BAD_COMMIT "$GOOD_COMMIT")
+                   output=${output##*[}
+                   output=${output%%]*}
+                   echo $output
                    popd 2>&1 > /dev/null
-                """,
+                ''',
         returnStdout: true
     )
 
-    commitId = firstCommit
+    commitId = firstCommit.trim()
     println "First commit is : " + commitId
 
     while (true) {
-        stage ("bisect_" + commitId.substring(0,7)) {
-        println "Current commit id is: " + commitId
-            def buildResult = build job: pipelineName, parameters: [string(name: 'KERNEL_GIT_URL', value: kernelTree),
-                                                                    string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
-                                                                    string(name: 'KERNEL_GIT_COMMIT_ID', value: commitId)],
-                                                                    propagate: false,
-                                                                    wait: true
-            if (buildResult.result == "SUCCESS") {
-                passed = "good"
+        stage("bisect " + commitId.substring(0,7)) {
+            job = buildJobWrapper(commitId)
+            if (isPerf) {
+                if (job.buildResult == "SUCCESS") {
+                    println "Current commit Id is " + commitId + " and value is " + job.perfResult + " GB/s"
+                    passed = checkVariation(job.perfResult)
+                } else {
+                    println "Current commit Id is " + commitId + ". Commit failed and we skip it."
+                    passed = "skip"
+                }
             } else {
-                passed = "bad"
+                if (job.buildResult == 'SUCCESS') {
+                    passed = 'good'
+                } else if (job.buildResult == 'FAILURE') {
+                    passed = 'bad'
+                }
             }
-            println("Commit " + commitId + " is " + passed)
         }
         commitId = getCommit(passed)
         if (commitId == "") {
@@ -213,3 +287,39 @@ def bisect () {
         }
     }
 }
+
+def buildJobWrapper(String commit) {
+    if (!commit) {
+        println("Commit " + commit + " is not valid.")
+        sh(script: "exit 1")
+    }
+    def buildResult = build job: pipelineName, parameters: [string(name: 'KERNEL_GIT_URL', value: kernelTree),
+                                                            string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
+                                                            string(name: 'KERNEL_GIT_COMMIT_ID', value: commit),
+                                                            string(name: 'DISTRO_VERSION', value: DISTRO),
+                                                            string(name: 'PERF__TEST', value: PERF_TEST),
+                                                            string(name: 'PERF_IPV', value: PERF_IPV),
+                                                            string(name: 'PERF__K', value: PERF_K),
+                                                            string(name: 'PERF_TEST_THREADS_TCP', value: PERF_TEST_THREADS_TCP),
+                                                            string(name: 'PERF_TEST_THREADS_UDP', value: PERF_TEST_THREADS_UDP),
+                                                            string(name: 'PERF_IO_SIZE', value: PERF_IO_SIZE),
+                                                            string(name: 'PERF_Q_DEPTH', value: PERF_Q_DEPTH),
+                                                            string(name: 'PERF_IO_MODE', value: PERF_IO_MODE),
+                                                            string(name: 'ENABLED_STAGES', value: ENABLED_STAGES)],
+                                                            propagate: false,
+                                                            wait: true
+    if (isPerf) {
+        try {
+            copyArtifacts(projectName: "$pipelineName", selector: specific("$buildResult.number"), target: 'result', filter: 'perf_result', optional: true)
+            perfResultS = readFile('result/perf_result')
+            sh 'rm -rf result'
+            perfResultF = Float.parseFloat(perfResultS)
+        } catch (Exception e) {
+            println "Current build for commit " + commit + " failed with exception " + e
+        }
+        return ["buildResult": buildResult.result ,"perfResult": perfResultF]
+    } else {
+        return ["buildResult": buildResult.result]
+    }
+}
+     currentBuild.displayName
