@@ -5,7 +5,8 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
-withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: 'LIS_ARCHIVE_LINK')]) {
+withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
+                                  variable: 'LIS_ARCHIVE_LINK')]) {
     properties ([
         [$class: 'ParametersDefinitionProperty',
             parameterDefinitions: [
@@ -21,15 +22,16 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: '
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
         withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'), 
-                                   string(credentialsId: 'REMOTE_HTML_LOCATION', variable: 'REMOTE_HTML_LOCATION')]) {
+                                   string(credentialsId: 'REMOTE_HTML_LOCATION',
+                                          variable: 'REMOTE_HTML_LOCATION')]) {
             dir ("check_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) { 
                 checkout scm
-                echo 'Cheking if there is a new kernel version'
+                echo 'Checking if there is a new kernel version'
                 PowerShellWrapper('''
-                    & ".\\scripts\\rhel_validation\\take_kernel_version.ps1"
+                    & ".\\scripts\\rhel_validation\\get_kernel_version.ps1"
                         -WorkDir '.\\temp'
                         -UtilsDir "${env:UTILS_DIR}"
-                        -LatestVersionsFile ".\\latest_tested_versions.txt"
+                        -LatestVersionsFile "${env:UTILS_DIR}\\latest_tested_versions.txt"
                         -RemoteHtmlLocation "${env:REMOTE_HTML_LOCATION}"
                         -OutputFile "kernel_versions.txt"
                 ''') // LatestVersionsFile changed
@@ -41,13 +43,19 @@ stage ("Check for kernel") {
 }
 
 stage ("Test kernel") {
-    node ("jenkins-meta-slave"){
+    node ("jenkins-meta-slave") {
         def runNumber = 1
         def runs = [:]
         dir ("rhel_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) {
             unstash 'kernel_versions'
         }
-        kernelVersions = readFile("./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt")
+        versionsPath = "./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt"
+        kernelVersions = readFile(versionsPath)
+        if (!kernelVersions) {
+            echo "No new kernel versions were found"
+            currentBuild.result = 'SUCCESS'
+            return
+        }
         kernelVersions = kernelVersions.replaceAll("[^A-Za-z0-9.=_;\\-]", "").split(";")
         kernelVersions.each() {
             def distro = it.split("=")[0]
@@ -55,7 +63,8 @@ stage ("Test kernel") {
             runs["${distro}-${version}"] = {
                 stage ("${distro}-${version}") {
                 withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',
-                                                            passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')]) {
+                                                            passwordVariable: 'PASSWORD',
+                                                            usernameVariable: 'USERNAME')]) {
                     dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                         def vmNumber = runNumber
                         runNumber = runNumber + 1
@@ -75,7 +84,8 @@ stage ("Test kernel") {
                         archiveArtifacts artifacts: "${distro}/lis_check.log"
                         if (exitCode == 0) {
                             sh (returnStatus: true, script: """
-                                bash scripts/azure_kernel_validation/remove_azure_vm_resources.sh "rpm-lis${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}"
+                                bash scripts/azure_kernel_validation/remove_azure_vm_resources.sh \
+                                    "rpm-lis${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}"
                             """)
                         } else {
                             currentBuild.result = 'FAILURE'

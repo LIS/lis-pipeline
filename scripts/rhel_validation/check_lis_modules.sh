@@ -2,7 +2,8 @@
 
 
 main() {
-    LIS_MODULES=(hv_vmbus hv_balloon hyperv_keyboard hv_netvsc hid_hyperv hv_utils hyperv_fb hv_storvsc pci_hyperv)
+    LIS_MODULES=(hv_vmbus hv_balloon hyperv_keyboard hv_netvsc hid_hyperv \
+                 hv_utils hyperv_fb hv_storvsc pci_hyperv)
     UNSET_MOD=()
     MISSING_MOD=()
     printf "Loaded LIS Modules after reboot:\n"

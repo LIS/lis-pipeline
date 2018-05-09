@@ -21,7 +21,8 @@ run_remote_az_commands() {
     IFS=';'; COMMANDS=($COMMANDS); unset IFS;
     for comm in "${COMMANDS[@]}"; do
         trimmed_com="$(echo $comm | xargs)"
-        output="$(az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME --command-id RunShellScript --scripts "$trimmed_com" 2>&1)"
+        output="$(az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME \
+                      --command-id RunShellScript --scripts "$trimmed_com" 2>&1)"
         COMM_STATUS=$?
         if [ $COMM_STATUS -ne 0 ];then
             printf "$output"
@@ -114,7 +115,8 @@ main() {
     
     az vm run-command invoke -g "$RESOURCE_GROUP" -n "$FULL_VM_NAME" \
         --command-id RunShellScript \
-        --scripts "sudo subscription-manager register --force --username ${USERNAME} --password ${PASSWORD}"
+        --scripts "sudo subscription-manager register --force \
+                    --username ${USERNAME} --password ${PASSWORD}"
     
     # Install the desired kernel version
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
