@@ -190,8 +190,8 @@ def validateCommit (String commit, String expectedState) {
     job = buildJobWrapper(commit)
     if (isPerf) {
         res = checkVariation(job.perfResult)
-        if (res == "good" && expectedState == "FAILURE" ||
-            res == "bad" && expectedState == "FAILURE") {
+        if (res == "good" || job.buildResult == "FAILURE") {
+            println "Commit was not validated. Build result was " + job.buildResult + " and perf result was " + job.perfResult + " GB/s" 
             currentBuild.result = 'FAILURE'
             sh(script: "exit 1")
         }
@@ -296,7 +296,7 @@ def buildJobWrapper(String commit) {
                                                             string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
                                                             string(name: 'KERNEL_GIT_COMMIT_ID', value: commit),
                                                             string(name: 'DISTRO_VERSION', value: DISTRO),
-                                                            string(name: 'PERF__TEST', value: PERF_TEST),
+                                                            string(name: 'PERF_TEST', value: PERF_TEST),
                                                             string(name: 'PERF_IPV', value: PERF_IPV),
                                                             string(name: 'PERF__K', value: PERF_K),
                                                             string(name: 'PERF_TEST_THREADS_TCP', value: PERF_TEST_THREADS_TCP),
