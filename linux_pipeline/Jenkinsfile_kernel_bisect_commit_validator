@@ -21,7 +21,7 @@ properties ([
             defaultValue: 'HEAD',
             description: 'Kernel repo commit id'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Ubuntu\nCentOS',
+            choices: 'Ubuntu_16.04.3\nCentOS_7.4',
             name: 'DISTRO_VERSION',
             description: 'Distro version'],
         [$class: 'ChoiceParameterDefinition',
@@ -81,8 +81,12 @@ isBootTest = ENABLED_STAGES.contains('boot')
 perfServer = GetPerfServer(PERF_TEST)
 perfTestType = GetPerfTestType(PERF_TEST)
 
+osDistro = DISTRO_VERSION.split('_')[0]
+osVersion = DISTRO_VERSION.split('_')[1]
+
+
 // this is the main logic
-build_kernel(DISTRO_VERSION)
+build_kernel(osDistro)
 
 if (isBootTest) {
     node ('meta_slave') {
@@ -173,8 +177,15 @@ def build_kernel(String distro) {
                         echo $BUILD_NUMBER-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
                        '''
             currentBuild.displayName = readFile "./build_name"
-            stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/**"),
-                        name: "kernel_artifacts"
+            if (distro == "Ubuntu") {
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*image*"),
+                            name: "kernel_artifacts"
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*daemons*"),
+                            name: "daemons"
+            } else if (distro == "CentOS") {
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*kernel*"),
+                            name: "kernel_artifacts"
+            }
             stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
             sh """
                     set -xe
@@ -252,6 +263,7 @@ def boot_test() {
 
 def perf() {
     PERF_OPTIONS = getPerfOptions(PERF_TEST)
+    (node, pkg) = getDistro(osDistro)
     XML = perfXml[PERF_TEST]
     stage('validation_perf_hyperv') {
         checkout scm
@@ -261,17 +273,20 @@ def perf() {
                                           variable: 'LISA_TEST_DEPENDENCIES')]) {
             println 'Running LISA...'
             unstash 'kernel_artifacts'
+            if (osDistro == "Ubuntu") {
+                unstash 'daemons'
+            }
             try {
                 PowerShellWrapper("""
                     & .\\scripts\\lis_hyperv_platform\\main_perf.ps1
                         -JobId $BUILD_NAME$BUILD_NUMBER$BRANCH_NAME
                         -InstanceName $BUILD_NAME$BUILD_NUMBER$BRANCH_NAME
-                        -VHDType $DISTRO_VERSION -WorkingDirectory C:\\workspace
-                        -OSVersion 7.4
+                        -VHDType $osDistro -WorkingDirectory C:\\workspace
+                        -OSVersion $osVersion
                         -LISAImagesShareUrl $LISA_IMAGES_SHARE_URL
                         -XmlTest $XML
                         -LisaTestDependencies $LISA_TEST_DEPENDENCIES
-                        -LocalKernelFolder "scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/rpm"
+                        -LocalKernelFolder "scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg"
                         -LisaPerfOptions '${PERF_OPTIONS}'
                     """)
                 println 'Finished running LISA.'

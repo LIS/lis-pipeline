@@ -34,7 +34,7 @@ properties ([
             defaultValue: 'HEAD',
             description: 'Bad commit (can be HEAD)'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Ubuntu\nCentOS',
+            choices: 'Ubuntu_16.04.3\nCentOS_7.4',
             name: 'DISTRO',
             description: 'Distro version to be tested'],
         [$class: 'ChoiceParameterDefinition',

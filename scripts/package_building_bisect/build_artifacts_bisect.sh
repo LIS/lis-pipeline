@@ -179,6 +179,84 @@ EOF
     popd
 }
 
+function prepare_daemons_debian (){
+    local base_dir="$1"; shift
+    local repository="$1"; shift
+    local dep_path="$1"; shift
+    local debian_version="$1"; shift
+    local package_prefix="$1"
+
+    build_folder="hyperv-daemons"
+    if [[ "$package_prefix" != "" ]];then
+        build_folder="${package_prefix}-${build_folder}"
+    fi
+    pushd "$repository"
+    kernel_version="$(make kernelversion)"
+    if [[ ! -d "tools/hv" ]];then
+        printf "Linux source folder expected"
+        exit 3
+    else
+        if [[ "$package_prefix" != "" ]];then
+            mv "${base_dir}/daemons/hyperv-daemons" "${base_dir}/daemons/$build_folder"
+        fi
+        cp ./tools/hv/* "${base_dir}/daemons/$build_folder"
+        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
+    fi
+    popd
+    pushd "${base_dir}/daemons/$build_folder"
+    dch --create --distribution unstable --package "$build_folder" \
+        --newversion "$kernel_version" "jenkins"
+    for i in *.sh;do
+        cp "$i" "${i%.*}"
+    done
+    if [ "$debian_version" -ge 15 ];then
+        cp "${dep_path}/16/"* "./debian"
+    else
+        cp "${dep_path}/14/"* "./debian"
+    fi
+    sed -i -e "s/Standards-Version:.*/Standards-Version: $kernel_version/g" "./debian/control"
+    sed -i -e "s/Package:.*/Package: $build_folder/g" "./debian/control"
+    sed -i -e "s/Source:.*/Source: $build_folder/g" "./debian/control"
+    popd
+}
+
+function build_daemons_debian () {
+    local base_dir="$1"; shift
+    local repository="$1"; shift
+    local dep_path="$1"; shift
+    local debian_version="$1"; shift
+    local package_prefix="$1"
+
+    local build_state="daemons"
+
+    pushd "$base_dir"
+    if [[ -d "$build_state" ]];then
+        rm -rf "./$build_state"
+    fi
+    mkdir -p "./$build_state/hyperv-daemons/debian"
+    popd
+
+    prepare_daemons_debian "$base_dir" "$repository" "$dep_path" "$debian_version" \
+                           "$package_prefix"
+
+    artifacts_dir="${base_dir}/${build_state}/"
+    if [[ -d "$artifacts_dir" ]];then
+        rm -f $artifacts_dir/*.deb
+    else
+        exit 1
+    fi
+    if [[ "$build_state" == "daemons" ]];then
+        build_dir="hyperv-daemons"
+        if [[ "$PACKAGE_PREFIX" != "" ]];then
+            build_dir="${PACKAGE_PREFIX}-${build_dir}"
+        fi
+        pushd "${base_dir}/daemons/${build_dir}"
+        echo "y" | debuild -us -uc
+        popd
+    fi
+    copy_artifacts "$artifacts_dir" "$destination_path"
+}
+
 function build_debian () {
     #
     # Building the kernel or daemons for deb based OSs
@@ -407,11 +485,15 @@ function main () {
     repository=$(get_source "$BASE_DIR" "$SOURCE_PATH")
 
     get_sources_git "$BASE_DIR" "$SOURCE_PATH" "$GIT_BRANCH" "$GIT_COMMIT_ID" "$repository"
-    destination_path="$(get_destination_path "$repository" "$DESTINATION_PATH" "$os_PACKAGE" "${GIT_COMMIT_ID:0:7}" "$BUILD_DATE" "$FOLDER_PREFIX")"
+    destination_path="$(get_destination_path_bisect "$repository" "$DESTINATION_PATH" "$os_PACKAGE" "$BUILD_DATE" "$FOLDER_PREFIX")"
     prepare_kernel_"$os_FAMILY" "$BASE_DIR" "$repository" "$PACKAGE_PREFIX" "$DEP_PATH"
 
     build_"${os_FAMILY}" "$BASE_DIR" "$repository" "$kernel" "$THREAD_NUMBER" "$destination_path" \
-        "$BUILD_DATE" "$KERNEL_VERSION"
+        "$BUILD_DATE"
+
+    if [[ "$os_FAMILY" == "debian" ]]; then
+        build_daemons_$os_FAMILY "$BASE_DIR" "$repository" "$DEP_PATH" "$DEBIAN_OS_VERSION" "$PACKAGE_PREFIX"
+    fi
 
     set_ini "$KERNEL_VERSION_FILE" "$repository" "$destination_path" "$FOLDER_PREFIX" "$os_PACKAGE"
 }
