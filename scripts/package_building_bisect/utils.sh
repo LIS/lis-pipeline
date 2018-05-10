@@ -1,3 +1,7 @@
+#!/bin/bash
+
+source ../package_building/utils.sh
+
 function install_deps_rhel {
     #
     # Installing packages required for the build process.
@@ -35,4 +39,23 @@ function get_job_number (){
     cores="$(cat /proc/cpuinfo | grep -c processor)"
     result="$(($cores * $multi))"
     echo ${result%.*}
+}
+
+get_destination_path_bisect () {
+    source_path="$1"
+    base_dest_path="$2"
+    os_package="$3"
+    build_date="$4"
+    folder_prefix="$5"
+
+    pushd "$source_path"
+    kernel_version="$(make kernelversion)"
+    kernel_version="${kernel_version%-*}"
+    full_git_tag=$(git rev-parse HEAD)
+    git_tag=${full_git_tag:0:7}
+    popd
+    destination_path="$base_dest_path/${folder_prefix}-${kernel_version}-${git_tag}-${build_date}"
+    destination_path="$(check_destination_dir $destination_path $os_package)"
+
+    echo "$destination_path"
 }
