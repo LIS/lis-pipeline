@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     if params.metadata:
         metadata = get_metadata_from_ini(params.metadata)
-        meta_table = HtmlTable(cellspacing="0", style="padding: 30px")
+        meta_table = HtmlTable(cellspacing="0")
         for key in metadata:
             cell_style = "border: 1px solid"
             new_row = meta_table.add_row()
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         new_section = HtmlTag("div", style="padding: 5px")
         tables = structure.sections[section]
         for table in tables.keys():
-            table_style = 'display: inline-table; padding: 20px'
+            table_style = 'display: inline-table'
             new_table = ComparisonTable(tables[table], cellspacing="0",
                                         style=table_style)
             new_table.add_sub_keys(structure.comp_keys, sub_keys)
