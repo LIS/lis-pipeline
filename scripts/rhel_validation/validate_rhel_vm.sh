@@ -95,10 +95,9 @@ main() {
     
     AZUREDIR="$WORKSPACE/$WORK_DIR/scripts/azure_kernel_validation"
     
-    if [[ -d "$LOG_DEST" ]];then
-        rm -rf "$LOG_DEST"
+    if [[ ! -d "$LOG_DEST" ]];then
+        mkdir "$LOG_DEST"
     fi
-    mkdir "$LOG_DEST"
     
     pushd "$AZUREDIR"
     IFS='_'; OS_TYPE=($OS_TYPE); unset IFS;
@@ -142,13 +141,15 @@ main() {
     # Install LIS
     echo "LIS Install Log:" > "${LOG_DEST}/lis_install.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        "cd ~/hv && bash ./*hv-driver-install;" >> "${LOG_DEST}/lis_install.log"
+        "cd ~/hv && bash ./*hv-driver-install;" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
           
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
     
     pushd $BASEDIR
-    run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        "@check_lis_modules.sh" > "${LOG_DEST}/lis_check.log"
+    echo "LIS modules check for ${OS_TYPE}_${OS_VERSION} with kernel ${KERNEL_VERSION}:" \
+        > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
+    run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
+        "@check_lis_modules.sh" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
     popd
 }
 
