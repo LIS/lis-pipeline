@@ -20,6 +20,9 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
     ])
 }
 
+def sendMail = true
+def stashList = []
+
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
         withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'), 
@@ -38,6 +41,7 @@ stage ("Check for kernel") {
                 ''') // LatestVersionsFile changed
                 stash includes: 'kernel_versions.txt', name: 'kernel_versions'
                 echo 'Kernel versions checked'
+                deleteDir()
             }
         } 
     }
@@ -53,6 +57,7 @@ stage ("Test kernel") {
         versionsPath = "./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt"
         kernelVersions = readFile(versionsPath)
         if (!kernelVersions) {
+            sendMail = false
             echo "No new kernel versions were found"
             currentBuild.result = 'SUCCESS'
             return
@@ -77,12 +82,14 @@ stage ("Test kernel") {
                                 --build_name "rpm-lis" --build_number "${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}" \
                                 --os_type "${distro}" --kernel_version "${version}" \
                                 --lis_link "${LIS_LINK}" \
-                                --log_destination "${distro}" \
+                                --log_destination "." \
                                 --rhel_username '${USERNAME}' \
                                 --rhel_password '${PASSWORD}'
                         """)
-                        archiveArtifacts artifacts: "${distro}/lis_install.log"
-                        archiveArtifacts artifacts: "${distro}/lis_check.log"
+                        archiveArtifacts artifacts: "${distro}_lis_install.log"
+                        archiveArtifacts artifacts: "${distro}_lis_check.log"
+                        stashList << distro
+                        stash includes: '*.log', name: distro
                         if (exitCode == 0) {
                             sh (returnStatus: true, script: """
                                 bash scripts/azure_kernel_validation/remove_azure_vm_resources.sh \
@@ -98,5 +105,32 @@ stage ("Test kernel") {
             }
         }
         parallel runs
+    }
+}
+
+stage ("Send Email Report"){
+    node ("jenkins-meta-slave") {
+        if (!sendMail) {
+            return
+        }
+        withCredentials(bindings: [string(credentialsId: 'REDHAT_VAL_MAIL_LIST', variable: 'REDHAT_VAL_MAIL_LIST')]) {
+            dir ("mail-send-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                def body = "<pre>"
+                stashList.each() {
+                    unstash it
+                    body += readFile("${it}_lis_check.log")
+                    body += "\n"
+                }
+                body += "</pre>"
+                emailext (
+                    subject: "Redhat LIS validation report",
+                    to: "${env.REDHAT_VAL_MAIL_LIST}",
+                    mimeType : "text/html",
+                    attachmentsPattern: "*_lis_*.log",
+                    body: body
+                )
+                deleteDir()
+            }
+        }
     }
 }
