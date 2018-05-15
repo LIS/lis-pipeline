@@ -47,7 +47,8 @@ param (
 
 # generate hash table with list of kernels for each version of rhel
 $RHEL_VERSIONS_TO_KERNEL_MAP = @{"rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
-                                 "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()}}
+                                 "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()};
+                                 "rhel_7.5" = @{"baseVer" = "3.10.0-862"; "newVer" = @()}}
 
 function Get-StoredVersions {
     param (
