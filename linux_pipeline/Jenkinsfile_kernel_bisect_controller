@@ -250,8 +250,8 @@ def bisect () {
                    set -xe
                    pushd "$buildDir/$cloneDir" 2>&1 > /dev/null
                    output=$(git bisect start $BAD_COMMIT "$GOOD_COMMIT")
-                   output=${output##*[}
                    output=${output%%]*}
+                   output=${output##*[}
                    echo $output
                    popd 2>&1 > /dev/null
                 ''',
