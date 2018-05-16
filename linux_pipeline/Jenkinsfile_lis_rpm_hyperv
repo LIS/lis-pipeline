@@ -162,26 +162,15 @@ stage ("Deploy stage") {
     }
 }
 
-node("hyper-v") {
+node("jenkins-meta-slave") {
     stage('Local Hyper-V performance') {
-            withCredentials(bindings:[ string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_JOB',
-                                       variable: 'LOCAL_JENKINS_LIS_PERF_JOB'),
-                                       string(credentialsId: 'LOCAL_JENKINS_LIS_PERF_TOKEN',
-                                       variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
+            withCredentials(bindings:[ string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS')]) {
                 if(env.ENABLED_STAGES.contains("perf")) {
-                    dir ("p${BUILD_NUMBER}") {
-                        checkout scm
-                        PowerShellWrapper("""
-                            & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
-                                -LocalJenkinsPerfURL '${LOCAL_JENKINS_LIS_PERF_JOB}'
-                                -LocalJenkinsPerfToken '${LOCAL_JENKINS_PERF_TOKEN}'
-                                -FullPerfRun "\${env:FULL_PERF_RUN}"
-                                -LisUrl "\${env:LIS_ARCHIVE_LINK}"
-                                -AzureToken "\${env:AZURE_SAS}"
-                        """)
-                        echo "Triggered LIS Local Hyper-V Performance tests."
-                    }
+                    build job: "performance-jobs/Pipeline_Performance_LIS", parameters: [
+                        string(name: 'LIS_URL', value: "${env:LIS_ARCHIVE_LINK}"),
+                        string(name: 'AZURE_TOKEN', value: "${env:AZURE_SAS}"),
+                        string(name: 'FULL_PERF_RUN', value: "${env:FULL_PERF_RUN}"),], wait: false;
+                    echo "Triggered LIS Local Hyper-V Performance tests."
                 }
             }
         }
