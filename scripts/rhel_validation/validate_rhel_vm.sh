@@ -89,10 +89,13 @@ main() {
             --log_destination)
                 LOG_DEST="$(readlink -f "$2")"
                 shift 2;;
+            --sku)
+                AZURE_SKU="$2"
+                shift 2;;
             *) break ;;
         esac
     done
-    
+
     AZUREDIR="$WORKSPACE/$WORK_DIR/scripts/azure_kernel_validation"
     
     if [[ ! -d "$LOG_DEST" ]];then
@@ -103,10 +106,13 @@ main() {
     IFS='_'; OS_TYPE=($OS_TYPE); unset IFS;
     OS_VERSION="${OS_TYPE[1]}"
     OS_TYPE="${OS_TYPE[0]}"
+    if [[ "$AZURE_SKU" == "" ]];then
+        AZURE_SKU="$OS_VERSION"
+    fi
     # Create azure vm
     FULL_BUILD_NAME="$BUILD_NAME$BUILD_NUMBER"
     bash create_azure_vm.sh --build_number "$FULL_BUILD_NAME" \
-        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE --os_version $OS_VERSION \
+        --resource_group $RESOURCE_GROUP --os_type $OS_TYPE --os_version $AZURE_SKU \
         --resource_location $RESOURCE_LOCATION --flavor $FLAVOR
         
     FULL_VM_NAME="${FULL_BUILD_NAME}-Kernel-Validation"

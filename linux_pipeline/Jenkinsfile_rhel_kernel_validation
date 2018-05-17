@@ -22,6 +22,7 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
 
 def sendMail = true
 def stashList = []
+def azureSku = ["rhel_7.3": "7.3", "rhel_7.4": "7.4", "rhel_7.5": "7-RAW"]
 
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
@@ -84,7 +85,8 @@ stage ("Test kernel") {
                                 --lis_link "${LIS_LINK}" \
                                 --log_destination "." \
                                 --rhel_username '${USERNAME}' \
-                                --rhel_password '${PASSWORD}'
+                                --rhel_password '${PASSWORD}' \
+                                --sku "${azureSku[distro]}"
                         """)
                         archiveArtifacts artifacts: "${distro}_lis_install.log"
                         archiveArtifacts artifacts: "${distro}_lis_check.log"
