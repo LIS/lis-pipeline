@@ -225,6 +225,33 @@ node ("meta_slave") {
             sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
 
             archiveArtifacts 'results.html'
+            stash includes: 'results.html', name: 'report_results'
+        }
+    }
+
+    stage ("Send Report"){
+        node ("jenkins-meta-slave") {
+            dir ("mail-send-comp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                unstash 'report_results'
+                mailBody = "Hello,</br></br>\nDeveloper Patch Validation Pipeline #${env.BUILD_NUMBER} is completed.</br>\n"
+                if (env.KERNEL_PATCH != '') {
+                    mailBody += "The following patches were applied:</br>\n"
+                    patches = env.KERNEL_PATCH.split(" ")
+                    patches.each(){
+                        mailBody += it + "</br>\n"
+                    }
+                }
+                mailBody += "</br>Testing results:</br></br>\n"
+                mailBody += readFile("results.html")
+                mailBody += "\n</br></br>Thank You,</br>Jenkins CI</br>\n"
+                emailext (
+                    subject: "Developer patch validation report for run:${env.BUILD_NUMBER}.",
+                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                    mimeType : "text/html",
+                    body: mailBody
+                )
+                deleteDir()
+            }
         }
     }
 }

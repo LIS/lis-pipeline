@@ -78,7 +78,7 @@ class HtmlFile(HtmlTag):
         super().__init__("div")
 
     def add_section(self, **sec):
-        section_title = HtmlTag("b")
+        section_title = HtmlTag("p", style="padding: 30px;font-weight: bold")
         section_title.add_inner_text(sec['title'])
         self.add_inner_tag(section_title)
         self.add_inner_tag(sec['section'])
