@@ -642,26 +642,21 @@ pipeline {
           }
           agent {
             node {
-              label 'hyper-v'
+              label 'jenkins-meta-slave'
             }
           }
           steps {
-            withCredentials(bindings:[ string(credentialsId: 'LOCAL_JENKINS_PERF_JOB',
-                                              variable: 'LOCAL_JENKINS_PERF_JOB'),
-                                       string(credentialsId: 'LOCAL_JENKINS_PERF_TOKEN',
-                                              variable: 'LOCAL_JENKINS_PERF_TOKEN')]) {
               dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
                 unstash 'kernel_version_ini'
-                PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
               }
-              PowerShellWrapper('''
-                    & ".\\scripts\\lis_hyperv_platform\\trigger_perf_tests.ps1"
-                        -KernelVersionPath "${env:WORKSPACE}\\kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
-                        -LocalJenkinsPerfURL "${env:LOCAL_JENKINS_PERF_JOB}"
-                        -LocalJenkinsPerfToken "${env:LOCAL_JENKINS_PERF_TOKEN}"
-              ''')
+              script {
+                    iniPath = "${env:WORKSPACE}/kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}/scripts/package_building/kernel_versions.ini"
+                    kernelPath = sh (script: "crudini --get ${iniPath} KERNEL_BUILT folder", returnStdout: true)
+                    build job: "performance-jobs/Pipeline_Performance", parameters: [
+                        string(name: 'KERNEL', value: "${kernelPath}")], wait: false;
+              }
               echo "Triggered Local Hyper-V Performance tests."
-            }
+            
           }
         }
       }
