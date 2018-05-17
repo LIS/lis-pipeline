@@ -25,48 +25,59 @@ properties ([
             name: 'DISTRO_VERSION',
             description: 'Distro version'],
         [$class: 'ChoiceParameterDefinition',
+            choices: 'Boot\nFunctional\nPerformance',
+            name: 'BISECT_TYPE',
+            description: 'Type of bisect that will be performed.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'KVP\nCore\nFCOPY\nNET\nNET6\nProd_Checkpoint\nSTOR_VHDX\nVHDX_RESIZE\nLIVE_MIGR16\nLIVE_MIGR12R2',
+            name: 'FUNC_TEST_SUITE',
+            description: '[FUNC] The test suite which you want to run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNC_XML_PATH',
+            defaultValue: '',
+            description: '[FUNC] An absolute path to LISA custom xml test. This path must a valid SMB share path, accessible by any test node.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: '1\n5\n10\n15\n20',
+            name: 'PERF_VARIATION',
+            description: '[PERF] If above this performance variation, the commit is bad'],
+        [$class: 'ChoiceParameterDefinition',
             choices: 'TCP\nUDP\nFIO',
             name: 'PERF_TEST',
-            description: 'Which perf test to run'],
+            description: '[PERF] Which perf test to run'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'v4\nv6',
             name: 'PERF_IPV',
-            description: '[TCP] [UDP] IP version to use if the net perf test is enabled'],
+            description: '[PERF] [TCP] [UDP] IP version to use.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1k\n8k',
             name: 'PERF_K',
-            description: '[UDP] K to be used.'],
+            description: '[PERF] [UDP] Buffer size to be used.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240',
             name: 'PERF_TEST_THREADS_TCP',
-            description: '[TCP] TEST_THREADS'],
+            description: '[PERF] [TCP] TEST_THREADS.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
             name: 'PERF_TEST_THREADS_UDP',
-            description: '[UDP] TEST_THREADS'],
+            description: '[PERF] [UDP] TEST_THREADS.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n1024',
+            choices: '4\n1024',
             name: 'PERF_IO_SIZE',
-            description: '[FIO] IO_SIZE'],
+            description: '[PERF] [FIO] IO_SIZE.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
             name: 'PERF_Q_DEPTH',
-            description: '[FIO] Queue depth.'],
+            description: '[PERF] [FIO] Queue depth.'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'read\nrandread\nwrite\nrandwrite',
             name: 'PERF_IO_MODE',
-            description: '[FIO] IO_MODE'],
-        [$class: 'StringParameterDefinition',
-            name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, boot_test, perf_hyperv',
-            description: 'What stages to run. By default all stages are enabled']
+            description: '[PERF] [FIO] IO_MODE']
         ]
     ]
 ])
 
 perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
 
-env.UBUNTU_VERSION = '16'
 env.BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
 env.KERNEL_ARTIFACTS_PATH = 'bisect-kernel-artifacts'
 env.KERNEL_CONFIG = 'Microsoft/config-azure'
@@ -76,13 +87,15 @@ env.USE_KERNEL_FOLDER_PREFIX = 'True'
 env.THREAD_NUMBER = 'x3'
 env.AZURE_MAX_RETRIES = '10'
 
-isPerf = ENABLED_STAGES.contains('perf')
-isBootTest = ENABLED_STAGES.contains('boot')
+isPerf = BISECT_TYPE.equals('Performance')
+isBootTest = BISECT_TYPE.equals('Boot')
+isFunc = BISECT_TYPE.equals('Functional')
+
 perfServer = GetPerfServer(PERF_TEST)
 perfTestType = GetPerfTestType(PERF_TEST)
 
-osDistro = DISTRO_VERSION.split('_')[0]
-osVersion = DISTRO_VERSION.split('_')[1]
+env.osDistro = DISTRO_VERSION.split('_')[0]
+env.osVersion = DISTRO_VERSION.split('_')[1]
 
 
 // this is the main logic
@@ -101,6 +114,10 @@ if (isPerf) {
     node ('meta_slave') {
         parse_perf_data()
     }
+}
+
+if (isFunc) {
+    func()
 }
 
 def GetPerfServer(xmlName) {
@@ -276,6 +293,7 @@ def perf() {
             if (osDistro == "Ubuntu") {
                 unstash 'daemons'
             }
+            println "$LISA_TEST_DEPENDENCIES"
             try {
                 PowerShellWrapper("""
                     & .\\scripts\\lis_hyperv_platform\\main_perf.ps1
@@ -300,6 +318,99 @@ def perf() {
                 junit testResultPath + ".xml"
             }
         }
+    }
+}
+
+def func() {
+    (node, pkg) = getDistro(osDistro)
+    env.pkg = pkg
+    if (FUNC_XML_PATH) {
+        env.lisaXml = FUNC_XML_PATH
+    } else {
+        env.lisaXml = getLisaXml(FUNC_TEST_SUITE)
+    }
+    slave = getSlave(FUNC_TEST_SUITE, FUNC_XML_PATH)
+    node(slave) {
+        stage('validation_functional_hyperv') {
+            checkout scm
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'DEVELOPER_AZURE_STORAGE_URL', variable: 'DEVELOPER_AZURE_STORAGE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
+                echo 'Running LISA...'
+                println "LISA test deps are:" + LISA_TEST_DEPENDENCIES
+                unstash 'kernel_artifacts'
+                if (osDistro == "Ubuntu") {
+                    unstash 'daemons'
+                }
+                result = 'SUCCESS'
+                try {
+                    PowerShellWrapper('''
+                        & ".\\scripts\\lis_hyperv_platform\\run_bisect_functional_tests.ps1"
+                             -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-functional"
+                             -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-f"
+                             -VHDType "${env:osDistro}" -WorkingDirectory "C:\\workspace"
+                             -OSVersion "${env:osVersion}"
+                             -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:lisaXml}"
+                             -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                             -LocalKernelFolder "scripts/package_building_bisect/${env:BUILD_NUMBER}-${env:BRANCH_NAME}/**/${env:pkg}"
+                        ''')
+                    echo 'Finished running LISA.'
+                } catch (exc) {
+                    println "LISA failed, will now archive logs and exit."
+                    result = 'FAILURE'
+                } finally {
+                    archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*"
+                    junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*.xml"
+                    currentBuild.result = result
+                }
+            }
+        }
+    }
+}
+
+def getSlave (testName, customPath) {
+    if (customPath) {
+        testName = customPath
+    }
+    switch (testName) {
+        case "LIVE_MIGR16":
+            return "lis-f2324"
+        case "LIVE_MIGR12R2":
+            return "lis-f1927"
+        case testName.contains("Intel"):
+            return "lis-f2322"
+        case testName.contains("Mellanox"):
+            return "lis-f2324"
+        default:
+            return "hyper-v"
+    }
+}
+
+def getLisaXml (testName) {
+    switch (testName) {
+        case "KVP":
+            return "KvpTests.xml"
+        case "Core":
+            return "CoreTests.xml"
+        case "FCOPY":
+            return "FCOPY_Tests.xml"
+        case "NET":
+            return "NET_Tests.xml"
+        case "NET6":
+            return "NET_Tests_IPv6.xml"
+        case "Prod_Checkpoint":
+            return "Production_Checkpoint.xml"
+        case "STOR_VHDX":
+            return "STOR_VHDX.xml"
+        case "VHDX_RESIZE":
+            return "STOR_VHDXResize.xml"
+        case "LIVE_MIGR16":
+            return "NET_LIVEMIG.xml"
+        case "LIVE_MIGR12R2":
+            return "NET_LIVEMIG.xml"
+        default:
+            currentBuild.result = 'FAILURE'
     }
 }
 

@@ -69,6 +69,98 @@ class XMLParser {
 
     }
 
+    [void] InsertInstallKernel () {
+        $testSuite = "<suiteTest>Install_MSFT_Kernel</suiteTest>"
+        $test = "<test>" +
+                "<testName>Install_MSFT_kernel</testName>" +
+                "<testScript>SetupScripts\install_kernel_rpm.ps1</testScript>" +
+                "<files>remote-scripts/ica/utils.sh</files>" +
+                "<timeout>2500</timeout>" +
+                "<OnError>Abort</OnError>" +
+                "<noReboot>False</noReboot>" +
+                "</test>"
+        $origInnerXML = $this.XML.config.testSuites.suite.suiteTests.InnerXml
+        $newInnerXML = "$testSuite$origInnerXML"
+        $this.XML.config.testSuites.suite.suiteTests.InnerXml = $newInnerXML
+
+        $origInnerXML = $this.XML.config.testCases.InnerXml
+        $newInnerXML = "$test$origInnerXML"
+        $this.XML.config.testCases.InnerXml = $newInnerXML
+    }
+
+    [void] InsertCheckpoint () {
+        $testSuite = "<suiteTest>MainVM_Checkpoint</suiteTest><suiteTest>DependencyVM_Checkpoint</suiteTest>"
+        $test = """
+    <test>
+        <testName>MainVM_Checkpoint</testName>
+        <testScript>setupscripts\PreVSS_TakeSnapshot.ps1</testScript>
+        <timeout>600</timeout>
+        <testParams>
+            <param>TC_COVERED=snapshot</param>
+            <param>snapshotVm=main</param>
+            <param>snapshotName=ICABase</param>
+        </testParams>
+        <onError>Abort</onError>
+        <noReboot>False</noReboot>
+    </test>
+    <test>
+        <testName>DependencyVM_Checkpoint</testName>
+        <testScript>setupscripts\PreVSS_TakeSnapshot.ps1</testScript>
+        <timeout>600</timeout>
+        <testParams>
+            <param>TC_COVERED=snapshot</param>
+            <param>snapshotVm=dependency</param>
+            <param>snapshotName=ICABase</param>
+        </testParams>
+        <onError>Continue</onError>
+        <noReboot>False</noReboot>
+    </test>
+"""
+
+        $origInnerXML = $this.XML.config.testSuites.suite.suiteTests.InnerXml
+        $newInnerXML = "$testSuite$origInnerXML"
+        $this.XML.config.testSuites.suite.suiteTests.InnerXml = $newInnerXML
+
+        $origInnerXML = $this.XML.config.testCases.InnerXml
+        $newInnerXML = "$test$origInnerXML"
+        $this.XML.config.testCases.InnerXml = $newInnerXML
+    }
+
+    [void] InsertCreateVM () {
+        $global = "<defaultSnapshot>ICABase</defaultSnapshot>" +
+                  "<LisaInitScript>" +
+                  "<file>.\setupScripts\CreateVMs.ps1</file>" +
+                  "</LisaInitScript>" +
+                  "<imageStoreDir>\\unc\path</imageStoreDir>"
+
+        $origInnerXML = $this.XML.config.global.InnerXml
+        $newInnerXML = "$global$origInnerXML"
+        $this.XML.config.global.InnerXml = $newInnerXML
+    }
+
+    [void] ChangeVM ([String] $VMSuffix) {
+        $index = 0
+        if ($this.XML.config.VMs.vm -is [array]) {
+            foreach ($vmDef in $this.XML.config.VMs.vm) {
+                $this.XML.config.VMS.vm[$index].vmName = $vmDef.vmName + $VMSuffix
+                $testParams = $vmDef.testParams
+                if ($testParams) {
+                    $paramIndex = 0
+                    foreach ($testParam in $testParams.param) {
+                        if ($testParam -like "VM2NAME=*") {
+                            $testParams.ChildNodes.Item($paramIndex)."#text" = `
+                                $testParam + $VMSuffix
+                        }
+                        $paramIndex = $paramIndex + 1
+                    }
+                }
+                $index = $index + 1
+            }
+        } else {
+            $this.XML.config.VMS.vm.vmName = $this.XML.config.VMS.vm.vmName + $VMSuffix
+        }
+    }
+
     [XML] ReturnXML () {
         return $this.XML
     }
