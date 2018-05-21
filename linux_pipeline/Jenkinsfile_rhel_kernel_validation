@@ -71,7 +71,8 @@ stage ("Test kernel") {
                 stage ("${distro}-${version}") {
                 withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',
                                                             passwordVariable: 'PASSWORD',
-                                                            usernameVariable: 'USERNAME')]) {
+                                                            usernameVariable: 'USERNAME'),
+                                           string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS')]) {
                     dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                         def vmNumber = runNumber
                         runNumber = runNumber + 1
@@ -86,7 +87,8 @@ stage ("Test kernel") {
                                 --log_destination "." \
                                 --rhel_username '${USERNAME}' \
                                 --rhel_password '${PASSWORD}' \
-                                --sku "${azureSku[distro]}"
+                                --sku "${azureSku[distro]}" \
+                                --azure_token '${AZURE_SAS}'
                         """)
                         archiveArtifacts artifacts: "${distro}_lis_install.log"
                         archiveArtifacts artifacts: "${distro}_lis_check.log"
