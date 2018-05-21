@@ -92,6 +92,9 @@ main() {
             --sku)
                 AZURE_SKU="$2"
                 shift 2;;
+            --azure_token)
+                AZURE_TOKEN="$2"
+                shift 2;;
             *) break ;;
         esac
     done
@@ -140,7 +143,7 @@ main() {
     # Download LIS
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
         "sudo yum -y install wget gcc;
-         wget ${LIS_LINK} -O ~/lis_package.tar.gz;
+         wget ${LIS_LINK}\'${AZURE_TOKEN}\' -O ~/lis_package.tar.gz;
          tar -xzvf ~/lis_package.tar.gz -C ~/;
          cd ~ && rpm2cpio ./LISISO/${LIS_DISTRO}/*.src.rpm | cpio -idmv && tar -xf lis-next*;"
     
