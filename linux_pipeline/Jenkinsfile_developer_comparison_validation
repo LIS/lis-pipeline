@@ -15,26 +15,30 @@ properties ([
             defaultValue: '',
             name: 'KERNEL_PATCH',
             description: 'Valid examples: \n scp://my-scp-hostname:/home/my-username/patch.p1 \n scp://my-username@my-scp-hostname:/home/my-username/patch.p1 \n http://my-website.com/patch.p1 \n Use the space separator for multiple patches.'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'no\nyes',
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
             name: 'SKIP_UNPATCHED',
             description: 'Skip unpatched kernel validation'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Azure VM boot test', 
+            name: 'AZURE_BOOT'],
         [$class: 'ChoiceParameterDefinition',
-            choices: "kernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
+            choices: "None\nkernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
-            description: 'Which tests should LISA run'],
+            description: 'Hyper-v functional validation type'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'all\nCore (fvt)\nStorage (fvt)\nNetwork_and_Stress (fvt)\nMemory (fvt)',
             name: 'LISA_TEST_SUITE',
-            description: 'LISA test suite'],
+            description: 'Functional test suite'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'SR-IOV_TCP\nSR-IOV_UDP\nFIO_RAID',
+            choices: 'None\nSR-IOV_TCP\nSR-IOV_UDP\nFIO_RAID',
             name: 'LISA_PERF_TEST',
-            description: 'Which perf test to run'],
+            description: 'Hyper-v performance test'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'v4\nv6',
             name: 'PERF_IPV',
-            description: 'IP version to use for networking perf test'],
+            description: 'IP version for network performance test'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
             name: 'PERF_NET_THREADS',
@@ -51,10 +55,6 @@ properties ([
             choices: 'all\nread\nrandread\nwrite\nrandwrite',
             name: 'PERF_IO_MODE',
             description: 'IO_MODE for FIO'],
-        [$class: 'StringParameterDefinition',
-            name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_perf_hyperv',
-            description: 'What stages to run. By default all stages are enabled']
         ]
     ]
 ])
@@ -90,6 +90,21 @@ def getPerfOptions(perf_test) {
     }
 }
 
+def createEnableStages(){
+    env.ENABLED_STAGES = "build_artifacts, publish_temp_artifacts, publish_artifacts, validation, validation_functional, validation_perf,"
+    if (AZURE_BOOT == "true") {
+        env.ENABLED_STAGES += " boot_test,"
+    }
+    if (env.LISA_TEST_XML != "None") {
+        env.ENABLED_STAGES +=  " validation_functional_hyperv,"
+    }
+    if (env.LISA_PERF_TEST != "None") {
+        env.ENABLED_STAGES += " validation_perf_hyperv"
+    }
+}
+
+createEnableStages()
+
 node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
@@ -115,7 +130,7 @@ node ("meta_slave") {
                     string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
                     string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
             }
-            if (env.SKIP_UNPATCHED == 'no') {
+            if (env.SKIP_UNPATCHED == "false") {
                 runs["kernel_unpatched"] = {
                     unpatchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
@@ -135,7 +150,7 @@ node ("meta_slave") {
         dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
-            if (env.SKIP_UNPATCHED == 'no') {
+            if (env.SKIP_UNPATCHED == "false") {
                 copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
                 if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
@@ -198,7 +213,7 @@ node ("meta_slave") {
 
             PARSE_PARAMS = ""
             PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
-            if (env.SKIP_UNPATCHED == 'no') {
+            if (env.SKIP_UNPATCHED == "false") {
                 if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
                     unstash 'patchedReport'
                     unstash 'unpatchedReport'
