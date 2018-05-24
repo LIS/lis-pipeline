@@ -157,7 +157,7 @@ function Main {
     Push-Location $LISARelPath
     Write-Host "Started running LISA"
     try {
-        $lisaParams = ("LIS_URL='{0}';AZURE_TOKEN={1};LIS_URL_PREVIOUS='{2}'" -f @($LisUrl, $AzureToken, $LisOldUrl))
+        $lisaParams = ("LIS_URL='{0}';AZURE_TOKEN='{1}';LIS_URL_PREVIOUS='{2}'" -f @($LisUrl, $AzureToken, $LisOldUrl))
         if ($LisaOptionalParams) {
             $lisaParams += ";${LisaOptionalParams}"
         }

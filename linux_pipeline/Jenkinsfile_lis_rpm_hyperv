@@ -7,7 +7,7 @@ properties ([
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
             name: 'DISTRO_VERSIONS',
-            defaultValue: '',
+            defaultValue: 'centos_all,rhel_all,oracle_all',
             description: 'Distros to be tested (default all)'],
         [$class: 'StringParameterDefinition',
             name: 'LIS_ARCHIVE_LINK',
@@ -110,6 +110,7 @@ stage ("Deploy stage") {
                     node ("${testNode}") {
                         stage ("${it}-${testNode}") {
                             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                        string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LIS_SECRET_PARAMS', variable: 'LIS_SECRET_PARAMS'),
                                         string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION'),
@@ -141,6 +142,7 @@ stage ("Deploy stage") {
                                             -LogsPath "\${env:LISA_LOG_DESTINATION}"
                                             -Delay '${sleepTime}'
                                             -ConfigPath "\${env:DB_CONFIG_DEPLOY}"
+                                            -AzureToken "\${env:AZURE_SAS}"
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
@@ -193,6 +195,7 @@ stage("Validation stage") {
                     node("${testNode}") {
                         stage("${TEST_TYPE}-${it}-${testNode}") {
                             withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                        string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION'),
                                         string(credentialsId: 'DB_CONFIG_VALIDATION', variable: 'DB_CONFIG_VALIDATION')]) { 
@@ -214,6 +217,7 @@ stage("Validation stage") {
                                             -LogsPath "\${env:LISA_LOG_DESTINATION}"
                                             -Delay '${sleepTime}'
                                             -ConfigPath "\${env:DB_CONFIG_VALIDATION}"
+                                            -AzureToken '${env.AZURE_SAS}'
                                         """)
                                     archiveArtifacts '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*'
                                     junit (testResults: '\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml', keepLongStdio: true)
