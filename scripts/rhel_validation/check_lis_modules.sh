@@ -20,14 +20,17 @@ main() {
     done
     printf "\nLoaded LIS modules after modprobe:\n"
     for module in ${UNSET_MOD[@]};do
-        modprobe $module
+        mod_out=$(modprobe $module)
         mod_exit=$?
         lsmod | grep "${module} " > /dev/null
         mod_found=$?
         if [[ $mod_exit -eq 0 ]] && [[ $mod_found -eq 0 ]];then
             mod_ver="$(modinfo $module | grep -w version)"
             mod_ver=${mod_ver#*:}
-            echo "${module}: ${mod_ver}"
+            printf "\n${module}: ${mod_ver}\n"
+            if [[ "$mod_out" != "" ]];then
+                printf "modprobe output:\n${mod_out}\n\n"
+            fi
         else
             MISSING_MOD[${#MISSING_MOD[@]}]="$module"
         fi

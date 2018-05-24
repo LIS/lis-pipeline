@@ -17,12 +17,13 @@ run_remote_az_commands() {
     VM_NAME="$2"
     OUTPUT="$3"
     COMMANDS="$4"
+    PARAMS="$5"
     
     IFS=';'; COMMANDS=($COMMANDS); unset IFS;
     for comm in "${COMMANDS[@]}"; do
-        trimmed_com="$(echo $comm | xargs)"
+        #trimmed_com="$(echo $comm | xargs)"
         output="$(az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME \
-                      --command-id RunShellScript --scripts "$trimmed_com" 2>&1)"
+                      --command-id RunShellScript --scripts "$comm" --parameters "$PARAMS" 2>&1)"
         COMM_STATUS=$?
         if [ $COMM_STATUS -ne 0 ];then
             printf "$output"
@@ -108,6 +109,7 @@ main() {
     pushd "$AZUREDIR"
     IFS='_'; OS_TYPE=($OS_TYPE); unset IFS;
     OS_VERSION="${OS_TYPE[1]}"
+    MAJOR_VERSION="${OS_VERSION%.*}"
     OS_TYPE="${OS_TYPE[0]}"
     if [[ "$AZURE_SKU" == "" ]];then
         AZURE_SKU="$OS_VERSION"
@@ -123,17 +125,23 @@ main() {
     
     az vm run-command invoke -g "$RESOURCE_GROUP" -n "$FULL_VM_NAME" \
         --command-id RunShellScript \
-        --scripts "sudo subscription-manager register --force \
+        --scripts "subscription-manager register --force \
                     --username ${USERNAME} --password ${PASSWORD}"
+    
+    if [[ "$OS_VERSION" == "6.8" ]] || [[ "$OS_VERSION" == "6.9" ]];then
+        KERNEL_REPO="rhel-${MAJOR_VERSION}-server-rpms"
+    else 
+        KERNEL_REPO="rhel-${MAJOR_VERSION}-server-eus-rpms"
+    fi
     
     # Install the desired kernel version
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "subscription-manager attach --auto;
          subscription-manager release --set=${OS_VERSION};
-         subscription-manager repos --enable=rhel-7-server-eus-rpms;
+         subscription-manager repos --enable=rhel-${MAJOR_VERSION}-server-eus-rpms;
          yum clean all;
-         sudo yum -y install kernel-${KERNEL_VERSION};
-         sudo yum -y install kernel-devel-${KERNEL_VERSION};"
+         yum -y install kernel-${KERNEL_VERSION};
+         yum -y install kernel-devel-${KERNEL_VERSION};"
     
     # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
@@ -142,16 +150,19 @@ main() {
     
     # Download LIS
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
-        "sudo yum -y install wget gcc;
+        "yum -y install wget gcc;
          wget ${LIS_LINK}\'${AZURE_TOKEN}\' -O ~/lis_package.tar.gz;
-         tar -xzvf ~/lis_package.tar.gz -C ~/;
-         cd ~ && rpm2cpio ./LISISO/${LIS_DISTRO}/*.src.rpm | cpio -idmv && tar -xf lis-next*;"
+         tar -xzvf ~/lis_package.tar.gz -C ~/;"
     
     # Install LIS
-    echo "LIS Install Log:" > "${LOG_DEST}/lis_install.log"
+    echo "KMOD Install Log:" > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        "cd ~/hv && bash ./*hv-driver-install;" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
-          
+        'cd ~/LISISO/${0} && cd ./$(ls -1v | grep update | tail -1) && rpm -ivh kmod*' "${LIS_DISTRO}" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
+    
+    printf "\nLIS Install Log:" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
+    run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
+        "cd ~/LISISO/${0} && cd ./$(ls -1v | grep update | tail -1) && rpm -ivh $(ls microsoft* | grep -vE 'src|debug')" "${LIS_DISTRO}" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
+    
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
     
     pushd $BASEDIR

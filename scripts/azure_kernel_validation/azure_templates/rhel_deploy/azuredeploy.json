@@ -18,7 +18,7 @@
       "type": "string",
       "defaultValue": "7.4",
       "allowedValues": [
-        "7-RAW","7.5", "7.4", "7.3"
+        "7-RAW","7.5", "7.4", "7.3", "6.9", "6.8", "6.7"
       ],
       "metadata": {
         "description": "The RHEL version for the VM. This will pick a fully patched image of this given RHEL version. Allowed values: 7.3, 7.4, 7.5"
