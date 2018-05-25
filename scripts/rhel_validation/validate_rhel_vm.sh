@@ -19,12 +19,17 @@ run_remote_az_commands() {
     COMMANDS="$4"
     PARAMS="$5"
     
+    TIMEOUT=600
+    
     IFS=';'; COMMANDS=($COMMANDS); unset IFS;
     for comm in "${COMMANDS[@]}"; do
-        #trimmed_com="$(echo $comm | xargs)"
-        output="$(az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME \
-                      --command-id RunShellScript --scripts "$comm" --parameters "$PARAMS" 2>&1)"
-        COMM_STATUS=$?
+        trimmed_com="$(echo $comm | xargs)"
+        COMM_STATUS=124
+        while [ $COMM_STATUS -eq 124 ]; do
+            output="$(timeout $TIMEOUT az vm run-command invoke -g $RESOURCE_GROUP -n $VM_NAME \
+                            --command-id RunShellScript --scripts "$comm" --parameters $PARAMS 2>&1)"
+            COMM_STATUS=$?
+        done
         if [ $COMM_STATUS -ne 0 ];then
             printf "$output"
             break
@@ -51,6 +56,7 @@ main() {
     RESOURCE_GROUP="kernel-validation"
     RESOURCE_LOCATION="westus2"
     FLAVOR="Standard_A2"
+    AZURE_CORE_COLLECT_TELEMETRY=false
     
     while true;do
         case "$1" in
@@ -109,8 +115,8 @@ main() {
     pushd "$AZUREDIR"
     IFS='_'; OS_TYPE=($OS_TYPE); unset IFS;
     OS_VERSION="${OS_TYPE[1]}"
-    MAJOR_VERSION="${OS_VERSION%.*}"
     OS_TYPE="${OS_TYPE[0]}"
+    
     if [[ "$AZURE_SKU" == "" ]];then
         AZURE_SKU="$OS_VERSION"
     fi
@@ -123,53 +129,35 @@ main() {
     FULL_VM_NAME="${FULL_BUILD_NAME}-Kernel-Validation"
     popd
     
-    az vm run-command invoke -g "$RESOURCE_GROUP" -n "$FULL_VM_NAME" \
-        --command-id RunShellScript \
-        --scripts "subscription-manager register --force \
-                    --username ${USERNAME} --password ${PASSWORD}"
-    
-    if [[ "$OS_VERSION" == "6.8" ]] || [[ "$OS_VERSION" == "6.9" ]];then
-        KERNEL_REPO="rhel-${MAJOR_VERSION}-server-rpms"
-    else 
-        KERNEL_REPO="rhel-${MAJOR_VERSION}-server-eus-rpms"
-    fi
-    
+    pushd $BASEDIR
     # Install the desired kernel version
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        "subscription-manager attach --auto;
-         subscription-manager release --set=${OS_VERSION};
-         subscription-manager repos --enable=rhel-${MAJOR_VERSION}-server-eus-rpms;
-         yum clean all;
-         yum -y install kernel-${KERNEL_VERSION};
-         yum -y install kernel-devel-${KERNEL_VERSION};"
+        "@prepare_lis_vm.sh" \
+        "sec=install_kernel os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
+            kernel_ver=\"$KERNEL_VERSION\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
     
     # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
     
-    LIS_DISTRO="$(get_lis_os $OS_TYPE $OS_VERSION)"
-    
     # Download LIS
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
-        "yum -y install wget gcc;
-         wget ${LIS_LINK}\'${AZURE_TOKEN}\' -O ~/lis_package.tar.gz;
-         tar -xzvf ~/lis_package.tar.gz -C ~/;"
+        "wget ${LIS_LINK}'${AZURE_TOKEN}' -O /root/lis_package.tar.gz &&
+        tar -xzvf /root/lis_package.tar.gz -C /root/;" "param=none"
     
     # Install LIS
-    echo "KMOD Install Log:" > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
+    echo "LIS modules install:" > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        'cd ~/LISISO/${0} && cd ./$(ls -1v | grep update | tail -1) && rpm -ivh kmod*' "${LIS_DISTRO}" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
-    
-    printf "\nLIS Install Log:" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
-    run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
-        "cd ~/LISISO/${0} && cd ./$(ls -1v | grep update | tail -1) && rpm -ivh $(ls microsoft* | grep -vE 'src|debug')" "${LIS_DISTRO}" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
-    
+        "@prepare_lis_vm.sh" \
+        "sec=install_lis workdir=\"/root/\" os_ver=\"$OS_VERSION\" lis_path=\"/root/LISISO\"" \
+        >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
+
+    # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
     
-    pushd $BASEDIR
     echo "LIS modules check for ${OS_TYPE}_${OS_VERSION} with kernel ${KERNEL_VERSION}:" \
         > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
-        "@check_lis_modules.sh" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
+        "@check_lis_modules.sh" "param=none" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
     popd
 }
 
