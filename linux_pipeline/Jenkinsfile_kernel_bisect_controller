@@ -6,7 +6,6 @@ netNextTree = "https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.gi
 env.kernelTree;
 
 env.buildDir = "/mnt/tmp/bisect"
-env.cloneDir = "kernel_tree"
 
 pipelineName = "pipeline-kernel-bisect-commit-validator/" + env.BRANCH_NAME
 
@@ -121,8 +120,19 @@ def resolveGitRepo(String gitURL) {
     }
 }
 
+def getCloneDir () {
+    if (env.kernelTree == "azure_kernel") {
+        return "linux-msft"
+    }
+    b = env.kernelTree.split('/')[-1]
+    c = b.split('\\.')[0]
+    return c
+}
+
 def initEnv() {
+    checkout scm
     isPerf = ENABLED_STAGES.contains('perf')
+    env.cloneDir = getCloneDir()
     withCredentials([[$class: 'StringBinding', credentialsId: ' MSFT_KERNEL_GIT_URL', variable: 'AZURE_KERNEL']]) {
         stage ("initialize_env") {
             def scriptFetch = sh(
@@ -135,26 +145,10 @@ def initEnv() {
                             kernel_tree=$kernelTree
                         fi
 
-                        mkdir -p $buildDir
-                        pushd $buildDir
-                        if [[ ! -d $cloneDir ]];then
-                            git clone $kernel_tree $cloneDir
-                            pushd $cloneDir
-                                git config --global gc.auto 0
-                            popd
-                        else
-                            pushd $cloneDir
-                            git remote set-url origin $kernel_tree
-                            popd
-                        fi
-                        pushd $cloneDir
-                        git checkout -f $KERNEL_GIT_BRANCH
-                        git clean -x -f -d
-                        git reset --hard HEAD
-                        git fetch --all
-                        git pull
-                        popd
-                        popd
+                        bash scripts/bisect/initialize_env_bisect.sh \
+                            --kernel_tree "$kernel_tree" \
+                            --build_dir    "$buildDir"    \
+                            --git_branch "$KERNEL_GIT_BRANCH"
                         '''
             )
             println "Finished cloning Git repo."
@@ -184,7 +178,7 @@ def checkVariation(value) {
 
 def validateCommit (String commit, String expectedState) {
     if (!commit) {
-        println("Commit " + commit + " is not valid.")
+        println "Commit " + commit + " is not valid."
         sh(script: "exit 1")
     }
     job = buildJobWrapper(commit)
