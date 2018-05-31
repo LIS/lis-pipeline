@@ -22,7 +22,22 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
 
 def sendMail = true
 def stashList = []
-def azureSku = ["rhel_7.3": "7.3", "rhel_7.4": "7.4", "rhel_7.5": "7-RAW"]
+def azureSku = ["rhel_6.7": "6.7", "rhel_6.8": "6.8", "rhel_6.9": "6.9", "rhel_7.3": "7.3", "rhel_7.4": "7.4", "rhel_7.5": "7-RAW"]
+
+def getVersionFromURL(lisLink){
+    def realLink = ""
+    def lisVer = ""
+
+    if (lisLink.contains("tar.gz")){
+        realLink = lisLink
+    } else {
+        realLink = sh (returnStdout: true, script: """
+            curl -Ls -o /dev/null -w %{url_effective} "${lisLink}"
+        """)
+    }
+    lisVer = realLink.split("/")
+    return lisVer[lisVer.size() - 1].split(".tar.gz")[0]
+}
 
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
@@ -99,9 +114,9 @@ stage ("Test kernel") {
                                 bash scripts/azure_kernel_validation/remove_azure_vm_resources.sh \
                                     "rpm-lis${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}"
                             """)
-                        } else {
-                            currentBuild.result = 'FAILURE'
-                        }
+                            } else {
+                                currentBuild.result = 'FAILURE'
+                            }
                         deleteDir()
                     }
                 }
@@ -119,10 +134,10 @@ stage ("Send Email Report"){
         }
         withCredentials(bindings: [string(credentialsId: 'REDHAT_VAL_MAIL_LIST', variable: 'REDHAT_VAL_MAIL_LIST')]) {
             dir ("mail-send-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                def lisVersion = getVersionFromURL(env.LIS_LINK)
                 def body = "<pre>"
-                def lisVersion = env.LIS_LINK.split("/")
-                lisVersion = lisVersion[lisVersion.size() - 1].split(".tar.gz")[0]
                 body += "\nLIS Version: ${lisVersion}\n\n"
+
                 stashList.each() {
                     unstash it
                     body += readFile("${it}_lis_check.log")

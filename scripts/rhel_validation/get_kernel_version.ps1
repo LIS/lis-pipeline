@@ -46,7 +46,10 @@ param (
 )
 
 # generate hash table with list of kernels for each version of rhel
-$RHEL_VERSIONS_TO_KERNEL_MAP = @{"rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
+$RHEL_VERSIONS_TO_KERNEL_MAP = @{"rhel_6.7" = @{"baseVer" = "2.6.32-573"; "newVer" = @()};
+                                 "rhel_6.8" = @{"baseVer" = "2.6.32-642"; "newVer" = @()};
+                                 "rhel_6.9" = @{"baseVer" = "2.6.32-696"; "newVer" = @()};
+                                 "rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
                                  "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()};
                                  "rhel_7.5" = @{"baseVer" = "3.10.0-862"; "newVer" = @()}}
 
