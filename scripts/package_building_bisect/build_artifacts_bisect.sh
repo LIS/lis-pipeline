@@ -99,7 +99,18 @@ function get_sources_git () {
         popd
     else
         pushd "$git_folder"
-        git remote set-url origin "$source_path"
+        repo=$(git remote -v | grep $source_path | wc -l)
+        if [[ $repo != 0 ]]; then
+            git bisect reset
+            git clean -x -f -d
+            git reset --hard
+            git fetch --all
+        else
+            git remote set-url origin $source_path
+            git checkout -b twig || git checkout twig
+            git branch -D $git_branch
+            git fetch --all
+        fi
         popd
     fi
     pushd "$git_folder"
@@ -109,6 +120,8 @@ function get_sources_git () {
     if [[ $? -ne 0 ]];then
         exit 1
     fi
+    git pull
+    git branch -D twig || true
     popd
     popd
 }
