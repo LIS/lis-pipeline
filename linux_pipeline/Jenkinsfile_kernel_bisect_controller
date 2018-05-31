@@ -15,6 +15,7 @@ def float baseValue = 0
 def float left = 0
 
 properties ([
+    overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
