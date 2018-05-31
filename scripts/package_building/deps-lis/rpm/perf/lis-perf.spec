@@ -33,3 +33,7 @@ mv %{buildroot}%{_usr}/etc %{buildroot}
 %{_bindir}/trace
 %{_usr}/share/*
 %{_usr}/lib64/libperf-jvmti.so
+
+# Ver:4.17.0
+%{_usr}/lib/examples/perf/bpf/*
+%{_usr}/lib/include/perf/bpf/bpf.h
