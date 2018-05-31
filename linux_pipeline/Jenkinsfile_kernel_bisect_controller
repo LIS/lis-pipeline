@@ -38,48 +38,58 @@ properties ([
             name: 'DISTRO',
             description: 'Distro version to be tested'],
         [$class: 'ChoiceParameterDefinition',
+            choices: 'Boot\nFunctional\nPerformance',
+            name: 'BISECT_TYPE',
+            description: 'Type of bisect that will be performed.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'KVP\nCore\nFCOPY\nNET\nNET6\nProd_Checkpoint\nSTOR_VHDX\nVHDX_RESIZE\nLIVE_MIGR16\nLIVE_MIGR12R2',
+            name: 'FUNC_TEST_SUITE',
+            description: '[FUNC] The test suite which you want to run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNC_XML_PATH',
+            defaultValue: '',
+            description: '[FUNC] An absolute path to LISAcustom xml test. This path must a valid SMB share path, accessible by any test node.'],
+        [$class: 'ChoiceParameterDefinition',
             choices: '1\n5\n10\n15\n20',
             name: 'PERF_VARIATION',
-            description: 'If above this performance variation, the commit is bad'],
+            description: '[PERF] If above this performance variation, the commit is bad'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'TCP\nUDP\nFIO',
             name: 'PERF_TEST',
-            description: 'Which perf test to run'],
+            description: '[PERF] Which perf test to run'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'v4\nv6',
             name: 'PERF_IPV',
-            description: '[TCP] [UDP] IP version to use.'],
+            description: '[PERF] [TCP] [UDP] IP version to use.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1k\n8k',
             name: 'PERF_K',
-            description: '[UDP] Buffer size to be used.'],
+            description: '[PERF] [UDP] Buffer size to be used.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240',
             name: 'PERF_TEST_THREADS_TCP',
-            description: '[TCP] TEST_THREADS.'],
+            description: '[PERF] [TCP] TEST_THREADS.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
             name: 'PERF_TEST_THREADS_UDP',
-            description: '[UDP] TEST_THREADS.'],
+            description: '[PERF] [UDP] TEST_THREADS.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '4\n1024',
             name: 'PERF_IO_SIZE',
-            description: '[FIO] IO_SIZE.'],
+            description: '[PERF] [FIO] IO_SIZE.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
             name: 'PERF_Q_DEPTH',
-            description: '[FIO] Queue depth.'],
+            description: '[PERF] [FIO] Queue depth.'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'read\nrandread\nwrite\nrandwrite',
             name: 'PERF_IO_MODE',
-            description: '[FIO] IO_MODE'],
-        [$class: 'StringParameterDefinition',
-            name: 'ENABLED_STAGES',
-            defaultValue: 'build_artifacts, boot_test, perf_hyperv',
-            description: 'boot_validation: build_artifacts, boot_test\nperf_validation: build_artifacts, boot_test, perf_hyperv']
+            description: '[PERF] [FIO] IO_MODE']
         ]
     ]
 ])
+
+isPerf = BISECT_TYPE.equals('Performance')
 
 node ("bisect_kernel_builder") {
     resolveGitRepo(KERNEL_TREE)
@@ -122,7 +132,6 @@ def resolveGitRepo(String gitURL) {
 }
 
 def initEnv() {
-    isPerf = ENABLED_STAGES.contains('perf')
     withCredentials([[$class: 'StringBinding', credentialsId: ' MSFT_KERNEL_GIT_URL', variable: 'AZURE_KERNEL']]) {
         stage ("initialize_env") {
             def scriptFetch = sh(
@@ -197,7 +206,7 @@ def validateCommit (String commit, String expectedState) {
         }
     }
     if (!isPerf && job.buildResult != expectedState) {
-        println "Commit " + commit + " was expected to be " + expectedState + " instead of " + buildResult.result
+        println "Commit " + commit + " was expected to be " + expectedState + " instead of " + job.buildResult
         currentBuild.result = 'FAILURE'
         sh(script: "exit 1")
     }
@@ -296,6 +305,9 @@ def buildJobWrapper(String commit) {
                                                             string(name: 'KERNEL_GIT_BRANCH', value: KERNEL_GIT_BRANCH),
                                                             string(name: 'KERNEL_GIT_COMMIT_ID', value: commit),
                                                             string(name: 'DISTRO_VERSION', value: DISTRO),
+                                                            string(name: 'BISECT_TYPE', value: BISECT_TYPE),
+                                                            string(name: 'FUNC_TEST_SUITE', value: FUNC_TEST_SUITE),
+                                                            string(name: 'FUNC_XML_PATH', value: FUNC_XML_PATH),
                                                             string(name: 'PERF_TEST', value: PERF_TEST),
                                                             string(name: 'PERF_IPV', value: PERF_IPV),
                                                             string(name: 'PERF__K', value: PERF_K),
@@ -303,8 +315,7 @@ def buildJobWrapper(String commit) {
                                                             string(name: 'PERF_TEST_THREADS_UDP', value: PERF_TEST_THREADS_UDP),
                                                             string(name: 'PERF_IO_SIZE', value: PERF_IO_SIZE),
                                                             string(name: 'PERF_Q_DEPTH', value: PERF_Q_DEPTH),
-                                                            string(name: 'PERF_IO_MODE', value: PERF_IO_MODE),
-                                                            string(name: 'ENABLED_STAGES', value: ENABLED_STAGES)],
+                                                            string(name: 'PERF_IO_MODE', value: PERF_IO_MODE)],
                                                             propagate: false,
                                                             wait: true
     if (isPerf) {
