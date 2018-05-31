@@ -48,7 +48,7 @@ properties ([
         [$class: 'StringParameterDefinition',
             name: 'FUNC_XML_PATH',
             defaultValue: '',
-            description: '[FUNC] An absolute path to LISAcustom xml test. This path must a valid SMB share path, accessible by any test node.'],
+            description: '[FUNC] An absolute path to LISA custom xml test. This path must a valid SMB share path, accessible by any test node.'],
         [$class: 'ChoiceParameterDefinition',
             choices: '1\n5\n10\n15\n20',
             name: 'PERF_VARIATION',
