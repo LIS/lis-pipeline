@@ -6,6 +6,7 @@ def PowerShellWrapper(psCmd) {
 }
 
 properties ([
+    overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
