@@ -57,6 +57,11 @@ function Sync-SMBShare {
                     @($fullFolderToSyncPath, $localFullFolderToSyncPath))
                 ROBOCOPY.exe $fullFolderToSyncPath $localFullFolderToSyncPath `
                     /MIR /COPY:DAT /DCOPY:DAT /R:1 /S 2>&1
+                # if LASTEXITCODE > 8, there was an error
+                # https://support.microsoft.com/en-us/help/954404/return-codes-that-are-used-by-the-robocopy-utility-in-windows-server-2
+                if ($LASTEXITCODE > 8) {
+                    throw "robocopy failed with exit code: ${$LASTEXITCODE}"
+                }
                 (Get-Item $localFullFolderToSyncPath).LastWriteTime = `
                     (Get-Item $fullFolderToSyncPath).LastWriteTime
             } else {
@@ -71,6 +76,7 @@ function Sync-SMBShare {
 function Main {
     # Note(avladu): Sync only folders that are max 2 months old
     $dateLimit = (Get-Date).AddMonths(-2)
+    $ROBOCOPY_FAILURE = $false
 
     foreach ($localFolderToSync in $LOCAL_TO_REMOTE_FOLDER_MAPPINGS.keys) {
         try {
@@ -84,7 +90,14 @@ function Main {
         } catch {
             Write-Host "Failed to sync $localFolderToSync"
             Write-Host $_
+            $ROBOCOPY_FAILURE = $true
         }
+    }
+
+    if ($ROBOCOPY_FAILURE) {
+        exit 1
+    } else {
+        exit 0
     }
 }
 
