@@ -445,6 +445,7 @@ function prepare_perf_rhel (){
     mkdir -p "${base_dir}/perf/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
     pushd "$source"
     kernel_version="$(make kernelversion)"
+    full_version="$kernel_version"
     kernel_version="${kernel_version%-*}"
     release="${kernel_version##*-}"
     if [[ "$release" != "$kernel_version" ]];then
@@ -474,6 +475,7 @@ function prepare_perf_rhel (){
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/Name:.*/Name:  ${package_prefix}-perf/g" "SPECS/$spec"
     fi
+    change_spec_version "SPECS/$spec" "$full_version"
     change_perf_options "./SOURCES/tools/perf/Makefile.perf" "NO_GTK2=True"
     popd
 }

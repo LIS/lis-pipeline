@@ -401,3 +401,27 @@ change_perf_options(){
         sed -i "s/# Define ${var}.*/$entry/" $perf_makefile
     done
 }
+
+function version_gt() {
+    test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1";
+}
+
+function change_spec_version() {
+    spec_path="$1"
+    base_ver="$2"
+
+    versions="$(cat "$spec_path" | grep "# Ver")"
+    IFS='#'; versions=($versions); unset IFS;
+    for ver in ${versions[@]}; do
+        ver=${ver#*:}
+        if version_gt $ver $base_ver ; then
+            big_version=$ver
+            break;
+        fi
+    done
+
+    if [[ "$big_version" != "" ]];then
+        sed -i "/$big_version/Q" "$spec_path"
+    fi
+}
+
