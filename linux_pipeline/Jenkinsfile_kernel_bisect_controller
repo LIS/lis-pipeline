@@ -151,24 +151,18 @@ def initEnv() {
                             git clone $kernel_tree $cloneDir
                             pushd $cloneDir
                                 git config --global gc.auto 0
+                            popd
                         else
                             pushd $cloneDir
-                            repo=$(git remote -v | grep $kernel_tree | wc -l)
-                            if [[ $repo != 0 ]]; then
-                                git bisect reset
-                                git clean -x -f -d
-                                git reset --hard
-                                git fetch --all
-                            else
-                                git remote set-url origin $kernel_tree
-                                git checkout -b twig || git checkout twig
-                                git branch -D $KERNEL_GIT_BRANCH
-                                git fetch --all
-                            fi
+                            git remote set-url origin $kernel_tree
+                            popd
                         fi
+                        pushd $cloneDir
                         git checkout -f $KERNEL_GIT_BRANCH
+                        git clean -x -f -d
+                        git reset --hard HEAD
+                        git fetch --all
                         git pull
-                        git branch -D twig || true
                         popd
                         popd
                         '''
@@ -231,9 +225,6 @@ String getCommit (String passed) {
                    commit_id=${output##*[}
                    commit_id=${commit_id%%]*}
                    if [[ "$final" != "0" ]]; then
-                       pusd "$cloneDir"
-                           git bisect reset
-                       popd
                        echo $output
                        exit 0
                    fi
