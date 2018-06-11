@@ -30,6 +30,10 @@ properties ([
             name: 'BISECT_TYPE',
             description: 'Type of bisect that will be performed.'],
         [$class: 'ChoiceParameterDefinition',
+            choices: 'Standard_A2\nStandard_E64_v3',
+            name: 'BOOT_FLAVOR_SIZE',
+            description: 'The Azure flavor size used for boot validation'],
+        [$class: 'ChoiceParameterDefinition',
             choices: 'KVP\nCore\nFCOPY\nNET\nNET6\nProd_Checkpoint\nSTOR_VHDX\nVHDX_RESIZE\nLIVE_MIGR16\nLIVE_MIGR12R2',
             name: 'FUNC_TEST_SUITE',
             description: '[FUNC] The test suite which you want to run.'],
@@ -254,7 +258,7 @@ def boot_test() {
                                                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
                                                --smb_share_username $USERNAME --smb_share_password $PASSWORD \
                                                --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
-                                               --local_path $local_path
+                                               --local_path $local_path --flavor "${BOOT_FLAVOR_SIZE}"
                                        ''',
                                  returnStatus:true
                              )
