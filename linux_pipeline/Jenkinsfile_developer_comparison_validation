@@ -23,6 +23,18 @@ properties ([
             defaultValue: true, 
             description: 'Azure VM boot test', 
             name: 'AZURE_BOOT'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_VM_SIZE',
+            defaultValue: 'Standard_A2',
+            description: 'Azure VM size'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
+                        canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
+                        japaneast\njapanwest\nkoreacentral\nkoreasouth\nnorthcentralus\nnortheurope
+                        southcentralus\nsoutheastasia\nsouthindia\nuksouth\nukwest\nwestcentralus
+                        westeurope\nwestindia\nwestus\nsepremium""",
+            name: 'AZURE_REGION',
+            description: 'Azure Region',],
         [$class: 'ChoiceParameterDefinition',
             choices: "None\nkernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
@@ -124,6 +136,8 @@ node ("meta_slave") {
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
+                    string(name: 'AZURE_VM_SIZE', value: AZURE_VM_SIZE),
+                    string(name: 'AZURE_REGION', value: AZURE_REGION),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
@@ -136,6 +150,8 @@ node ("meta_slave") {
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                         string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
+                        string(name: 'AZURE_VM_SIZE', value: AZURE_VM_SIZE),
+                        string(name: 'AZURE_REGION', value: AZURE_REGION),
                         string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                         string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                         string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
