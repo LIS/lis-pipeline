@@ -212,7 +212,9 @@ node ("meta_slave") {
             '''
 
             PARSE_PARAMS = ""
-            PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
+            if (perfXml[LISA_PERF_TEST]) {
+                PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
+            }
             if (env.SKIP_UNPATCHED == "false") {
                 if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
                     unstash 'patchedReport'
