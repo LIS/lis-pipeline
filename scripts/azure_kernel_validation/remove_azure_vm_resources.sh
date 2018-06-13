@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -e -o pipefail
 
 function remove_log_container() {
@@ -29,8 +30,14 @@ function remove_log_container() {
 
 function main(){
     BUILD_NUMBER="$1"
+    RESOURCE_LOCATION="$2"
     RESOURCE_GROUP_NAME="kernel-validation"
-    STORAGE_ACCOUNT_NAME="kernelstorageacc"
+
+    if [[ ! -z $RESOURCE_LOCATION ]]; then
+        STORAGE_ACCOUNT_NAME="lspl$RESOURCE_LOCATION"
+    else
+        STORAGE_ACCOUNT_NAME="lsplwestus2"
+    fi
 
     az group deployment delete -n "$BUILD_NUMBER"-KernelBuild -g $RESOURCE_GROUP_NAME
     az vm delete -n "$BUILD_NUMBER"-Kernel-Validation -y -g $RESOURCE_GROUP_NAME

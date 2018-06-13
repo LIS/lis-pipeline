@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "newStorageAccountName": {
-      "value": "kernelstorageacc"
+      "value": "%storage_acc%"
     },
     "adminUsername": {
       "value": "rhel"
@@ -19,6 +19,9 @@
     },
     "flavor": {
       "value": "%flavor_name%"
+    },
+    "location": {
+      "value": "%custom_location%"
     }
   }
 }
