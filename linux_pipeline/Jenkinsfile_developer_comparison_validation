@@ -216,32 +216,25 @@ node ("meta_slave") {
             '''
 
             PARSE_PARAMS = ""
-            if (perfXml[LISA_PERF_TEST]) {
-                PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
-            }
-            if (env.SKIP_UNPATCHED == "false") {
-                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
-                    unstash 'patchedReport'
+            PERF_LOGS = ""
+            if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
+                unstash 'patchedReport'
+                PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
+                if (env.SKIP_UNPATCHED == "false") {
                     unstash 'unpatchedReport'
-                    PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
                     PARSE_PARAMS += " --func_comp_path ./unpatched_run/*-functional/TestResults/**/Report*.xml"
                 }
-                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
-                    unstash 'patchedPerf'
+            }
+            if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
+                PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
+                unstash 'patchedPerf'
+                PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
+                if (env.SKIP_UNPATCHED == "false") {
                     unstash 'unpatchedPerf'
-                    PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
                     PARSE_PARAMS += " --perf_comp_path ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
                 }
-            } else {
-                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
-                    unstash 'patchedReport'
-                    PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
-                }
-                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
-                    unstash 'patchedPerf'
-                    PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
-                }
             }
+
             println (PARSE_PARAMS)
             sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
 
