@@ -1,0 +1,702 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+def reportStageStatus(stageName, stageStatus) {
+    script {
+        env.STAGE_NAME_REPORT = stageName
+        env.STAGE_STATUS_REPORT = stageStatus
+    }
+    withCredentials(bindings: [file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
+                                    variable: 'PERF_DB_CONFIG')]) {
+        dir('kernel_version_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+              unstash 'kernel_version_ini'
+              sh returnStatus: true, script: '''
+                  #!/bin/bash
+                  KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
+                  KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
+                  KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
+                  bash "${WORKSPACE}/scripts/reporting/report_stage_state.sh" \
+                      --pipeline_name "pipeline-linux-upstream-validation/${BRANCH_NAME}" \
+                      --pipeline_build_number "${BUILD_NUMBER}" \
+                      --pipeline_stage_status "${STAGE_STATUS_REPORT}" \
+                      --pipeline_stage_name "${STAGE_NAME_REPORT}" \
+                      --kernel_info "./scripts/package_building/kernel_versions.ini" \
+                      --kernel_source "${KERNEL_SOURCE}" --kernel_branch "${KERNEL_GIT_BRANCH}" \
+                      --distro_version "${DISTRO_VERSION}" --db_config "${PERF_DB_CONFIG}" || true
+              '''
+        }
+    }
+}
+
+pipeline {
+  parameters {
+    choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
+    string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
+    choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
+    choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
+    choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure",
+           description: 'What stages to run', name: 'ENABLED_STAGES')
+  }
+  environment {
+    KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
+    UBUNTU_VERSION = '16'
+    BUILD_PATH = '/mnt/tmp/upstream-kernel-build-folder'
+    KERNEL_CONFIG = 'Microsoft/config-azure'
+    CLEAN_ENV = 'True'
+    USE_CCACHE = 'True'
+    AZURE_MAX_RETRIES = '60'
+    BUILD_NAME = 'u'
+    CREATE_CHANGELOG = 'False'
+    INSTALL_DEPS = 'True'
+    USE_KERNEL_FOLDER_PREFIX = 'True'
+    THREAD_NUMBER = 'x3'
+    AZURE_BOOT_LARGE_FLAVOR = 'Standard_E64_v3'
+  }
+  options {
+    overrideIndexTriggers(false)
+  }
+  agent {
+    node {
+      label 'meta_slave'
+    }
+  }
+  stages {
+          stage('build_artifacts_ubuntu') {
+              when {
+                beforeAgent true
+                expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+              }
+              agent {
+                node {
+                  label 'ubuntu_kernel_builder'
+                }
+              }
+              steps {
+              stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+              sh '''#!/bin/bash
+                set -xe
+                echo "Building artifacts..."
+                pushd "$WORKSPACE/scripts/package_building"
+                bash build_artifacts.sh \\
+                    --git_url "${KERNEL_GIT_URL}" \\
+                    --git_branch "${KERNEL_GIT_BRANCH}" \\
+                    --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                    --install_deps "${INSTALL_DEPS}" \\
+                    --thread_number "${THREAD_NUMBER}" \\
+                    --debian_os_version "${UBUNTU_VERSION}" \\
+                    --build_path "${BUILD_PATH}" \\
+                    --kernel_config "${KERNEL_CONFIG}" \\
+                    --clean_env "${CLEAN_ENV}" \\
+                    --use_ccache "${USE_CCACHE}" \\
+                    --use_kernel_folder_prefix "${USE_KERNEL_FOLDER_PREFIX}" \\
+                    --create_changelog "${CREATE_CHANGELOG}" \\
+                    --enable_kernel_debug "${KERNEL_DEBUG}"
+                popd
+                '''
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
+                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
+                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
+                writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
+
+                stash includes: '*.azure.env', name: 'azure.env'
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
+                sh '''
+                    set -xe
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+                '''
+                archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+              }
+          }
+          stage('build_artifacts_centos') {
+              when {
+                beforeAgent true
+                expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
+                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+              }
+              agent {
+                node {
+                  label 'centos_kernel_builder'
+                }
+              }
+              steps {
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                sh '''#!/bin/bash
+                set -xe
+                echo "Building artifacts..."
+                pushd "$WORKSPACE/scripts/package_building"
+                bash build_artifacts.sh \\
+                    --git_url "${KERNEL_GIT_URL}" \\
+                    --git_branch "${KERNEL_GIT_BRANCH}" \\
+                    --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                    --install_deps "${INSTALL_DEPS}" \\
+                    --thread_number "${THREAD_NUMBER}" \\
+                    --build_path "${BUILD_PATH}" \\
+                    --kernel_config "${KERNEL_CONFIG}" \\
+                    --clean_env "${CLEAN_ENV}" \\
+                    --use_ccache "${USE_CCACHE}" \\
+                    --use_kernel_folder_prefix "${USE_KERNEL_FOLDER_PREFIX}" \\
+                popd
+                '''
+                sh '''#!/bin/bash
+                  echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                '''
+                script {
+                  currentBuild.displayName = readFile "./build_name"
+                }
+                writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.4 latest'
+                writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.4-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
+                writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
+
+                stash includes: '*.azure.env', name: 'azure.env'
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
+                      name: "${env.KERNEL_ARTIFACTS_PATH}"
+                sh '''
+                    set -xe
+                    rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+                '''
+                archiveArtifacts 'scripts/package_building/kernel_versions.ini'
+              }
+              post {
+                failure {
+                  reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
+                }
+              }
+    }
+    stage('publish_temp_artifacts') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                               usernamePassword(credentialsId: 'smb_share_user_pass',
+                                                passwordVariable: 'PASSWORD',
+                                                usernameVariable: 'USERNAME')]) {
+                sh '''#!/bin/bash
+                    set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                        --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --artifacts_folder_prefix "${folder_prefix}"
+                '''
+            }
+        }
+      }
+    }
+    stage('boot_test') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('boot_test') }
+      }
+      post {
+        failure {
+          reportStageStatus("BootOnAzure", 0)
+        }
+        success {
+          reportStageStatus("BootOnAzure", 1)
+        }
+      }
+      parallel {
+        stage('boot_test_small') {
+            agent {
+              node {
+                label 'meta_slave'
+              }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
+                                           file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
+                                           ]) {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    sh 'cat scripts/package_building/kernel_versions.ini'
+                  }
+                  sh '''#!/bin/bash
+                    OS_TYPE=${DISTRO_VERSION%_*}
+                    OS_TYPE=${OS_TYPE,,}
+                    bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                        --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                        --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                    '''
+                }
+            }
+            post {
+              always {
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+              }
+              failure {
+                sh 'echo "Load failure test results."'
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+              }
+              success {
+                echo "Cleaning Azure resources up..."
+                sh '''#!/bin/bash
+                  pushd ./scripts/azure_kernel_validation
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                  popd
+                  '''
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+              }
+            }
+        }
+        stage('boot_test_large') {
+            when {
+              beforeAgent true
+              expression { params.ENABLED_STAGES.contains('boot_test_large') }
+            }
+            agent {
+              node {
+                label 'meta_slave'
+              }
+            }
+            steps {
+                withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                           usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
+                                           file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
+                                           ]) {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME + 'l') {
+                    unstash 'kernel_version_ini'
+                    sh 'cat scripts/package_building/kernel_versions.ini'
+                  }
+                  sh '''#!/bin/bash
+                    OS_TYPE=${DISTRO_VERSION%_*}
+                    OS_TYPE=${OS_TYPE,,}
+                    bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}l" \
+                        --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                        --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                        --flavor $AZURE_BOOT_LARGE_FLAVOR
+                    '''
+                }
+            }
+            post {
+              always {
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}l-boot-diagnostics/*.log"
+              }
+              failure {
+                sh 'echo "Load failure test results."'
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
+              }
+              success {
+                echo "Cleaning Azure resources up..."
+                sh '''#!/bin/bash
+                  pushd ./scripts/azure_kernel_validation
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}l"
+                  popd
+                  '''
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
+              }
+            }
+        }
+      }
+    }
+    stage('publish_artifacts') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                               usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                               ]) {
+                sh '''#!/bin/bash
+                    set -xe
+                    folder_prefix="${KERNEL_GIT_URL##*/}"
+                    folder_prefix="${folder_prefix%.*}"
+                    bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                        --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                        --smb_url "${SMB_SHARE_URL}/${folder_prefix}" --smb_username "${USERNAME}" \\
+                        --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                        --artifacts_folder_prefix "${folder_prefix}"
+                '''
+            }
+        }
+      }
+    }
+    stage('publish_azure_vhd') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
+      }
+      agent {
+        node {
+          label 'azure'
+        }
+      }
+      steps {
+        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+          cleanWs()
+          git "https://github.com/iamshital/azure-linux-automation.git"
+          stash includes: '**' , name: 'azure-linux-automation'
+          unstash "${env.KERNEL_ARTIFACTS_PATH}"
+          unstash 'kernel_version_ini'
+          unstash 'azure.env'
+          script {
+              env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+              env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+          }
+          RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+          RunPowershellCommand(".\\RunAzureTests.ps1" +
+          " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+          " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+          " -testLocation 'westus2'" +
+          " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+          " -testCycle 'PUBLISH-VHD'" +
+          " -OverrideVMSize 'Standard_D2_v2'" +
+          " -ARMImageName '${ARM_IMAGE_NAME}'" +
+          " -StorageAccount 'ExistingStorage_Standard'" +
+          " -ExitWithZero"
+          )
+          script {
+              env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+          }
+          RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" +
+          " -sourceLocation westus2 " +
+          " -destinationLocations 'westus,westus2,northeurope'" +
+          " -destinationAccountType Standard" +
+          " -sourceVHDName '${ARM_OSVHD_NAME}'" +
+          " -destinationVHDName '${ARM_OSVHD_NAME}'"
+          )
+        }
+      }
+    }
+    stage('validation') {
+     parallel {
+      stage('validation_functional_hyperv') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+          }
+          agent {
+            node {
+              label 'hyper-v'
+            }
+          }
+          steps {
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'UPSTREAM_AZURE_STORAGE_URL', variable: 'UPSTREAM_AZURE_STORAGE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
+                                       string(credentialsId: 'DB_CONFIG_UPSTREAM', variable: 'DB_CONFIG_UPSTREAM'),
+                                       string(credentialsId: 'LISA_UPSTREAM_LOG_DESTINATION', variable: 'LISA_UPSTREAM_LOG_DESTINATION'),
+                                       file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
+                                            variable: 'DBConfigPath')]) {
+                echo 'Running LISA...'
+                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+                }
+                PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                        -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
+                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]" -LISAManageVMS:$true
+                        -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}"
+                        -AzureToken "${env:AZURE_SAS}"
+                        -AzureUrl "${env:UPSTREAM_AZURE_STORAGE_URL}/temp-kernel-artifacts"
+                        -IdRSAPub "C:\\bin\\id_rsa.pub"
+                        -XmlTest "${env:LISA_TEST_XML}"
+                        -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                        -PipelineName "pipeline-linux-upstream-validation/${env:BRANCH_NAME}"
+                        -DBConfigPath "${env:DBConfigPath}"
+                        -LisaLogDBConfigPath "${env:DB_CONFIG_UPSTREAM}"
+                        -LogsPath "${env:LISA_UPSTREAM_LOG_DESTINATION}"
+                  ''')
+                echo 'Finished running LISA.'
+              }
+            }
+          post {
+            always {
+              archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*"
+              junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*.xml"
+            }
+            success {
+              echo 'Cleaning up LISA environment...'
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                ''')
+            }
+          }
+        }
+        stage('validation_functional_azure') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'BVTMK'" +
+              " -OverrideVMSize 'Standard_D1_v2'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('validation_perf_azure_net') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -ResultDBTable 'Perf_Network_Latency_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
+              " -EnableAcceleratedNetworking" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-LAGSCOPE'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -ResultDBTable 'Perf_Network_Latency_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-NTTTCP'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_TCP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
+              " -ExitWithZero"
+              )
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -testCycle 'PERF-UDPLOSS'" +
+              " -OverrideVMSize 'Standard_D15_v2'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ResultDBTable 'Perf_Network_UDP_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'PERF-UDPLOSS'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('validation_perf_azure_stor') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              cleanWs()
+              unstash 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -testLocation 'centralus'" +
+              " -testCycle 'PERF-FIO'" +
+              " -OverrideVMSize 'Standard_DS14_v2'" +
+              " -ResultDBTable 'Perf_Storage_Azure_LinuxNext'" +
+              " -ResultDBTestTag 'FIO-12DISKS'" +
+              " -StorageAccount 'NewStorage_Premium'" +
+              " -ExitWithZero"
+              )
+              junit "report\\*-junit.xml"
+              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+            }
+          }
+        }
+        stage('validation_perf_hyperv') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+          }
+          agent {
+            node {
+              label 'meta_slave'
+            }
+          }
+          steps {
+            echo "NOOP Hyper-V Performance test."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,289 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    overrideIndexTriggers(false),
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\n',
+            name: 'KERNEL_GIT_URL',
+            description: 'Linux kernel repository'],
+        [$class: 'StringParameterDefinition',
+            name: 'KERNEL_GIT_BRANCH',
+            defaultValue: 'master',
+            description: 'Kernel repo branch name'],
+        [$class: 'StringParameterDefinition',
+            name: 'KERNEL_GIT_COMMIT_ID',
+            defaultValue: 'HEAD',
+            description: 'Kernel repo commit id'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'Ubuntu_16.04.3\nCentOS_7.4',
+            name: 'DISTRO_VERSION',
+            description: 'Distro version'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'Boot\nFunctional\nPerformance',
+            name: 'BISECT_TYPE',
+            description: 'Type of bisect that will be performed.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'Standard_A2\nStandard_E64_v3',
+            name: 'BOOT_FLAVOR_SIZE',
+            description: 'The Azure flavor size used for boot validation'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'KVP\nCore\nFCOPY\nNET\nNET6\nProd_Checkpoint\nSTOR_VHDX\nVHDX_RESIZE\nLIVE_MIGR16\nLIVE_MIGR12R2',
+            name: 'FUNC_TEST_SUITE',
+            description: '[FUNC] The test suite which you want to run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNC_XML_PATH',
+            defaultValue: '',
+            description: '[FUNC] An absolute path to LISA custom xml test. This path must a valid SMB share path, accessible by any test node.'],
+        ]
+    ]
+])
+
+env.BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
+env.KERNEL_ARTIFACTS_PATH = 'bisect-kernel-artifacts'
+env.KERNEL_CONFIG = 'Microsoft/config-azure'
+env.BUILD_NAME = 'b'
+env.INSTALL_DEPS = 'True'
+env.USE_KERNEL_FOLDER_PREFIX = 'True'
+env.THREAD_NUMBER = 'x3'
+env.AZURE_MAX_RETRIES = '10'
+
+isBootTest = BISECT_TYPE.equals('Boot')
+isFunc = BISECT_TYPE.equals('Functional')
+
+env.osDistro = DISTRO_VERSION.split('_')[0]
+env.osVersion = DISTRO_VERSION.split('_')[1]
+
+
+// this is the main logic
+build_kernel(osDistro)
+
+if (isBootTest) {
+    node ('meta_slave') {
+        boot_test()
+    }
+}
+
+if (isFunc) {
+    func()
+}
+
+def getDistro(String distro) {
+    switch (distro) {
+        case "Ubuntu":
+            return ["ubuntu_kernel_builder", "deb"]
+        case "CentOS":
+            return ["centos_kernel_builder", "rpm"]
+
+    }
+}
+
+def build_kernel(String distro) {
+    (slave, pkg) = getDistro(distro)
+    println "NODE IS " + slave
+    println "PKG IS " + slave
+    node (slave) {
+        checkout scm
+        stage('build_artifacts_' + distro.toLowerCase()) {
+            withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL')]) {
+                sh '''#!/bin/bash
+                    set -xe
+                    if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                            KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
+                    fi
+                    echo "Building artifacts..."
+                    pushd "$WORKSPACE/scripts/package_building_bisect"
+                    bash build_artifacts_bisect.sh \\
+                        --git_url "$KERNEL_GIT_URL" \\
+                        --git_branch "$KERNEL_GIT_BRANCH" \\
+                        --git_commit_id "$KERNEL_GIT_COMMIT_ID" \\
+                        --destination_path "$BUILD_NUMBER-$BRANCH_NAME" \\
+                        --build_path "$BUILD_PATH"
+                    popd
+                    '''
+                    sh '''#!/bin/bash
+                        echo $BUILD_NUMBER-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+                       '''
+            currentBuild.displayName = readFile "./build_name"
+            if (distro == "Ubuntu") {
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*image*"),
+                            name: "kernel_artifacts"
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*daemons*"),
+                            name: "daemons"
+            } else if (distro == "CentOS") {
+                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*kernel*"),
+                            name: "kernel_artifacts"
+            }
+            stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+            sh """
+                    set -xe
+                    rm -rf "scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME"
+            """
+            }
+        }
+    }
+}
+
+def boot_test() {
+    node ('meta_slave') {
+        stage('boot_test') {
+            checkout scm
+            dir(BUILD_NUMBER + BRANCH_NAME) {
+                unstash "kernel_artifacts"
+            }
+            dir('kernel_version' + BUILD_NUMBER + BRANCH_NAME) {
+                unstash 'kernel_version_ini'
+                sh 'cat scripts/package_building/kernel_versions.ini'
+            }
+            withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                              usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                                      ]) {
+                sh(script: '''#!/bin/bash
+                              set -xe
+                              distro_version=$DISTRO_VERSION
+                              OS_TYPE=${distro_version%_*}
+                              OS_TYPE=${OS_TYPE,,}
+                              if [[ $OS_TYPE == "ubuntu" ]]; then
+                                  PACKAGE_NAME="deb"
+                              elif [[ $OS_TYPE == "centos" ]]; then
+                                  PACKAGE_NAME="rpm"
+                              fi
+                              pushd $BUILD_NUMBER$BRANCH_NAME
+                              mkdir -p "$PACKAGE_NAME"
+                              art=$(find . -name "*.$PACKAGE_NAME")
+                              mv $art "$PACKAGE_NAME"
+                              popd
+                              '''
+                )
+                exitStatus = sh(script: '''#!/bin/bash
+                                       distro_version=$DISTRO_VERSION
+                                       OS_TYPE=${distro_version%_*}
+                                       OS_TYPE=${OS_TYPE,,}
+                                       local_path=$(readlink -f ${BUILD_NUMBER}${BRANCH_NAME})
+                                       AZURE_MAX_RETRIES=$AZURE_MAX_RETRIES bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                                               --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                                               --smb_share_username $USERNAME --smb_share_password $PASSWORD \
+                                               --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                                               --local_path $local_path --flavor "${BOOT_FLAVOR_SIZE}"
+                                       ''',
+                                 returnStatus:true
+                             )
+            }
+        }
+
+        println "Cleaning Azure resources up..."
+        sh(script: """#!/bin/bash
+                      pushd ./scripts/azure_kernel_validation
+                      bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                      popd
+                      """
+        )
+
+        archiveArtifacts(artifacts: "$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME-boot-diagnostics/*.log", allowEmptyArchive: true)
+        if (exitStatus == 0) {
+            nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml', failIfNoResults: false)
+        } else {
+            nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml', failIfNoResults: false)
+            sh(script: "exit 1")
+        }
+    }
+}
+
+def func() {
+    (node, pkg) = getDistro(osDistro)
+    env.pkg = pkg
+    if (FUNC_XML_PATH) {
+        env.lisaXml = FUNC_XML_PATH
+    } else {
+        env.lisaXml = getLisaXml(FUNC_TEST_SUITE)
+    }
+    slave = getSlave(FUNC_TEST_SUITE, FUNC_XML_PATH)
+    node(slave) {
+        stage('validation_functional_hyperv') {
+            checkout scm
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'DEVELOPER_AZURE_STORAGE_URL', variable: 'DEVELOPER_AZURE_STORAGE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
+                echo 'Running LISA...'
+                println "LISA test deps are:" + LISA_TEST_DEPENDENCIES
+                unstash 'kernel_artifacts'
+                if (osDistro == "Ubuntu") {
+                    unstash 'daemons'
+                }
+                result = 'SUCCESS'
+                try {
+                    PowerShellWrapper('''
+                        & ".\\scripts\\lis_hyperv_platform\\run_bisect_functional_tests.ps1"
+                             -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-functional"
+                             -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-f"
+                             -VHDType "${env:osDistro}" -WorkingDirectory "C:\\workspace"
+                             -OSVersion "${env:osVersion}"
+                             -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:lisaXml}"
+                             -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                             -LocalKernelFolder "scripts/package_building_bisect/${env:BUILD_NUMBER}-${env:BRANCH_NAME}/**/${env:pkg}"
+                        ''')
+                    echo 'Finished running LISA.'
+                } catch (exc) {
+                    println "LISA failed, will now archive logs and exit."
+                    result = 'FAILURE'
+                } finally {
+                    archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*"
+                    junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*.xml"
+                    currentBuild.result = result
+                }
+            }
+        }
+    }
+}
+
+def getSlave (testName, customPath) {
+    if (customPath) {
+        testName = customPath
+    }
+    switch (testName) {
+        case "LIVE_MIGR16":
+            return "lis-f2324"
+        case "LIVE_MIGR12R2":
+            return "lis-f1927"
+        case testName.contains("Intel"):
+            return "lis-f2322"
+        case testName.contains("Mellanox"):
+            return "lis-f2324"
+        default:
+            return "hyper-v"
+    }
+}
+
+def getLisaXml (testName) {
+    switch (testName) {
+        case "KVP":
+            return "KvpTests.xml"
+        case "Core":
+            return "CoreTests.xml"
+        case "FCOPY":
+            return "FCOPY_Tests.xml"
+        case "NET":
+            return "NET_Tests.xml"
+        case "NET6":
+            return "NET_Tests_IPv6.xml"
+        case "Prod_Checkpoint":
+            return "Production_Checkpoint.xml"
+        case "STOR_VHDX":
+            return "STOR_VHDX.xml"
+        case "VHDX_RESIZE":
+            return "STOR_VHDXResize.xml"
+        case "LIVE_MIGR16":
+            return "NET_LIVEMIG.xml"
+        case "LIVE_MIGR12R2":
+            return "NET_LIVEMIG.xml"
+        default:
+            currentBuild.result = 'FAILURE'
+    }
+}
