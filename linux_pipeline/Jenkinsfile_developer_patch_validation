@@ -14,7 +14,7 @@ def GetPerfServer(xmlName) {
         case ~/FIO.*/:
             return "stor_perf"
          default:
-            currentBuild.result = 'FAILURE'
+            return "NullNode"
     }
 }
 
@@ -296,7 +296,7 @@ pipeline {
                 stage('validation_perf_hyperv') {
                     when {
                         beforeAgent true
-                        expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+                        expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') && LISA_PERF_TEST_XML != "null" }
                     }
                     agent {
                         node {
