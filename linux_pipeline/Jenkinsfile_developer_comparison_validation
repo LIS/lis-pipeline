@@ -60,6 +60,7 @@ properties ([
 ])
 
 def perfXml = ["SR-IOV_TCP": "TCP_SRIOV_v4.xml", "SR-IOV_UDP":"UDP_SRIOV_v4.xml", "FIO_RAID": "FIO_RAID0_Pipeline.xml"]
+def sendMail = false
 
 def getPerfOptions(perf_test) {
     switch (perf_test) {
@@ -178,13 +179,16 @@ node ("meta_slave") {
         dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             checkout scm
             unstash 'Metadata'
+            
             if (env.ENABLED_STAGES.contains("validation_perf_hyperv")){
                 env.PERF_RUN = "true"
                 env.LISA_PARAMS = getPerfOptions(LISA_PERF_TEST)
+                sendMail = true
             }
             if (env.ENABLED_STAGES.contains("validation_functional_hyperv")){
                 env.FUNC_RUN = "true"
-            } 
+                sendMail = true
+            }
             sh '''#!/bin/bash
                 INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
                 if [[ ! -e "$INI_PATH" ]];then
@@ -241,33 +245,37 @@ node ("meta_slave") {
             println (PARSE_PARAMS)
             sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
 
-            archiveArtifacts 'results.html'
-            stash includes: 'results.html', name: 'report_results'
+            if (sendMail) {
+                archiveArtifacts 'results.html'
+                stash includes: 'results.html', name: 'report_results'
+            }
         }
     }
 
     stage ("Send Report"){
         node ("jenkins-meta-slave") {
-            dir ("mail-send-comp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-                unstash 'report_results'
-                mailBody = "Hello,</br></br>\nDeveloper Patch Validation Pipeline #${env.BUILD_NUMBER} is completed.</br>\n"
-                if (env.KERNEL_PATCH != '') {
-                    mailBody += "The following patches were applied:</br>\n"
-                    patches = env.KERNEL_PATCH.split(" ")
-                    patches.each(){
-                        mailBody += it + "</br>\n"
+            if (sendMail) {
+                dir ("mail-send-comp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                    unstash 'report_results'
+                    mailBody = "Hello,</br></br>\nDeveloper Patch Validation Pipeline #${env.BUILD_NUMBER} is completed.</br>\n"
+                    if (env.KERNEL_PATCH != '') {
+                        mailBody += "The following patches were applied:</br>\n"
+                        patches = env.KERNEL_PATCH.split(" ")
+                        patches.each(){
+                            mailBody += it + "</br>\n"
+                        }
                     }
+                    mailBody += "</br>Testing results:</br></br>\n"
+                    mailBody += readFile("results.html")
+                    mailBody += "\n</br></br>Thank You,</br>Jenkins CI</br>\n"
+                    emailext (
+                        subject: "Developer patch validation report for run:${env.BUILD_NUMBER}.",
+                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                        mimeType : "text/html",
+                        body: mailBody
+                    )
+                    deleteDir()
                 }
-                mailBody += "</br>Testing results:</br></br>\n"
-                mailBody += readFile("results.html")
-                mailBody += "\n</br></br>Thank You,</br>Jenkins CI</br>\n"
-                emailext (
-                    subject: "Developer patch validation report for run:${env.BUILD_NUMBER}.",
-                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                    mimeType : "text/html",
-                    body: mailBody
-                )
-                deleteDir()
             }
         }
     }
