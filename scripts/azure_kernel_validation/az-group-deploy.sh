@@ -84,7 +84,7 @@ then
 
         if [[ -z $( az storage account list -o json | jq -r '.[].name | select(. == '\"$artifactsStorageAccountName\"')' ) ]]
         then
-            az group create -n "$artifactsResourceGroupName" -l "$location"
+            az group create -n "$artifactsResourceGroupName" -l "$location" || true
             az storage account create -l "$location" --sku "Standard_LRS" -g "$artifactsResourceGroupName" -n "$artifactsStorageAccountName" 2>/dev/null
         fi
     else
@@ -124,7 +124,9 @@ then
 
 fi
 
-az group create -n "$resourceGroupName" -l "$location"
+az group create -n "$resourceGroupName" -l "$location" || true
+az storage account create -n "$storageAccountName" -g "$resourceGroupName" -l "$location" --sku "Standard_LRS" || true
+
 
 # Remove line endings from parameter JSON so it can be passed in to the CLI as a single line
 parameterJson=$( echo "$parameterJson" | jq -c '.' )

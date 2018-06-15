@@ -51,10 +51,17 @@ function change_vm_params(){
     base_dir="$4"
     flavor="$5"
     os_version="$6"
+    resource_location="$7"
+    storage_account_name="$8"
     
-    parse_vm_params "$params" "$base_dir" "$os_type"
-    sed -i -e "s/%number%/$build_number/g" ./azuredeploy.parameters.json
-    sed -i -e "s/%flavor_name%/$flavor/g" ./azuredeploy.parameters.json
+    parse_vm_params "$params" "$base_dir" "$os_type" "$resource_location"
+
+    file="azuredeploy.parameters.json"
+    ( jq ".parameters.buildNumber.value           = \"$build_number\""         $file > tmp ) && mv tmp $file
+    ( jq ".parameters.flavor.value                = \"$flavor\""               $file > tmp ) && mv tmp $file
+    ( jq ".parameters.location.value              = \"$resource_location\""    $file > tmp ) && mv tmp $file
+    ( jq ".parameters.newStorageAccountName.value = \"$storage_account_name\"" $file > tmp ) && mv tmp $file
+
     if [[ "$os_version" != "" ]];then
         sed -i -e "s/%os_version%/$os_version/g" ./azuredeploy.parameters.json
     fi
@@ -65,9 +72,10 @@ function create_vm(){
     resource_group="$2"
     build_number="$3"
     resource_location="$4"
+    storage_account_name="$5"
 
     chmod +x ./az-group-deploy.sh
-    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l "$resource_location" -n "$build_number"
+    ./az-group-deploy.sh -a "$deploy_data" -g "$resource_group" -l "$resource_location" -n "$build_number" -s "$storage_account_name"
 }
 
 function main(){
@@ -132,12 +140,13 @@ function main(){
         exit 1
     fi
 
+    storage_account_name="lspl$RESOURCE_LOCATION"
     echo "Azure image type used: $OS_TYPE"
     pushd "$TEMPLATE_FOLDER"
-    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR" "$FLAVOR" "$OS_VERSION"
+    change_vm_params "$VM_PARAMS" "$BUILD_NUMBER" "$OS_TYPE" "$BASE_DIR" "$FLAVOR" "$OS_VERSION" "$RESOURCE_LOCATION" "$storage_account_name"
     popd
     pushd "$BASE_DIR"
-    create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER" "$RESOURCE_LOCATION"
+    create_vm "$TEMPLATE_FOLDER" "$RESOURCE_GROUP" "$BUILD_NUMBER" "$RESOURCE_LOCATION" "$storage_account_name"
     popd
 }
 
