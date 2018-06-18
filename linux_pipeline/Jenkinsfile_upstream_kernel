@@ -36,7 +36,7 @@ def reportStageStatus(stageName, stageStatus) {
 
 pipeline {
   parameters {
-    choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
+    choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git', description: 'Kernel tree repo', name: 'KERNEL_GIT_URL')
     string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
