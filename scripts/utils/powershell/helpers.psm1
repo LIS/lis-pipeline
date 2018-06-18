@@ -220,7 +220,41 @@ function Parse-IcaLog {
     }
 }
 
+function Get-LisaCode {
+    param(
+        [String] $LISAPath,
+        [String] $GitPath = "git.exe"
+    )
+    if (Test-Path $LISAPath) {
+        rm -Recurse -Force $LISAPath
+    }
+    & $GitPath clone https://github.com/LIS/lis-test.git $LISAPath
+}
+
+function Copy-LisaTestDependencies {
+    param(
+        [parameter(Mandatory=$true)]
+        [String] $LisaTestDependencies,
+        [parameter(Mandatory=$true)]
+        [string[]] $TestDependenciesFolders,
+        [parameter(Mandatory=$true)]
+        [string] $LISARelPath
+    )
+
+    # This function copies test dependencies in lisa folder
+    # from a given share
+    if (!(Test-Path $LisaTestDependencies)) {
+        throw "$LisaTestDependencies path does not exist!"
+    }
+    foreach ($folder in $TestDependenciesFolders) {
+        $LisaDepPath = Join-Path $LisaTestDependencies $folder
+        Copy-Item -Force `
+            -Recurse -Path $LisaDepPath `
+            -Destination $LISARelPath
+    }
+}
+
 Export-ModuleMember login_azure, make_cred, make_cred_initial,
     Assert-PathExists, Assert-URLExists, Execute-WithRetry, Mount-SMBShare,
-    Parse-IcaLog, Get-LisaCode
+    Parse-IcaLog, Get-LisaCode, Copy-LisaTestDependencies
 
