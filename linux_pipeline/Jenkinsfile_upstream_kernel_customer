@@ -80,6 +80,11 @@ pipeline {
                 }
               }
               steps {
+
+              script {
+                env.BRANCH_NAME_SHORT = env.BRANCH_NAME.substring(0,6)
+              }
+
               stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
               sh '''#!/bin/bash
                 set -xe
@@ -245,7 +250,7 @@ pipeline {
                                            usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
                                            file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
                                            ]) {
-                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME_SHORT) {
                     unstash 'kernel_version_ini'
                     sh 'cat scripts/package_building/kernel_versions.ini'
                   }
@@ -253,7 +258,7 @@ pipeline {
                     OS_TYPE=${DISTRO_VERSION%_*}
                     OS_TYPE=${OS_TYPE,,}
                     bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME_SHORT}" \
                         --smb_share_username $USERNAME --smb_share_password $PASSWORD \
                         --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
                     '''
@@ -261,7 +266,7 @@ pipeline {
             }
             post {
               always {
-                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME_SHORT}-boot-diagnostics/*.log"
               }
               failure {
                 sh 'echo "Load failure test results."'
@@ -271,7 +276,7 @@ pipeline {
                 echo "Cleaning Azure resources up..."
                 sh '''#!/bin/bash
                   pushd ./scripts/azure_kernel_validation
-                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME_SHORT}"
                   popd
                   '''
                 nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
@@ -293,7 +298,7 @@ pipeline {
                                            usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
                                            file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
                                            ]) {
-                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME + 'l') {
+                  dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME_SHORT + 'l') {
                     unstash 'kernel_version_ini'
                     sh 'cat scripts/package_building/kernel_versions.ini'
                   }
@@ -301,7 +306,7 @@ pipeline {
                     OS_TYPE=${DISTRO_VERSION%_*}
                     OS_TYPE=${OS_TYPE,,}
                     bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}l" \
+                        --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME_SHORT}l" \
                         --smb_share_username $USERNAME --smb_share_password $PASSWORD \
                         --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
                         --flavor $AZURE_BOOT_LARGE_FLAVOR
@@ -310,7 +315,7 @@ pipeline {
             }
             post {
               always {
-                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}l-boot-diagnostics/*.log"
+                archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME_SHORT}l-boot-diagnostics/*.log"
               }
               failure {
                 sh 'echo "Load failure test results."'
@@ -320,7 +325,7 @@ pipeline {
                 echo "Cleaning Azure resources up..."
                 sh '''#!/bin/bash
                   pushd ./scripts/azure_kernel_validation
-                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}l"
+                  bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME_SHORT}l"
                   popd
                   '''
                 nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
