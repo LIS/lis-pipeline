@@ -41,8 +41,19 @@ prepare_vm_ubuntu() {
     elif [[ "$target_artifacts" == "kernel" ]];then
         sudo dpkg -i *headers* *image*
     fi
+
+    image_file=$(ls -1 *image* | grep -v "dbg" | sed -n 1p)
+    if [[ "${image_file}" != '' ]]; then
+        kernel_identifier=$(dpkg-deb --info "${image_file}" | grep 'Package: ' | grep -o "image.*")
+        kernel_identifier=${kernel_identifier#image-}
+        sudo sed -i.bak 's/GRUB_DEFAULT=.*/GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux '$kernel_identifier'"/g' /etc/default/grub
+        sudo update-grub
+    else
+        exit 1
+    fi
+
     popd
-    
+
     if [[ "$root_key" == "true" ]];then
         add_root_ssh_ubuntu "$vm_username"
     fi
