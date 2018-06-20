@@ -80,11 +80,6 @@ pipeline {
                 }
               }
               steps {
-
-              script {
-                env.BRANCH_NAME_SHORT = env.BRANCH_NAME.substring(0,6)
-              }
-
               stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
               sh '''#!/bin/bash
                 set -xe
@@ -246,6 +241,10 @@ pipeline {
               }
             }
             steps {
+                script {
+                  env.BRANCH_NAME_SHORT = env.BRANCH_NAME.substring(0,6)
+                }
+
                 withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                            usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
                                            file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
@@ -294,6 +293,10 @@ pipeline {
               }
             }
             steps {
+                script {
+                  env.BRANCH_NAME_SHORT = env.BRANCH_NAME.substring(0,6)
+                }
+
                 withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                            usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME'),
                                            file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG', variable: 'PERF_DB_CONFIG')
