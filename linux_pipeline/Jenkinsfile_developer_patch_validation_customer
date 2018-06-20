@@ -54,13 +54,9 @@ pipeline {
                 }
             }
             steps {
-                withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
-                                           string(credentialsId: 'SCP_USERNAME_DEFAULT', variable: 'SCP_USERNAME_DEFAULT')]) {
+                withCredentials(bindings: [string(credentialsId: 'SCP_USERNAME_DEFAULT', variable: 'SCP_USERNAME_DEFAULT')]) {
                     sh '''#!/bin/bash
                           set -xe -o pipefail
-                          if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
-                              KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
-                          fi
                           echo "Building artifacts..."
                           pushd "$WORKSPACE/scripts/package_building"
                           echo ${KERNEL_PATCH} | tr ' ' '\n' > developer_patches
@@ -124,16 +120,12 @@ pipeline {
             steps {
                 dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
                     unstash "${env.KERNEL_ARTIFACTS_PATH}"
-                    withCredentials([string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
-                                     string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                    withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                         usernamePassword(credentialsId: 'smb_share_user_pass',
                                                     passwordVariable: 'PASSWORD',
                                                     usernameVariable: 'USERNAME')]) {
                         sh '''#!/bin/bash
                             set -xe
-                            if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
-                                KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
-                            fi
                             folder_prefix="${KERNEL_GIT_URL##*/}"
                             folder_prefix="${folder_prefix%.*}"
                             bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
@@ -207,16 +199,12 @@ pipeline {
             steps {
                 dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
                     unstash "${env.KERNEL_ARTIFACTS_PATH}"
-                    withCredentials([string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
-                                     string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                    withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                             usernamePassword(credentialsId: 'smb_share_user_pass',
                                             passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
                                     ]) {
                         sh '''#!/bin/bash
                             set -xe
-                            if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
-                                KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
-                            fi
                             folder_prefix="${KERNEL_GIT_URL##*/}"
                             folder_prefix="${folder_prefix%.*}"
                             bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
