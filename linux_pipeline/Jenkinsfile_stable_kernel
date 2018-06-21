@@ -71,7 +71,7 @@ pipeline {
               when {
                 beforeAgent true
                 expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
-                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+                expression { ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -133,7 +133,7 @@ pipeline {
               when {
                 beforeAgent true
                 expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
-                expression { params.ENABLED_STAGES.contains('build_artifacts') }
+                expression { ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -191,7 +191,7 @@ pipeline {
     stage('publish_temp_artifacts') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('publish_temp_artifacts') }
+        expression { ENABLED_STAGES.contains('publish_temp_artifacts') }
       }
       agent {
         node {
@@ -222,7 +222,7 @@ pipeline {
     stage('boot_test') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('boot_test') }
+        expression { ENABLED_STAGES.contains('boot_test') }
       }
       post {
         failure {
@@ -280,7 +280,7 @@ pipeline {
         stage('boot_test_large') {
             when {
               beforeAgent true
-              expression { params.ENABLED_STAGES.contains('boot_test_large') }
+              expression { ENABLED_STAGES.contains('boot_test_large') }
             }
             agent {
               node {
@@ -331,7 +331,7 @@ pipeline {
     stage('publish_artifacts') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('publish_artifacts') }
+        expression { ENABLED_STAGES.contains('publish_artifacts') }
       }
       agent {
         node {
@@ -361,7 +361,7 @@ pipeline {
     stage('publish_azure_vhd') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
+        expression { ENABLED_STAGES.contains('publish_azure_vhd') }
       }
       agent {
         node {
@@ -410,7 +410,7 @@ pipeline {
       stage('validation_functional_hyperv') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
+            expression { ENABLED_STAGES.contains('validation_functional_hyperv') }
           }
           agent {
             node {
@@ -468,7 +468,7 @@ pipeline {
         stage('validation_functional_azure') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_functional_azure') }
+            expression { ENABLED_STAGES.contains('validation_functional_azure') }
           }
           agent {
             node {
@@ -507,7 +507,7 @@ pipeline {
         stage('validation_perf_azure_net') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+            expression { ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
             node {
@@ -643,7 +643,7 @@ pipeline {
         stage('validation_perf_azure_stor') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_perf_azure') }
+            expression { ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
             node {
@@ -684,7 +684,7 @@ pipeline {
         stage('validation_perf_hyperv') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+            expression { ENABLED_STAGES.contains('validation_perf_hyperv') }
           }
           agent {
             node {
