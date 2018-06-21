@@ -116,7 +116,7 @@ def createEnableStages(){
     if (AZURE_BOOT == "true") {
         env.ENABLED_STAGES += " boot_test,"
     }
-    if (AZURE_STRESS_PROVISION_NUMBER != "" && AZURE_STRESS_REBOOT_NUMBER != ""){
+    if (AZURE_STRESS_PROVISION_NUMBER != "" && AZURE_STRESS_REBOOT_NUMBER != "") {
         env.ENABLED_STAGES += " validation_stress_azure,"
     }
     if (env.LISA_TEST_XML != "None") {

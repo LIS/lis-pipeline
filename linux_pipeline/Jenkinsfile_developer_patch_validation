@@ -127,6 +127,9 @@ pipeline {
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                 stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                 name: "${env.KERNEL_ARTIFACTS_PATH}"
+                dir ("scripts/package_building") {
+                    stash includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**", name: "SHORT_KERNEL_PATH"
+                }
                 sh '''
                     set -xe
                     rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
@@ -348,22 +351,24 @@ pipeline {
                         }
                     }
                     steps {
-                        withCredentials(bindings: [file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File'),
+                        withCredentials(bindings: [file(credentialsId: 'Dev_Azure_Secrets_File', variable: 'Dev_Azure_Secrets_File'),
+                                                   file(credentialsId: 'AZURE_AUTH_XML', variable: 'AZURE_AUTH_XML'),
                                                    string(credentialsId: 'AZURE_STORAGE_ACC', variable: 'AZURE_STORAGE_ACC'),
                                                    string(credentialsId: 'AZURE_RESOURCE_GROUP', variable: 'AZURE_RESOURCE_GROUP')]) {
                             echo 'Running LISA...'
-                            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+                            unstash "SHORT_KERNEL_PATH"
                             PowerShellWrapper('''
-                            & ".\\scripts\\azure_kernel_validation\\main-azure.ps1"
-                                -AzureSecretsPath "${env:Azure_Secrets_File}"
-                                -Identifier "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                            & ".\\scripts\\azure_kernel_validation\\main-stress-azure.ps1"
+                                -AzureAuthXml "${env:AZURE_AUTH_XML}"
+                                -AzureSecretsPath "${env:Dev_Azure_Secrets_File}"
+                                -Identifier "kernel-val-${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                                 -WorkingDir "C:\\workspace"
-                                -BaseImage "Canonical UbuntuServer 16.04-LTS latest"
+                                -BaseImage 'Canonical UbuntuServer 16.04-LTS latest'
                                 -TestCase "STRESSTEST-VERIFY-RESTART"
                                 -TestParameters "rebootNumber=${env:AZURE_STRESS_REBOOT_NUMBER}"
                                 -TestIterations "${env:AZURE_STRESS_PROVISION_NUMBER}"
                                 -AzureLocation "${env:AZURE_REGION}"
-                                -KernelDir "scripts\\package_building\\${env:BUILD_NUMBER}-${env:BRANCH_NAME}-${env:KERNEL_ARTIFACTS_PATH}\\**\\deb"
+                                -KernelDir "${env:BUILD_NUMBER}-${env:BRANCH_NAME}-${env:KERNEL_ARTIFACTS_PATH}\\**\\deb"
                                 -ResultsDest ".\\results"
                                 -CleanVhd $true
                                 -StorageAccount "${env:AZURE_STORAGE_ACC}"

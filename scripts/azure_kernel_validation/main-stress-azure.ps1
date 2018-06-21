@@ -3,8 +3,9 @@ param(
     [String] $AzureSecretsPath,
     [parameter(Mandatory=$true)]
     [String] $TestCase,
-    [String] $Identifier,
+    [parameter(Mandatory=$true)]
     [String] $AzureAuthXml,
+    [String] $Identifier,
     [String] $WorkingDir = ".",
     [String] $AzureLocation = "westus2",
     [String] $KernelDir,
@@ -27,7 +28,7 @@ function Search-Kernel {
         [String] $PackageExtension
     )
     
-    if (Test-Path $KernelDir){
+    if (Test-Path $KernelDir) {
         $package = Get-ChildItem -Path $KernelDir | `
             Where-Object {$_.Name -NotMatch "dbg" -and $_.Name -Match "image" -and $_.Name -Match "$PackageExtension"}
         if ($package) {
@@ -45,7 +46,8 @@ function Copy-LatestResults {
         [String] $ResultsDest
     )
     
-    $latestLogs = Get-ChildItem "E:\Test" | Where { $_.PSIsContainer } | Sort CreationTime -Descending | Select -First 1
+    $latestLogs = Get-ChildItem $ResultsPath | Where { $_.PSIsContainer } | `
+        Sort CreationTime -Descending | Select -First 1
     Move-Item -Path $latestLogs -Destination $ResultsDest
 }
 
@@ -73,7 +75,7 @@ function Get-LisaCode {
     if (Test-Path $LISAPath) {
         rm -Recurse -Force $LISAPath
     }
-    git clone https://github.com/mbivolan/LISAv2.git $LISAPath
+    git clone https://github.com/LIS/LISAv2.git $LISAPath
 }
 
 function Set-DeployStorageAccount {
@@ -96,6 +98,12 @@ function Set-DeployStorageAccount {
 }
 
 function Search-TestXml {
+    <#
+    .SYNOPSIS
+        Search all XML files in the given directory for the given test case
+        If the test is found return the XML path.
+    #>
+
     param(
         [parameter(Mandatory=$true)]
         [String] $XmlDir,
@@ -170,12 +178,12 @@ function Prepare-Env {
         [String] $AzureXmlPath,
         [String] $KernelDir,
         [String] $Location,
-        [String] $StorageAccount
+        [String] $StorageAccount,
+        [String] $AzureAuthXml
     )
     
     $AzureXmlPath = Resolve-Path $AzureXmlPath
     $KernelDir = Resolve-Path $KernelDir
-    $KernelDir = Join-Path $KernelDir "deb"
     $regionsXml = Join-Path $LisaPath "XML\RegionAndStorageAccounts.xml"
     
     Push-Location $LisaPath
@@ -183,6 +191,7 @@ function Prepare-Env {
         -XmlSecretsFilePath $AzureXmlPath
     Set-DeployStorageAccount -RegionsXml $regionsXml `
         -Location $Location -StorageAccount $StorageAccount
+    & .\Utilities\AddAzureRmAccountFromSecretsFile.ps1 -customSecretsFilePath $AzureAuthXml
     
     # Note (mbivolan): The kernel package must be in a path relative to the LISA folder
     # For simplicity it will be copied in the LISA folder
@@ -225,22 +234,22 @@ function Run-LisaTest {
             -TestParameters $TestParameters
     }
     
-    $lisaParametes = @{"TestPlatform" = "Azure"; "TestLocation" = $Location; `
-        "RGIdentifier" = "kernel-validation" + $Identifier; `
+    $lisaParameters = @{"TestPlatform" = "Azure"; "TestLocation" = $Location; `
+        "RGIdentifier" = $Identifier; `
         "TestNames" = $TestCase; "TestIterations" = $TestIterations}
     if ($CustomKernel){
         $package = Search-Kernel -KernelDir "." -PackageExtension "deb"
-        $lisaParametes += @{"CustomKernel" = "localfile:" + $package.Name}
+        $lisaParameters += @{"CustomKernel" = "localfile:" + $package.Name}
     }
     if ($ARMImage){
-        $lisaParametes += @{"ARMImageName" = "'$ARMImage'"}
+        $lisaParameters += @{"ARMImageName" = "'$ARMImage'"}
     } elseif ($OSvhd) {
-        $lisaParametes += @{"OsVHD" = $OSvhd}
+        $lisaParameters += @{"OsVHD" = $OSvhd}
     }
     
-    echo $lisaParametes
+    echo $lisaParameters
 
-    powershell.exe -Command ".\RunTests.ps1" -args @lisaParametes
+    powershell.exe -Command ".\RunTests.ps1" -args @lisaParameters
     
     if ($ResultsDest){
         Copy-LatestResults -ResultsPath $resultsDir -ResultsDest $ResultsDest
@@ -252,14 +261,21 @@ function Run-LisaTest {
 } 
 
 function Main {
+    $WorkingDir = Join-Path $WorkingDir $Identifier
+    if ( -not (Test-Path $WorkingDir)) {
+        New-Item -Type Directory -Path $WorkingDir
+    }
     $WorkingDir = Resolve-Path $WorkingDir
     $LisaDir = Join-Path $WorkingDir "LISAv2"
+    if ( -not (Test-Path $ResultsDest)) {
+        New-Item -Type Directory -Path $ResultsDest
+    }
     $ResultsDest = Resolve-Path $ResultsDest
     
     Get-LisaCode -LisaPath $LisaDir
     Prepare-Env -LisaPath $LisaDir -AzureXmlPath $AzureSecretsPath `
         -KernelDir $KernelDir -Location $AzureLocation `
-        -StorageAccount $StorageAccount
+        -StorageAccount $StorageAccount -AzureAuthXml $AzureAuthXml
     
     Run-LisaTest -LisaPath $LisaDir -TestCase "CAPTURE-VHD-BEFORE-TEST" `
         -CustomKernel $true -ARMImage $BaseImage -Location $AzureLocation `
@@ -277,6 +293,8 @@ function Main {
         Clean-AzureVhd -ResourceGroup $ResourceGroup -StorageAccount $StorageAccount `
             -VHDName $generatedVHD
     }
+    
+    Remove-Item -Recurse $WorkingDir
 }
 
 Main
