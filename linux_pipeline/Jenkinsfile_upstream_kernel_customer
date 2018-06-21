@@ -40,6 +40,7 @@ pipeline {
     choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
   }
   environment {
+    ENABLED_STAGES = 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure'
     KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
     UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/upstream-kernel-build-folder'
@@ -56,7 +57,6 @@ pipeline {
     KERNEL_GIT_BRANCH = 'master'
     LISA_TEST_XML = 'kernel_pipeline_bvt.xml'
     KERNEL_DEBUG = 'False'
-    ENABLED_STAGES = 'build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure'
   }
   options {
     overrideIndexTriggers(false)
@@ -71,7 +71,7 @@ pipeline {
               when {
                 beforeAgent true
                 expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
-                expression { ENABLED_STAGES.contains('build_artifacts') }
+                expression { env.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -133,7 +133,7 @@ pipeline {
               when {
                 beforeAgent true
                 expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
-                expression { ENABLED_STAGES.contains('build_artifacts') }
+                expression { env.ENABLED_STAGES.contains('build_artifacts') }
               }
               agent {
                 node {
@@ -191,7 +191,7 @@ pipeline {
     stage('publish_temp_artifacts') {
       when {
         beforeAgent true
-        expression { ENABLED_STAGES.contains('publish_temp_artifacts') }
+        expression { env.ENABLED_STAGES.contains('publish_temp_artifacts') }
       }
       agent {
         node {
@@ -222,7 +222,7 @@ pipeline {
     stage('boot_test') {
       when {
         beforeAgent true
-        expression { ENABLED_STAGES.contains('boot_test') }
+        expression { env.ENABLED_STAGES.contains('boot_test') }
       }
       post {
         failure {
@@ -284,7 +284,7 @@ pipeline {
         stage('boot_test_large') {
             when {
               beforeAgent true
-              expression { ENABLED_STAGES.contains('boot_test_large') }
+              expression { env.ENABLED_STAGES.contains('boot_test_large') }
             }
             agent {
               node {
@@ -339,7 +339,7 @@ pipeline {
     stage('publish_artifacts') {
       when {
         beforeAgent true
-        expression { ENABLED_STAGES.contains('publish_artifacts') }
+        expression { env.ENABLED_STAGES.contains('publish_artifacts') }
       }
       agent {
         node {
@@ -369,7 +369,7 @@ pipeline {
     stage('publish_azure_vhd') {
       when {
         beforeAgent true
-        expression { ENABLED_STAGES.contains('publish_azure_vhd') }
+        expression { env.ENABLED_STAGES.contains('publish_azure_vhd') }
       }
       agent {
         node {
@@ -418,7 +418,7 @@ pipeline {
       stage('validation_functional_hyperv') {
           when {
             beforeAgent true
-            expression { ENABLED_STAGES.contains('validation_functional_hyperv') }
+            expression { env.ENABLED_STAGES.contains('validation_functional_hyperv') }
           }
           agent {
             node {
@@ -476,7 +476,7 @@ pipeline {
         stage('validation_functional_azure') {
           when {
             beforeAgent true
-            expression { ENABLED_STAGES.contains('validation_functional_azure') }
+            expression { env.ENABLED_STAGES.contains('validation_functional_azure') }
           }
           agent {
             node {
@@ -515,7 +515,7 @@ pipeline {
         stage('validation_perf_azure_net') {
           when {
             beforeAgent true
-            expression { ENABLED_STAGES.contains('validation_perf_azure') }
+            expression { env.ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
             node {
@@ -651,7 +651,7 @@ pipeline {
         stage('validation_perf_azure_stor') {
           when {
             beforeAgent true
-            expression { ENABLED_STAGES.contains('validation_perf_azure') }
+            expression { env.ENABLED_STAGES.contains('validation_perf_azure') }
           }
           agent {
             node {
@@ -692,7 +692,7 @@ pipeline {
         stage('validation_perf_hyperv') {
           when {
             beforeAgent true
-            expression { ENABLED_STAGES.contains('validation_perf_hyperv') }
+            expression { env.ENABLED_STAGES.contains('validation_perf_hyperv') }
           }
           agent {
             node {
