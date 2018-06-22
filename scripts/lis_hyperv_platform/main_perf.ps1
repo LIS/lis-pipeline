@@ -13,7 +13,8 @@ param(
     [String] $LISAImagesShareUrl,
     [String] $LisaTestDependencies,
     [String] $LocalKernelFolder,
-    [String] $LisaPerfOptions
+    [String] $LisaPerfOptions,
+    [String] $VHDDestination
 )
 
 $ErrorActionPreference = "Stop"
@@ -28,36 +29,17 @@ $LISA_TEST_RESULTS_REL_PATH = ".\TestResults\*\ica.log"
 Import-Module "$scriptPathParent\utils\powershell\ini.psm1"
 Import-Module "$scriptPathParent\utils\powershell\helpers.psm1"
 
-function Get-LisaCode {
+function Edit-PerfXML{
     param(
-        [parameter(Mandatory=$true)]
-        [string] $LISAPath
-    )
-    if (Test-Path $LISAPath) {
-        rm -Recurse -Force $LISAPath
-    }
-    & $gitPath clone https://github.com/LIS/lis-test.git $LISAPath
-}
-
-function Copy-LisaTestDependencies {
-    param(
-        [parameter(Mandatory=$true)]
-        [string[]] $TestDependenciesFolders,
-        [parameter(Mandatory=$true)]
-        [string] $LISARelPath
+        [String] $Path,
+        [String] $Options
     )
 
-    # This function copies test dependencies in lisa folder
-    # from a given share
-    if (!(Test-Path $LisaTestDependencies)) {
-        throw "${LisaTestDependencies} path does not exist!"
+    $parser = [XMLParser]::new($Path)
+    foreach ($option in ($Options.Split(";"))) {
+        $parser.ChangeXML($option)
     }
-    foreach ($folder in $TestDependenciesFolders) {
-        $LisaDepPath = Join-Path $LisaTestDependencies $folder
-        Copy-Item -Force `
-            -Recurse -Path $LisaDepPath `
-            -Destination $LISARelPath
-    }
+    $parser.Save($Path)
 }
 
 function Run-Lisa {
@@ -70,7 +52,6 @@ function Run-Lisa {
     )
 
     Push-Location $LisaPath
-    Write-Host "Started running LISA"
     try {
         $ErrorActionPreference = "Continue"
         & .\lisa.ps1 @LisaParams
@@ -97,30 +78,11 @@ function Run-Lisa {
     }
 }
 
-function Edit-PerfXML{
-    param(
-        [String] $Path,
-        [String] $Options
-    )
-
-    $parser = [XMLParser]::new($Path)
-    foreach ($option in ($Options.Split(";"))) {
-        $parser.ChangeXML($option)
-    }
-    $parser.Save($Path)
-}
-
-
 function Main {
     if ($KernelVersionPath) {
         $KernelVersionPath = Join-Path $env:Workspace $KernelVersionPath
-        $kernelFolder = Get-IniFileValue -Path $KernelVersionPath `
+        $kernelName = Get-IniFileValue -Path $KernelVersionPath `
             -Section "KERNEL_BUILT" -Key "folder"
-        if (!$kernelFolder) {
-            throw "Kernel folder cannot be empty."
-        }
-        $LocalKernelFolder = Join-Path $env:Workspace $kernelFolder
-        $LocalKernelFolder = Join-Path $LocalKernelFolder $package
     }
     if (!(Test-Path $LocalKernelFolder)) {
         throw "Kernel folder does not exist"
@@ -138,41 +100,46 @@ function Main {
     Write-Host "Getting the proper VHD folder name for LISA with ${OsVersion} and ${VHDType}"
     $imageFolder = Join-Path $LISAImagesShareUrl ("{0}\{0}_{1}" -f @($VHDType, $OsVersion))
     Write-Host "Getting LISA code..."
-    Get-LisaCode -LISAPath $LISAPath
+    Get-LisaCode -LISAPath $LISAPath -GitPath $gitPath
 
     Write-Host "Copying lisa dependencies from share"
     Copy-LisaTestDependencies `
+        -LisaTestDependencies $LisaTestDependencies `
         -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh") `
         -LISARelPath $LISARelPath
 
     # Edit XML
-
-    Push-Location $LISARelPath
-    Write-Host "Editing XML for Perf"
-    $xmlPath = Resolve-Path -Path ".\xml\${XmlTest}"
-    Edit-PerfXML -Path $xmlPath -Options $LisaPerfOptions
-    Write-Host "Finished editing XML for Perf"    
-    Pop-Location
+    if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
+        Push-Location $LISARelPath
+        Write-Host "Editing XML for Perf"
+        $xmlPath = Resolve-Path -Path ".\xml\${XmlTest}"
+        Edit-PerfXML -Path $xmlPath -Options $LisaPerfOptions
+        Write-Host "Finished editing XML for Perf"    
+        Pop-Location
+    }
 
     # Image Build
 
-    $VhdDestination = Join-Path $jobPath "vhd-destination"
-    New-Item -ItemType "Directory" -Path $VhdDestination
+    if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
+        $VhdDestination = Join-Path $jobPath "vhd-destination"
+        New-Item -ItemType "Directory" -Path $VhdDestination
+    }
+    $vhdName = "$kernelName.vhdx"
 
-    $vhdName = "${JobId}-image.vhdx"
     $testParams = ("distro={0};vhdStore={1};uploadName={2};localPath={3}" `
-        -f @($VHDType, $VhdDestination, $vhdName, $LocalKernelFolder))
+        -f @($VHDType, $VHDDestination, $vhdName, $LocalKernelFolder))
     $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\build-vhdx-msft.xml"; `
         "dbgLevel" = "9";"CLImageStorDir" = $imageFolder;"testParams" = $testParams}
     Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams
 
     # Perf Run
-
-    $NetPath = ("\\{0}\{1}$\{2}" `
-        -f @($(hostname), $VhdDestination.split(":")[0], $VhdDestination.split(":")[1]))
-    $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
-        "dbgLevel" = "6";"CLImageStorDir" = $NetPath}
-    Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
+    if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
+        $NetPath = ("\\{0}\{1}$\{2}" `
+            -f @($(hostname), $VhdDestination.split(":")[0], $VhdDestination.split(":")[1]))
+        $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
+            "dbgLevel" = "6";"CLImageStorDir" = $NetPath}
+        Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
+    }
 
     # Cleanup
 

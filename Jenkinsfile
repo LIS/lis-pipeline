@@ -39,7 +39,7 @@ pipeline {
     choice(choices: 'Ubuntu_16.04.3\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_azure_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -294,53 +294,95 @@ pipeline {
         }
       }
     }
-    stage('publish_azure_vhd') {
+    stage('publish_vhd') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
-        expression { params.ENABLED_STAGES.contains('validation') }
-        expression { params.ENABLED_STAGES.contains('azure') }
+        expression { params.ENABLED_STAGES.contains('publish_vhd') }
       }
-      agent {
-        node {
-          label 'azure'
+      parallel {
+        stage('publish_azure_vhd') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
+            expression { params.ENABLED_STAGES.contains('validation') }
+            expression { params.ENABLED_STAGES.contains('azure') }
+          }
+          agent {
+            node {
+              label 'azure'
+            }
+          }
+          steps {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+              build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
+              cleanWs()
+              git "https://github.com/iamshital/azure-linux-automation.git"
+              stash includes: '**' , name: 'azure-linux-automation'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash 'kernel_version_ini'
+              unstash 'azure.env'
+              script {
+                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
+                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+              }
+              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
+              RunPowershellCommand(".\\RunAzureTests.ps1" +
+              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
+              " -testLocation 'westus2'" +
+              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
+              " -testCycle 'PUBLISH-VHD'" +
+              " -OverrideVMSize 'Standard_D2_v2'" +
+              " -ARMImageName '${ARM_IMAGE_NAME}'" +
+              " -StorageAccount 'ExistingStorage_Standard'" +
+              " -ExitWithZero"
+              )
+              script {
+                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+              }
+              RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" +
+              " -sourceLocation westus2 " +
+              " -destinationLocations 'westus,westus2,northeurope'" +
+              " -destinationAccountType Standard" +
+              " -sourceVHDName '${ARM_OSVHD_NAME}'" +
+              " -destinationVHDName '${ARM_OSVHD_NAME}'"
+              )
+            }
+          }
         }
-      }
-      steps {
-        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-          build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
-          cleanWs()
-          git "https://github.com/iamshital/azure-linux-automation.git"
-          stash includes: '**' , name: 'azure-linux-automation'
-          unstash "${env.KERNEL_ARTIFACTS_PATH}"
-          unstash 'kernel_version_ini'
-          unstash 'azure.env'
-          script {
-              env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-              env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
+        stage('publish_hyperv_vhd') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('publish_hyperv_vhd') }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
           }
-          RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-          RunPowershellCommand(".\\RunAzureTests.ps1" +
-          " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-          " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-          " -testLocation 'westus2'" +
-          " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-          " -testCycle 'PUBLISH-VHD'" +
-          " -OverrideVMSize 'Standard_D2_v2'" +
-          " -ARMImageName '${ARM_IMAGE_NAME}'" +
-          " -StorageAccount 'ExistingStorage_Standard'" +
-          " -ExitWithZero"
-          )
-          script {
-              env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
+          agent {
+            node {
+              label 'hyper-v'
+            }
           }
-          RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" + 
-          " -sourceLocation westus2 " +
-          " -destinationLocations 'westus,westus2,northeurope'" +
-          " -destinationAccountType Standard" + 
-          " -sourceVHDName '${ARM_OSVHD_NAME}'" +
-          " -destinationVHDName '${ARM_OSVHD_NAME}'"
-          )
+          steps {
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
+                                       string(credentialsId: 'VHD_UPLOAD_DESTINATION', variable: 'VHD_UPLOAD_DESTINATION')]) {
+              println 'Running LISA...'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+              unstash "kernel_version_ini"
+              PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main_perf.ps1"
+                         -KernelVersionPath "scripts\\package_building\\kernel_versions.ini"
+                         -LocalKernelFolder "scripts/package_building/${env:BUILD_NUMBER}-${env:BRANCH_NAME}-${env:KERNEL_ARTIFACTS_PATH}/**/deb"
+                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-msft"
+                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-f"
+                         -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
+                         -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]"
+                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "None"
+                         -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                         -VHDDestination ${env:VHD_UPLOAD_DESTINATION}
+                      ''')
+              println 'Finished running LISA.'
+            }
+          }
         }
       }
     }
