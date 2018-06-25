@@ -475,7 +475,7 @@ function prepare_perf_rhel (){
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/Name:.*/Name:  ${package_prefix}-perf/g" "SPECS/$spec"
     fi
-    change_spec_version "SPECS/$spec" "$full_version"
+    check_spec_file "SPECS/$spec" "${dep_path}/perf/files.ini" "${source}/tools/perf"
     change_perf_options "./SOURCES/tools/perf/Makefile.perf" "NO_GTK2=True"
     popd
 }
