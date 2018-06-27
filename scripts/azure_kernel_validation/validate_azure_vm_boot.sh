@@ -73,11 +73,11 @@ validate_azure_vm_boot() {
         exit 2
     fi
 
-    MOUNT_POINT="/tmp/${BUILD_NUMBER}"
-    mkdir -p $MOUNT_POINT
-    sudo mount -t cifs "${SMB_SHARE_URL}/temp-kernel-artifacts" $MOUNT_POINT \
-               -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
     if [[ "$LOCAL_PATH" == "" ]]; then
+        MOUNT_POINT="/tmp/${BUILD_NUMBER}"
+        mkdir -p $MOUNT_POINT
+        sudo mount -t cifs "${SMB_SHARE_URL}/temp-kernel-artifacts" $MOUNT_POINT \
+                   -o vers=3.0,username=${USERNAME},password=${PASSWORD},dir_mode=0777,file_mode=0777,sec=ntlmssp
         target_url="${MOUNT_POINT}/${KERNEL_FOLDER}/${artifacts_folder}"
         target_artifacts="kernel"
     else
@@ -88,7 +88,10 @@ validate_azure_vm_boot() {
     run_remote_script "$BASEDIR/prepare_test_vm.sh" "$PRIVATE_KEY_PATH" "$VM_USER_NAME" "$public_ip" \
                 "--artifacts_path /tmp --os_type $OS_TYPE --target_artifacts $target_artifacts --vm_username $VM_USER_NAME"
     ssh -i $PRIVATE_KEY_PATH -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$VM_USER_NAME@$public_ip" 'sudo reboot' || true
-    sudo umount $MOUNT_POINT
+
+    if [[ "$LOCAL_PATH" == "" ]]; then
+        sudo umount $MOUNT_POINT
+    fi
     sleep 10
 
     INTERVAL=5
