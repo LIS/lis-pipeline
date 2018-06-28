@@ -229,56 +229,54 @@ def boot_test() {
                 unstash 'kernel_version_ini'
                 sh 'cat scripts/package_building/kernel_versions.ini'
             }
-            withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                              usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                      ]) {
-                sh(script: '''#!/bin/bash
-                              set -xe
-                              distro_version=$DISTRO_VERSION
-                              OS_TYPE=${distro_version%_*}
-                              OS_TYPE=${OS_TYPE,,}
-                              if [[ $OS_TYPE == "ubuntu" ]]; then
-                                  PACKAGE_NAME="deb"
-                              elif [[ $OS_TYPE == "centos" ]]; then
-                                  PACKAGE_NAME="rpm"
-                              fi
-                              pushd $BUILD_NUMBER$BRANCH_NAME
-                              mkdir -p "$PACKAGE_NAME"
-                              art=$(find . -name "*.$PACKAGE_NAME")
-                              mv $art "$PACKAGE_NAME"
-                              popd
-                              '''
-                )
-                exitStatus = sh(script: '''#!/bin/bash
-                                       distro_version=$DISTRO_VERSION
-                                       OS_TYPE=${distro_version%_*}
-                                       OS_TYPE=${OS_TYPE,,}
-                                       local_path=$(readlink -f ${BUILD_NUMBER}${BRANCH_NAME})
-                                       AZURE_MAX_RETRIES=$AZURE_MAX_RETRIES bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                                               --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
-                                               --smb_share_username $USERNAME --smb_share_password $PASSWORD \
-                                               --smb_share_url $SMB_SHARE_URL --os_type $OS_TYPE --vm_user_name $OS_TYPE \
-                                               --local_path $local_path --flavor "${BOOT_FLAVOR_SIZE}"
-                                       ''',
-                                 returnStatus:true
-                             )
+
+            sh(script: '''#!/bin/bash
+                set -xe
+                distro_version=$DISTRO_VERSION
+                OS_TYPE=${distro_version%_*}
+                OS_TYPE=${OS_TYPE,,}
+                if [[ $OS_TYPE == "ubuntu" ]]; then
+                    PACKAGE_NAME="deb"
+                elif [[ $OS_TYPE == "centos" ]]; then
+                    PACKAGE_NAME="rpm"
+                fi
+                pushd $BUILD_NUMBER$BRANCH_NAME
+                mkdir -p "$PACKAGE_NAME"
+                art=$(find . -name "*.$PACKAGE_NAME")
+                mv $art "$PACKAGE_NAME"
+                popd
+            '''
+            )
+
+            println "Validating Azure boot..."
+            exitStatus = sh(script: '''#!/bin/bash
+                distro_version=$DISTRO_VERSION
+                OS_TYPE=${distro_version%_*}
+                OS_TYPE=${OS_TYPE,,}
+                local_path=$(readlink -f ${BUILD_NUMBER}${BRANCH_NAME})
+                AZURE_MAX_RETRIES=$AZURE_MAX_RETRIES bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
+                       --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
+                       --os_type $OS_TYPE --vm_user_name $OS_TYPE \
+                       --local_path $local_path --flavor "${BOOT_FLAVOR_SIZE}"
+               ''',
+               returnStatus:true
+            )
+
+            println "Cleaning Azure resources up..."
+            sh(script: '''#!/bin/bash
+                pushd ./scripts/azure_kernel_validation
+                bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
+                popd
+            '''
+            )
+
+            archiveArtifacts(artifacts: "$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME-boot-diagnostics/*.log", allowEmptyArchive: true)
+            if (exitStatus == 0) {
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml', failIfNoResults: false)
+            } else {
+                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml', failIfNoResults: false)
+                sh(script: "exit 1")
             }
-        }
-
-        println "Cleaning Azure resources up..."
-        sh(script: """#!/bin/bash
-                      pushd ./scripts/azure_kernel_validation
-                      bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
-                      popd
-                      """
-        )
-
-        archiveArtifacts(artifacts: "$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME-boot-diagnostics/*.log", allowEmptyArchive: true)
-        if (exitStatus == 0) {
-            nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml', failIfNoResults: false)
-        } else {
-            nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml', failIfNoResults: false)
-            sh(script: "exit 1")
         }
     }
 }
