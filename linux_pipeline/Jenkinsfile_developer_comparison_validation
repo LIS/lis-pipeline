@@ -73,6 +73,7 @@ properties ([
 
 def perfXml = ["SR-IOV_TCP": "TCP_SRIOV_v4.xml", "SR-IOV_UDP":"UDP_SRIOV_v4.xml", "FIO_RAID": "FIO_RAID0_Pipeline.xml"]
 def sendMail = false
+def slavePipelineName = "pipeline-developer-patch-runner"
 
 def getPerfOptions(perf_test) {
     switch (perf_test) {
@@ -132,7 +133,7 @@ node ("meta_slave") {
 
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
+                patchedRun = build job: "${slavePipelineName}/${env.BRANCH_NAME}", parameters: [
                     string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                     string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                     string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
@@ -147,7 +148,7 @@ node ("meta_slave") {
             }
             if (env.SKIP_UNPATCHED == "false") {
                 runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", parameters: [
+                    unpatchedRun = build job: "${slavePipelineName}/${env.BRANCH_NAME}", parameters: [
                         string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
                         string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
                         string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
@@ -165,10 +166,10 @@ node ("meta_slave") {
 
     stage ("aggregate_results") {
         dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
+            copyArtifacts(projectName: "${slavePipelineName}/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
             archiveArtifacts 'patched_run/**';
             if (env.SKIP_UNPATCHED == "false") {
-                copyArtifacts(projectName: "pipeline-developer-patch-validation/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                copyArtifacts(projectName: "${slavePipelineName}/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
                 archiveArtifacts 'unpatched_run/**';
                 if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
                     stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
