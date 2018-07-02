@@ -20,6 +20,7 @@ $LOCAL_TO_REMOTE_FOLDER_MAPPINGS = @{
     "stable-kernels" = "stable-kernels";
     "linux-next-kernels" = "upstream-kernel/linux-next";
     "net-next-kernels" = "upstream-kernel/net-next";
+    "upstream-stable-kernels" = "upstream-kernel/linux-stable";
 }
 
 function Sync-SMBShare {
