@@ -8,7 +8,7 @@ env.kernelTree;
 env.buildDir = "/mnt/tmp/bisect"
 env.cloneDir = "kernel_tree"
 
-pipelineName = "pipeline-kernel-bisect-commit-validator/" + env.BRANCH_NAME
+pipelineName = "pipeline-kernel-bisect-runner/" + env.BRANCH_NAME
 
 isPerf = false
 def float baseValue = 0
