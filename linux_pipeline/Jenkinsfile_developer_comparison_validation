@@ -275,8 +275,8 @@ node ("meta_slave") {
         }
     }
 
-    stage ("Send Report"){
-        node ("jenkins-meta-slave") {
+    stage ("email_report"){
+        node ("meta_slave") {
             if (sendMail) {
                 dir ("mail-send-comp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                     unstash 'report_results'
