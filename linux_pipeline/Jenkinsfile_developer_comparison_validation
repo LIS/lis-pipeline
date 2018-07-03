@@ -35,6 +35,14 @@ properties ([
                         westeurope\nwestindia\nwestus\nsepremium""",
             name: 'AZURE_REGION',
             description: 'Azure Region',],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_STRESS_PROVISION_NUMBER',
+            defaultValue: '100',
+            description: 'Azure stress test parameter for provisions number'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_STRESS_REBOOT_NUMBER',
+            defaultValue: '100',
+            description: 'Azure stress test parameter for reboot number'],
         [$class: 'ChoiceParameterDefinition',
             choices: "None\nkernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
             name: 'LISA_TEST_XML',
@@ -109,6 +117,9 @@ def createEnableStages(){
     if (AZURE_BOOT == "true") {
         env.ENABLED_STAGES += " boot_test,"
     }
+    if (AZURE_STRESS_PROVISION_NUMBER != "" && AZURE_STRESS_REBOOT_NUMBER != "") {
+        env.ENABLED_STAGES += " validation_stress_azure,"
+    }
     if (env.LISA_TEST_XML != "None") {
         env.ENABLED_STAGES +=  " validation_functional_hyperv,"
     }
@@ -140,6 +151,8 @@ node ("meta_slave") {
                     string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
                     string(name: 'AZURE_VM_SIZE', value: AZURE_VM_SIZE),
                     string(name: 'AZURE_REGION', value: AZURE_REGION),
+                    string(name: 'AZURE_STRESS_PROVISION_NUMBER', value: "${AZURE_STRESS_PROVISION_NUMBER}"),
+                    string(name: 'AZURE_STRESS_REBOOT_NUMBER', value: "${AZURE_STRESS_REBOOT_NUMBER}"),
                     string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
                     string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
                     string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
