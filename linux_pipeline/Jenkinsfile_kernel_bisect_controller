@@ -151,23 +151,15 @@ def initEnv() {
 
                         mkdir -p $buildDir
                         pushd $buildDir
-                        if [[ ! -d $cloneDir ]];then
-                            git clone $kernel_tree $cloneDir
-                            pushd $cloneDir
-                                git config --global gc.auto 0
-                            popd
-                        else
-                            pushd $cloneDir
-                            git remote set-url origin $kernel_tree
-                            popd
-                        fi
-                        pushd $cloneDir
-                        git checkout -f $KERNEL_GIT_BRANCH
-                        git clean -x -f -d
-                        git reset --hard HEAD
-                        git fetch --all
-                        git pull
-                        popd
+                          if [[ -d $cloneDir ]];then
+                            rm -rf "${cloneDir}"
+                          fi
+
+                          git clone $kernel_tree $cloneDir
+                          pushd $cloneDir
+                            git config --global gc.auto 0
+                            git checkout -f $KERNEL_GIT_BRANCH
+                          popd
                         popd
                         '''
             )
