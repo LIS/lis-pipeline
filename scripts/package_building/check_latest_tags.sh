@@ -35,7 +35,11 @@ function get_latest_commits {
     results_path="$3"
     
     pushd "./${repo_name}"
-    full_tags="$(git tag -l --format='%(refname) %(taggerdate)' | grep "$(date +"%b %d" -d "yesterday")" | grep "$(date +"%Y" -d "yesterday")" || true)"
+    current_month="$(date +"%b" -d "yesterday")"
+    current_day="$(date +"%d" -d "yesterday" | sed 's/^0*//')"
+    current_year="$(date +"%Y" -d "yesterday")"
+
+    full_tags="$(git tag -l --format='%(refname) %(taggerdate)' | grep "${current_month} ${current_day}" | grep "${current_year}" || true)"
     if [[ $versions ]];then
         full_tags="$(echo "$full_tags" | grep -E "$versions" || true)"
     fi
