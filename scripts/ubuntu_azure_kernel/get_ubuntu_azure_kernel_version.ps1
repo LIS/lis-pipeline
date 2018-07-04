@@ -32,6 +32,9 @@ param (
 
 $URI_MAP = @{bionic_azure = "https://launchpad.net/ubuntu/bionic/+source/linux-azure";
              xenial_azure = "https://launchpad.net/ubuntu/xenial/+source/linux-azure";}
+$EXIT_CODE_MAP = @{both = 10;
+                   xenial = 11;
+                   bionic = 12;}
 
 function Get-LatestPackageVersion {
     param (
@@ -77,14 +80,14 @@ function Main {
     }
     
     if (($changeTable.xenial_azure -eq $False) -and ($changeTable.bionic_azure -eq $False)) {
-        Write-Output "New kernel available for Bionic and Xenial. Triggering testing for both"
-        exit 1
+        Write-Output "New kernel available for Bionic and Xenial."
+        exit $EXIT_CODE_MAP.both
     } elseIf ($changeTable.xenial_azure -eq $False) {
-        Write-Output "New kernel available for Xenial. Triggering testing"
-        exit 2
+        Write-Output "New kernel available for Xenial."
+        exit $EXIT_CODE_MAP.xenial
     } elseIf ($changeTable.bionic_azure -eq $False) {
-        Write-Output "New kernel available for Bionic. Triggering testing"
-        exit 3
+        Write-Output "New kernel available for Bionic."
+        exit $EXIT_CODE_MAP.bionic
     } else {
         Write-Output "No new kernels are available"
         exit 0
