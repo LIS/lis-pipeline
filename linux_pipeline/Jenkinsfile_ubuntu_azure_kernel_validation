@@ -1,0 +1,227 @@
+#!/usr/bin/env groovy
+
+def PowerShellWrapper(psCmd) {
+    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
+    def exitCode = bat (returnStatus: true, script: "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\"")
+    return exitCode
+}
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    parameters([
+        choice (name: 'Distro', choices: 'default\nxenial\nbionic\nall', 
+                description: 'xenial - only Xenial validation <br> bionic - only Bionic validation <br> all - all distros validation <br>'),
+        choice (name: 'Kernel', choices: 'linux-azure\nlinux-azure-edge\nall',
+                description: 'linux-azure - only linux-azure kernel validation <br> linux-azure-edge - only linux-azure-edge kernel validation - KERNEL NOT SUPPORTED ON AZURE <br> all - all kernels validation <br>'),
+        choice (name: 'Platform', choices: 'all\nhyperv\nazure',
+                description: 'hyperv - only Hyper-V validation <br> azure - only Azure validation <br> all - all platforms validation <br>')
+    ]),
+    pipelineTriggers([cron('H */12 * * *')])
+])
+
+distroToTest = []
+DISTRO_TRIGGER = "default"
+DISTRO_BIONIC = "bionic"
+DISTRO_XENIAL = "xenial"
+DISTRO_BIONIC_EDGE = "bionic-edge"
+DISTRO_XENIAL_EDGE = "xenial-edge"
+DISTRO_ALL = "all"
+
+KERNEL_AZURE = "linux-azure"
+KERNEL_AZURE_EDGE = "linux-azure-edge"
+KERNEL_ALL = "all"
+
+PLATFORM_HYPERV = "hyperv"
+PLATFORM_AZURE = "azure"
+PLATFORM_ALL = "all"
+
+HYPERV_PARAMS_AZURE = "azure_kernel=yes; azure_kernel_edge=no"
+HYPERV_PARAMS_AZURE_EDGE = "azure_kernel=no; azure_kernel_edge=yes"
+HYPERV_XML = "ubuntu_azure_kernel_fvt.xml"
+XENIAL_VERSION = "ubuntu_16.04.3"
+BIONIC_VERSION = "Ubuntu_18.04"
+
+AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
+ARM_XENIAL = "Canonical UbuntuServer 16.04-LTS latest"
+ARM_BIONIC = "Canonical UbuntuServer 18.04-LTS latest"
+
+EXIT_CODE_ALL = 10
+EXIT_CODE_XENIAL = 11
+EXIT_CODE_BIONIC = 12
+
+def AddDistroToTest (distroBionic, distroXenial) {
+    if (env.distro == DISTRO_ALL) {
+        distroToTest.add(distroBionic)
+        distroToTest.add(distroXenial)
+    }
+    if (env.distro == DISTRO_XENIAL) {
+        distroToTest.add(distroXenial)
+    }
+    if (env.distro == DISTRO_BIONIC) {
+        distroToTest.add(distroBionic)
+    }
+}
+
+if (env.distro == DISTRO_TRIGGER) {
+    stage ("Check for kernel update") {
+        node ("ws2016"){
+            withCredentials(bindings: [string(credentialsId: 'AZURE_KERNEL_INFO_LOCATION', variable: 'AZURE_KERNEL_INFO_LOCATION')]) {
+                dir (env.BUILD_NUMBER + env.BRANCH_NAME) { 
+                    checkout scm
+                    echo 'Checking if there is a new kernel version'
+                    kernelCheckExitCode = PowerShellWrapper('''
+                        & ".\\scripts\\ubuntu_azure_kernel\\get_ubuntu_azure_kernel_version.ps1"
+                            -RemoteLocation "${env:AZURE_KERNEL_INFO_LOCATION}"
+                    ''')
+                    if (kernelCheckExitCode == EXIT_CODE_ALL) {
+                        echo "New kernel available for Bionic and Xenial."
+                        env.distro = DISTRO_ALL
+                        distroToTest.add(DISTRO_BIONIC)
+                        distroToTest.add(DISTRO_XENIAL)
+                    }
+                    if (kernelCheckExitCode == EXIT_CODE_XENIAL) {
+                        echo "New kernel available for Xenial."
+                        env.distro = DISTRO_XENIAL
+                        distroToTest.add(DISTRO_XENIAL)
+                    }
+                    if (kernelCheckExitCode == EXIT_CODE_BIONIC) {
+                        echo "New kernel available for Bionic."
+                        env.distro = DISTRO_BIONIC
+                        distroToTest.add(DISTRO_BIONIC)
+                    }
+                    deleteDir()
+                }
+            } 
+        }
+    }
+    if (kernelCheckExitCode == 0) {
+        echo "No new kernels found"
+        currentBuild.result = 'ABORTED'
+        return
+    }
+    if (env.distro == DISTRO_TRIGGER) {
+        echo "get_ubuntu_azure_kernel_version.ps1 failed with exit code ${kernelCheckExitCode}"
+        currentBuild.result = 'FAILED'
+        return
+    }
+} else {
+    if ((env.kernel == KERNEL_ALL) || (env.kernel == KERNEL_AZURE)) {   
+        AddDistroToTest (DISTRO_BIONIC, DISTRO_XENIAL)
+    }
+}
+
+if ((env.kernel == KERNEL_ALL) || (env.kernel == KERNEL_AZURE_EDGE)) {
+    AddDistroToTest (DISTRO_BIONIC_EDGE, DISTRO_XENIAL_EDGE)
+}
+
+stage ("Validation") {
+    parallel "Hyper-V": {
+        if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
+            def runNumber = 1
+            def runs = [:]
+            distroToTest.each() {
+                def distro = it
+                runs["${distro}-HyperV"] = {
+                    stage ("${distro}-HyperV") {
+                        node ("ws2016") {
+                            withCredentials(bindings: [
+                            string(credentialsId:'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                            string(credentialsId:'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
+                                dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                                    checkout scm
+                                    if ((distro == DISTRO_XENIAL_EDGE) || (distro == DISTRO_XENIAL)) {
+                                        distroVersion = XENIAL_VERSION
+                                        if (distro == DISTRO_XENIAL_EDGE) {
+                                            testParams = HYPERV_PARAMS_AZURE_EDGE
+                                        } else {
+                                            testParams = HYPERV_PARAMS_AZURE
+                                        }
+                                    }
+                                    if ((distro == DISTRO_BIONIC_EDGE) || (distro == DISTRO_BIONIC)) {
+                                        distroVersion = BIONIC_VERSION
+                                        if (distro == DISTRO_BIONIC_EDGE) {
+                                            testParams = HYPERV_PARAMS_AZURE_EDGE
+                                        } else {
+                                            testParams = HYPERV_PARAMS_AZURE
+                                        }
+                                    }
+                                    echo "Test params: ${testParams}"
+                                    echo "Distro version: ${distroVersion}"
+                                    echo 'Running LISA...'
+                                    PowerShellWrapper("""
+                                        & '.\\scripts\\lis_hyperv_platform\\main-lis-rpm.ps1'
+                                            -JobId '${distro}-d-${BUILD_NUMBER}'
+                                            -InstanceName '${distro}'
+                                            -DistroVersion '${distroVersion}' -WorkingDirectory 'C:\\workspace'
+                                            -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}' 
+                                            -XmlTest '${HYPERV_XML}'
+                                            -LisaTestDependencies '${LISA_TEST_DEPENDENCIES}'
+                                            -LisaOptionalParams '${testParams}'
+                                        """)
+                                deleteDir()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            parallel runs
+        } else {
+            echo "Skipping Hyper-V validation"
+        }
+    },
+    "Azure": {
+        node ("azure") {
+            if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
+                def runNumber = 1
+                def runs = [:]
+                distroToTest.remove(DISTRO_XENIAL_EDGE)
+                distroToTest.remove(DISTRO_BIONIC_EDGE)
+                distroToTest.each() {
+                    def distro = it
+                    runs["${distro}-Azure"] = {
+                        stage ("${distro}-Azure") {
+                        withCredentials(bindings: [
+                        file(credentialsId:'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+                            echo "Azure is running"
+                            dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                                git AZURE_LINUX_AUTOMATION_REPO
+                                if (distro == DISTRO_XENIAL) {
+                                    armVMImage = ARM_XENIAL
+                                }
+                                if (distro == DISTRO_BIONIC) {
+                                    armVMImage = ARM_BIONIC
+                                }
+                                RunPowershellCommand(".\\RunAzureTests.ps1" +
+                                " -BuildNumber '${BUILD_NUMBER}'" +
+                                " -testLocation 'westus2'" +
+                                " -DistroIdentifier '${distro}'" +
+                                " -testCycle 'BVT'" +
+                                " -testIterations '1'" +
+                                " -customSecretsFilePath '${Azure_Secrets_File}'" +
+                                " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
+                                " -StorageAccount 'ExistingStorage_Standard'" +
+                                " -ARMImageName '${armVMImage}'" +
+                                " -OverrideVMSize 'Standard_D2_v2'" +
+                                " -customKernel 'proposed'" +
+                                " -coureCountExceededTimeout '3600'" +
+                                " -ExitWithZero"
+                                )
+                                junit "report\\*-junit.xml"
+                                RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+                            deleteDir()
+                            }
+                        }
+                        }
+                    }
+                }
+                parallel runs
+            } else {
+                echo "Skipping Azure validation"
+            }
+        }
+    }
+}
