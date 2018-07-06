@@ -22,7 +22,10 @@
 ################################################################################
 #
 #   Description
-#
+#      This script extracts and parses the ubuntu linux-azure kernel version.
+#      The linux-azure kernel version is saved in a text file and further
+#      used to compare if a new version is available.
+#      Only Ubuntu LTS releases are supported.
 #
 ################################################################################
 
