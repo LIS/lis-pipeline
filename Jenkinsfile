@@ -53,6 +53,7 @@ pipeline {
     BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
     THREAD_NUMBER = 'x3'
+    AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
   }
   options {
     overrideIndexTriggers(false)
@@ -316,7 +317,7 @@ pipeline {
             withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
               build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
               cleanWs()
-              git "https://github.com/iamshital/azure-linux-automation.git"
+              git env.AZURE_LINUX_AUTOMATION_REPO
               stash includes: '**' , name: 'azure-linux-automation'
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
               unstash 'kernel_version_ini'
