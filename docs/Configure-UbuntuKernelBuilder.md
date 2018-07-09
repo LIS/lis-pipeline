@@ -33,13 +33,13 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     #!/bin/bash
     set -xe
     pushd /usr/local/bin
-    ln -s /usr/bin/pbzip2 bzip2
-    ln -s /usr/bin/pbzip2 bunzip2
-    ln -s /usr/bin/pbzip2 bzcat
-    ln -s /usr/bin/pigz gzip
-    ln -s /usr/bin/pigz gunzip
-    ln -s /usr/bin/pigz gzcat
-    ln -s /usr/bin/pigz zcat
+    ln -sf /usr/bin/pbzip2 bzip2
+    ln -sf /usr/bin/pbzip2 bunzip2
+    ln -sf /usr/bin/pbzip2 bzcat
+    ln -sf /usr/bin/pigz gzip
+    ln -sf /usr/bin/pigz gunzip
+    ln -sf /usr/bin/pigz gzcat
+    ln -sf /usr/bin/pigz zcat
     popd
     ```
   - Force a lower compression level on dpkg-deb \-\-build.
@@ -54,6 +54,13 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
     set -xe
 
     dpkg_deb_path=$(which dpkg-deb)
+    dpkg_deb_fileinfo=$(file $dpkg_deb_path | grep "ELF" || true)
+
+    if [[ "${dpkg_deb_fileinfo}" == '' ]]; then
+        echo "dpkg-deb has been already optimized"
+        exit 1
+    fi
+
     cp $dpkg_deb_path "${dpkg_deb_path}-original"
     cat > $dpkg_deb_path <<- EOM
     #!/bin/bash
