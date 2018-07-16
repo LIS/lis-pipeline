@@ -38,19 +38,27 @@ $URI_MAP = @{bionic_azure = "https://launchpad.net/ubuntu/bionic/+source/linux-a
 $EXIT_CODE_MAP = @{both = 10;
                    xenial = 11;
                    bionic = 12;}
+$CURL_PATH = "C:\PortableGit\mingw64\bin\curl.exe"
 
 function Get-LatestPackageVersion {
     param (
         [String] $URI
     )
+    [System.Object]$htmlObj = New-Object -ComObject "HTMLFile"
+    $htmlFileName = "linux-azure.html"
+    
+    # Download the html file
+    $downloadCommand = &${CURL_PATH} ${URI} --output ${htmlFileName}
+    $srcBytes = [System.Text.Encoding]::Unicode.GetBytes($(Get-Content ${htmlFileName}))
+    $htmlObj.write($srcBytes)
 
     # Get the latest version from the HTML file
-    $htmlData = Invoke-WebRequest -Uri $URI
-    $innerText = $htmlData.ParsedHtml.getElementById('maincontent').innerText
+    $innerText = $htmlObj.getElementById('maincontent').innerText
     $startPosition = $innerText.IndexOf("Current version: ") + 17
-    $endPosition = $innerText.IndexOf(" Uploaded:")
+    $endPosition = $innerText.IndexOf("Uploaded:")
 
     # This is the latest kernel version as shown in launchpad
+    Remove-Item -Force $htmlFileName
     [string] $launchpadVersion = $innerText.Substring($startPosition,$endPosition-$startPosition)
     return $launchpadVersion
 }
@@ -61,14 +69,30 @@ function Write-VersionToShare {
         [String] $Distro
     )
 
-    [string] $savedVersion = Get-Content "${RemoteLocation}\latest-${Distro}.txt"
+    # Get the latest known version
+    $currentDir = (Get-Item -Path ".\").FullName
+    Robocopy.exe $RemoteLocation $currentDir "latest-${Distro}.txt"
+    if (-not $?) {
+        Write-Output "Robocopy failed to download latest-${Distro}.txt"
+        return $false   
+    }
+
+    [string] $savedVersion = Get-Content "latest-${Distro}.txt"
+    $savedVersion = $savedVersion -replace '\s',''
+    $KernelVersion = $KernelVersion -replace '\s',''
+    
     if ($savedVersion -eq $KernelVersion) {
         Write-Output "No new versions of ${Distro} kernel are avilable on launchpad" 
         return $true
     } else {
         Write-Output "New version available for ${Distro} kernel: $KernelVersion"
         Write-Output "Old version for ${Distro} kernel: $savedVersion"
-        Set-Content -Value $KernelVersion -Path "${RemoteLocation}\latest-${Distro}.txt"
+        Set-Content -Value $KernelVersion -Path "latest-${Distro}.txt"
+        Robocopy.exe $currentDir $RemoteLocation "latest-${Distro}.txt"
+        if (-not $?) {
+            Write-Output "Robocopy failed to upload latest-${Distro}.txt"
+            return $false   
+        }
         return $false
     }
 }
