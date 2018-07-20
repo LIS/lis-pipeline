@@ -67,7 +67,7 @@ def AddDistroToTest (distroBionic, distroXenial) {
 
 if (env.distro == DISTRO_TRIGGER) {
     stage ("Check for kernel update") {
-        node ("ws2016"){
+        node ("ubuntu_trigger"){
             withCredentials(bindings: [string(credentialsId: 'AZURE_KERNEL_INFO_LOCATION', variable: 'AZURE_KERNEL_INFO_LOCATION')]) {
                 dir (env.BUILD_NUMBER + env.BRANCH_NAME) { 
                     checkout scm

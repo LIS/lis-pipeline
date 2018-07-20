@@ -71,8 +71,8 @@ function Write-VersionToShare {
 
     # Get the latest known version
     $currentDir = (Get-Item -Path ".\").FullName
-    Robocopy.exe $RemoteLocation $currentDir "latest-${Distro}.txt"
-    if (-not $?) {
+    Robocopy.exe $RemoteLocation $currentDir "latest-${Distro}.txt" /IS /IT /COPY:DAT /DCOPY:DAT /R:1 /S 2>&1
+    if ($LASTEXITCODE -gt "7") {
         Write-Output "Robocopy failed to download latest-${Distro}.txt"
         return $false   
     }
@@ -88,9 +88,9 @@ function Write-VersionToShare {
         Write-Output "New version available for ${Distro} kernel: $KernelVersion"
         Write-Output "Old version for ${Distro} kernel: $savedVersion"
         Set-Content -Value $KernelVersion -Path "latest-${Distro}.txt"
-        Robocopy.exe $currentDir $RemoteLocation "latest-${Distro}.txt"
-        if (-not $?) {
-            Write-Output "Robocopy failed to upload latest-${Distro}.txt"
+        Robocopy.exe $currentDir $RemoteLocation "latest-${Distro}.txt" /IS /IT /COPY:DAT /DCOPY:DAT /R:1 /S 2>&1
+        if ($LASTEXITCODE -gt "7") {
+            Write-Output "Robocopy failed to download latest-${Distro}.txt"
             return $false   
         }
         return $false
