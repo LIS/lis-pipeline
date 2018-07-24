@@ -1,0 +1,168 @@
+#!/usr/bin/env groovy
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_CASE',
+            defaultValue: '',
+            description: 'Test cases to be run, comma separated.'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_CATEGORY',
+            defaultValue: '',
+            description: 'Test category to be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_AREA',
+            defaultValue: '',
+            description: 'Test area to be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'GIT_URL',
+            defaultValue: 'https://github.com/mbivolan/LISAv2.git',
+            description: 'LISAv2 repository url.'],
+        [$class: 'StringParameterDefinition',
+            name: 'GIT_BRANCH',
+            defaultValue: 'hyperv',
+            description: 'LISAv2 repository branch.'],
+        [$class: 'StringParameterDefinition',
+            name: 'HYPERV_VHD_PATH',
+            defaultValue: 'F:\\Hyper-V\\VHDs\\lisav2\\Centos_7.5_x64.vhd',
+            description: 'Local path for the vhd user for testing.'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Azure testing.',
+            name: 'AZURE_TEST'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Hyper-V testing.',
+            name: 'HYPERV_TEST'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            description: 'Economy mode for Hyper-V and Azure.',
+            name: 'ECONOMY_MODE'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: false,
+            description: 'Whether to use VM GENERATION 2. Valid only for Hyper-V.',
+            name: 'VM_GENERATION_2']
+        ]
+    ]
+])
+
+if (!(params.GIT_URL.contains("LISAv2.git") && params.GIT_BRANCH)) {
+    throw "Git repository missing or wrong"
+}
+
+def economyModeFlag = ""
+if (ECONOMY_MODE == "true") {
+    economyModeFlag = " -EconomyMode"
+}
+
+
+def regionAzure = "westus2"
+def osImageAzure = "RedHat RHEL 7-RAW 7.5.2018050901"
+def vmSizeAzure = "Standard_D14_v2"
+def testIterationsAzure = "1"
+
+def regionHyperV = "hyper-v"
+def testParameter = ""
+
+if (TEST_CASE) {
+    testParameter = " -TestNames '${TEST_CASE}'"
+}
+if (TEST_CATEGORY) {
+    testParameter += " -TestCategory '${TEST_CATEGORY}' "
+}
+
+if (TEST_AREA) {
+    testParameter += " -TestArea '${TEST_AREA}' "
+}
+
+if (VM_GENERATION_2 == "true") {
+    testParameter += " -VMGeneration '2' "
+}
+
+stage("lisav2") {
+    def runs = [:]
+    if (HYPERV_TEST == "true") {
+        runs["hyperv"] = {
+            node('lisav2-hyperv') {
+                stage("hyperv") {
+                    try {
+                        timeout (10800) {
+                            withCredentials([file(credentialsId: 'HyperV_Secrets_File',
+                                             variable: 'HyperV_Secrets_File')]) {
+                                echo "Current VHD: ${HYPERV_VHD_PATH}, Current Region: ${regionHyperV}"
+                                cleanWs()
+                                git branch: params.GIT_BRANCH, url: params.GIT_URL
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                " -TestLocation 'localhost'" +
+                                " -RGIdentifier '${regionHyperV}'" +
+                                " -TestPlatform  'HyperV'" +
+                                " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                " ${testParameter}" +
+                                " -ForceDeleteResources" +
+                                " -UpdateGlobalConfigurationFromSecretsFile" +
+                                " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                " -ExitWithZero" +
+                                economyModeFlag
+                                )
+                                junit "report\\*-junit.xml"
+                                archiveArtifacts "TestResults\\**\\*"
+                            }
+                        }
+                    } catch (exc) {
+                        println "${regionHyperV}: STAGE_FAILED_EXCEPTION."
+                        currentBuild.result = 'FAILURE'
+                    } finally {
+                        echo "Cleaning up environment"
+                    }
+                }
+            }
+        }
+    }
+    if (AZURE_TEST == "true") {
+        runs["azure"] = {
+            node('azure-slave-2-executor-1') {
+                stage("azure") {
+                    try {
+                        timeout (10800) {
+                            withCredentials([file(credentialsId: 'Azure_Test_Secrets_File',
+                                     variable: 'Azure_Secrets_File')]) {
+                                echo "Current Image: ${osImageAzure}, Current Region: ${regionAzure}"
+                                cleanWs()
+                                git branch: params.GIT_BRANCH, url: params.GIT_URL
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                " -TestLocation '${regionAzure}'" +
+                                " -RGIdentifier '${regionAzure}'" +
+                                " -TestPlatform  'Azure'" +
+                                " -ARMImageName '${osImageAzure}'" +
+                                " ${testParameter}" +
+                                " -TestIterations ${testIterationsAzure}" +
+                                " -StorageAccount 'ExistingStorage_Standard'" +
+                                " -UpdateGlobalConfigurationFromSecretsFile" +
+                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                " -UseManagedDisks" +
+                                " -ForceDeleteResources" +
+                                " -ExitWithZero" +
+                                economyModeFlag
+                                )
+                                junit "report\\*-junit.xml"
+                                archiveArtifacts "TestResults\\**\\*"
+                            }
+                        }
+                    } catch (exc) {
+                        println "${regionAzure}: STAGE_FAILED_EXCEPTION."
+                        currentBuild.result = 'FAILURE'
+                    } finally {
+                        echo "Cleaning up environment"
+                    }
+                }
+            }
+        }
+    }
+
+    parallel runs
+}
