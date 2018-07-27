@@ -23,7 +23,7 @@ function build_opengcs() {
     fi
 
     echo "$PATH"
-    make -j"${thread_num}"
+    make -j"${thread_num}" "bin/gcstools"
     popd
 
     echo "Opengcs tools artifacs built successfully"
@@ -74,8 +74,8 @@ function copy_artifacts() {
     artifacts_folder="$1"; shift
     destination_path="$1"
     
-    atifact_exists="$(ls $artifacts_folder/* || true)"
-    if [[ "$atifact_exists" != "" ]];then
+    artifact_exists="$(ls $artifacts_folder/* || true)"
+    if [[ "$artifact_exists" != "" ]];then
         cp "$artifacts_folder"/* "$destination_path"
     fi
 }
@@ -117,7 +117,7 @@ function main {
     done
 
     OPENGCS_BASE_BUILD_DIR="${BUILD_BASE_DIR}/opengcs-build-folder"
-    OPENGCS_BUILD_DIR="${GOPATH}/src/github.com/Microsoft/opengcs/service"
+    OPENGCS_BUILD_DIR="${GOPATH}/src/github.com/Microsoft/opengcs"
     OPENGCS_ARTIFACT_DIR="${OPENGCS_BUILD_DIR}/bin"
 
     echo "GOPATH is: $GOPATH"
