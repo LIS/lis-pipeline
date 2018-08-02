@@ -1,0 +1,78 @@
+#!/usr/bin/env groovy
+
+properties ([
+    pipelineTriggers([cron('H 1 * * *')])
+])
+
+env.PREVIOUS_LATEST_IMAGES = "/mnt/tmp/watcher-azure-latest-image/${BRANCH_NAME}/latest_images.txt"
+env.LATEST_IMAGES = "latest_images.txt"
+env.TEMP_PREVIOUS_IMAGES = "previous_images.txt"
+env.PIPELINE_NAME = "pipeline-azure-latest-image"
+
+node ("meta_slave") {
+    stage ("latest_azure_image") {
+        dir ("watcher-azure-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            checkout scm
+
+            sh '''#!/bin/bash
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "14.04.5-LTS"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "16.04-LTS"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "18.04-LTS"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "7.5"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-RAW"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-LVM"
+
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "15"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "12"
+                # bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Oracle" "7.5"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "9-backports"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "CoreOS" "stable"
+            '''
+
+            def runs = [:]
+            def imagesResult = readFile (env.LATEST_IMAGES)
+            currentBuildImages = imagesResult.split(";")
+
+            def previousImagesResult = ""
+            try {
+                previousImagesResult = readFile (env.PREVIOUS_LATEST_IMAGES)
+                sh '''#!/bin/bash
+                    set -xe
+                    cp -f "${PREVIOUS_LATEST_IMAGES}" "./${TEMP_PREVIOUS_IMAGES}"
+                '''
+                archiveArtifacts env.TEMP_PREVIOUS_IMAGES
+            } catch (ex) {
+                echo "No previous images tested."
+            }
+
+            sh '''#!/bin/bash
+                set -xe
+                mkdir -p $(dirname "${PREVIOUS_LATEST_IMAGES}")
+                cp -f "${LATEST_IMAGES}" "${PREVIOUS_LATEST_IMAGES}"
+            '''
+
+            archiveArtifacts env.LATEST_IMAGES
+            currentBuildImages.each() {
+                def image = it.replace("\n", "").replace("\r", "");
+                if (image && !previousImagesResult.contains(image)) {
+                    runs["${image}"] = {
+                        build (job: "${env.PIPELINE_NAME}/${env.BRANCH_NAME}",
+                            parameters: [
+                                string(name: 'AZURE_IMAGES', value: "${image}"),
+                                string(name: 'AZURE_REGIONS', value: "westus2"),
+                                string(name: 'TEST_ITERATIONS', value: "3"),
+                            ],
+                            wait: true, propagate: true)
+                    }
+                } else {
+                    if (image) {
+                        echo "Image ${image} has been built during the previous runs."
+                    }
+                }
+            }
+
+            parallel runs
+            deleteDir()
+        }
+    }
+}

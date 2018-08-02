@@ -1,0 +1,90 @@
+#!/usr/bin/env groovy
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_IMAGES',
+            defaultValue: 'Canonical UbuntuServer 18.04-DAILY-LTS latest',
+            description: 'Azure images to be tested, comma separated.'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_REGIONS',
+            defaultValue: 'westeurope',
+            description: 'Azure regions to be tested, comma separated'],
+        [$class: 'StringParameterDefinition',
+            name: 'VM_SIZE',
+            defaultValue: "Standard_D14_v2",
+            description: 'Azure vm size to be tested. The vm size requires support for 8 nics.'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_CASE',
+            defaultValue: "STRESSTEST-VERIFY-RESTART-MAX-SRIOV-NICS,VERIFY-IFUP-NICS-SRIOV",
+            description: 'Test cases to be run, comma separated'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_ITERATIONS',
+            defaultValue: "3",
+            description: 'How many vms to spawn for each test']
+        ]
+    ]
+])
+
+def gitRemoteUrl = "https://github.com/lis/LISAv2.git"
+def gitBranchName = "master"
+def azureImages = env.AZURE_IMAGES.split(",")
+def azureRegions = env.AZURE_REGIONS.split(",")
+
+if (!azureImages || !azureRegions || !env.VM_SIZE) {
+  throw 'Failed to validate the pipeline parameters'
+}
+
+azureImages.each {
+    stage("${it}") {
+        def currentImage = "${it}".trim()
+        ARMImage = [:]
+
+        azureRegions.each {
+            def currentRegion = "${it}"
+            ARMImage["${currentRegion}"] = {
+                try {
+                    timeout (3600) {
+
+                        node('azure') {
+                            withCredentials([file(credentialsId: 'CBS_Azure_Secrets_File',
+                                             variable: 'Azure_Secrets_File')]) {
+                                echo "Current Image: ${currentImage}, Current Region: ${currentRegion}"
+                                cleanWs()
+                                git branch: gitBranchName, url: gitRemoteUrl
+                                RunPowershellCommand(".\\RunTests.ps1" +
+                                " -TestLocation '${currentRegion}'" +
+                                " -RGIdentifier '${currentRegion}'" +
+                                " -TestPlatform  'Azure'" +
+                                " -OverrideVMSize '${VM_SIZE}'" +
+                                " -ARMImageName '${currentImage}'" +
+                                " -TestNames '${TEST_CASE}'" +
+                                " -TestIterations ${TEST_ITERATIONS}" +
+                                " -StorageAccount 'ExistingStorage_Standard'" +
+                                " -UpdateGlobalConfigurationFromSecretsFile" +
+                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                " -UseManagedDisks" +
+                                " -ForceDeleteResources" +
+                                " -ExitWithZero"
+                                )
+                                junit "report\\*-junit.xml"
+                            }
+                        }
+                    }
+                } catch (exc) {
+                    println "${currentRegion}: STAGE_FAILED_EXCEPTION."
+                    currentBuild.result = 'FAILURE'
+                } finally {
+                    echo "Cleaning up environment"
+                }
+            }
+        }
+
+        parallel ARMImage
+    }
+}
