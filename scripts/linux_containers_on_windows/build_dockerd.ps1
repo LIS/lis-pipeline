@@ -59,24 +59,31 @@ function Build-Dockerd {
     )
 
     # build both daemon and client
-    # TODO because of broken patch we need to use and existing client,
-    # otherwise use -Binary
-    & $Path\docker\hack\make.ps1
-    Copy-Item "C:\docker.exe" "$Path\docker\bundles"
+    & $Path\docker\hack\make.ps1 -Client -Daemon -ForceBuildAll
 }
 
 function Main {
-    $ClonePath = "${env:HOMEDRIVE}\${env:HOMEPATH}\$ClonePath"
-    $GoPath = "${env:HOMEDRIVE}\${env:HOMEPATH}\$GoPath"
+    $ClonePath = Join-Path $env:SystemDrive $ClonePath
+    $GoPath = Join-Path $env:SystemDrive $GoPath
 
-    Write-Host "Clone Path : $ClonePath"
-    Write-Host "Go Path : $GoPath"
+    $toolsPath = Join-Path $env:SystemDrive "tool-chains\bin"
 
-    $env:GOPATH = $GoPath
-    $env:PATH +=";C:\tool-chains\bin"
+    Write-Host "Clone Path: $ClonePath"
+    Write-Host "Go Path: $GoPath"
+    Write-Host "Tools Path: $toolsPath"
+
+
+    if (-not (Test-Path $toolsPath)) { Throw "$toolsPath could not be found" }
 
     if (-not (Test-Path $GoPath)) { Throw "$GoPath could not be found" }
-    if (-not (Test-Path $ClonePath)) { Throw "$ClonePath PATH could not be found" }
+
+    if (-not (Test-Path $ClonePath)) {
+        Write-Host "$ClonePath could not be found. Creating it.."
+        New-Item -Force -Type Directory -Path $ClonePath
+    }
+
+    $env:GOPATH = $GoPath
+    $env:PATH +=";${toolsPath};${GOPATH}\bin"
 
     Clone-Dockerd $DockerGitRepo $DockerGitBranch $ClonePath `
         $DockerTestsGitRepo $DockerTestsGitBranch

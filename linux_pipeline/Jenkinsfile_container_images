@@ -19,7 +19,7 @@ pipeline {
     OPENGCS_GIT_BRANCH = 'master'
     DOCKER_GIT_REPO = 'https://github.com/moby/moby.git'
     DOCKER_GIT_BRANCH = 'master'
-    DOCKER_TESTS_GIT_REPO = 'https://github.com/dardelean/docker-testing-framework.git'
+    DOCKER_TESTS_GIT_REPO = 'https://github.com/ader1990/docker-testing-framework.git'
     DOCKER_TESTS_GIT_BRANCH = 'master'
     USE_CCACHE = 'True'
     CHECKOUT_COMMIT = '6f7da290413ba713f0cdd9ff1a2a9bb129ef4f6c'
