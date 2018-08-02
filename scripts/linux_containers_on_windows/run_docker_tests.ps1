@@ -19,7 +19,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$SERVICE_WRAPPER_PATH = "C:\service_wrapper.exe"
+$DOCKER_DATA_PATH = "C:\lcow"
 $LinuxContainersPath = "C:\Program Files\Linux Containers"
+
 
 function Register-DockerdService {
     param(
@@ -31,17 +34,17 @@ function Register-DockerdService {
     Write-Host $env:LCOW_SUPPORTED
     Write-Host $env:LCOW_API_PLATFORM_IF_OMITTED
 
-    if (Test-Path "c:\lcow" ) { 
-        Remove-Item "c:\lcow" -Force -Recurse
-        New-Item "c:\lcow" -ItemType Directory
+    if (Test-Path $DOCKER_DATA_PATH ) {
+        Remove-Item $DOCKER_DATA_PATH -Force -Recurse
+        New-Item $DOCKER_DATA_PATH -ItemType Directory
     } else {
-        New-Item "c:\lcow" -ItemType Directory
+        New-Item $DOCKER_DATA_PATH -ItemType Directory
     }
 
     try {
         pushd "$BuildPath\docker\bundles\"
         New-Service -Name "dockerd" -BinaryPathName `
-            "C:\service_wrapper.exe dockerd $BuildPath\docker\bundles\dockerd.exe -D --experimental --data-root C:\lcow"
+            "${SERVICE_WRAPPER_PATH} dockerd $BuildPath\docker\bundles\dockerd.exe -D --experimental --data-root ${DOCKER_DATA_PATH}"
         Write-Host "Docker service registration ran successfully"
         popd
     } catch {
@@ -59,6 +62,7 @@ function Start-DockerdService {
         exit 1
     } else {
         Write-Host "Dockerd service started successfully"
+        Start-Sleep 10
     }
 }
 
@@ -194,8 +198,8 @@ function Publish-ToPowerBI {
 }
 
 function Main {
-    $GopathBuildDir = "${env:HOMEDRIVE}\${env:HOMEPATH}\$GopathBuildDir"
-    $DockerClientPath = ";${env:HOMEDRIVE}\${env:HOMEPATH}\$DockerClientPath"
+    $GopathBuildDir = Join-Path $env:SystemDrive $GopathBuildDir
+    $DockerClientPath = ";${env:SystemDrive}\$DockerClientPath"
 
     $currentPath = (Get-Item -Path ".\" -Verbose).FullName
     $currentPath = "$currentPath\artifacts"
