@@ -35,5 +35,5 @@ mv %{buildroot}%{_usr}/etc %{buildroot}
 %{_usr}/lib64/libperf-jvmti.so
 
 # Ver:4.17.0
-%{_usr}/lib/examples/perf/bpf/*
-%{_usr}/lib/include/perf/bpf/bpf.h
+%{_usr}/lib/perf/examples/bpf/*
+%{_usr}/lib/perf/include/bpf/bpf.h
