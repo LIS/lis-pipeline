@@ -110,20 +110,22 @@ function Copy-Artifacts {
         New-Item $Destination -ItemType Directory -ErrorAction SilentlyContinue
     }
 
-    Copy-Item "$ArtifactPath\initrd_artifact\initrd.img" $Destination -Force
+    $initrdImagePath = Join-Path $Destination "initrd.img"
+    Copy-Item "$ArtifactPath\initrd_artifact\initrd.img" $initrdImagePath -Force
     if ($LastExitCode) {
-        throw "Cannot copy $ArtifactPath\initrd_artifact\initrd.img to $Destination"
+        throw "Cannot copy $ArtifactPath\initrd_artifact\initrd.img to $initrdImagePath"
     } else {
-        Write-Host "Initrd artifact copied from $ArtifactPath\initrd_artifact\initrd.img to $Destination successfully"
+        Write-Host "Initrd artifact copied from $ArtifactPath\initrd_artifact\initrd.img to $initrdImagePath successfully"
     }
 
-    Copy-Item "$ArtifactPath\bootx64.efi" $Destination -Force
+    $kernelImagePath = Join-Path $Destination "kernel"
+    Copy-Item "$ArtifactPath\bootx64.efi" $kernelImagePath -Force
     if ($LastExitCode) {
-        throw "Cannot copy $ArtifactPath\bootx64.efi to $Destination"
+        throw "Cannot copy and rename $ArtifactPath\bootx64.efi to $kernelImagePath"
     } else {
-        Write-Host "bootx64.efi artifact copied from $ArtifactPath\bootx64.efi to $Destination successfully"
+        Write-Host "bootx64.efi artifact copied and renamed from $ArtifactPath\bootx64.efi to $kernelImagePath successfully"
     }
-    Write-Host "Artifact copied successfully"
+    Write-Host "Artifacts copied successfully"
 }
 
 function Clean-Up {
@@ -133,26 +135,33 @@ function Clean-Up {
     }
 }
 
-function Mount-Share {
+
+function Mount-SMBShare {
     param(
         [String] $SharedStoragePath,
         [String] $ShareUser,
         [String] $SharePassword
     )
 
+    # Note(avladu): Replace backslashes with forward slashes
+    # for Windows compat
+    $SharedStoragePath = $SharedStoragePath.replace('/', '\')
+
     # Note(avladu): Sometimes, SMB mappings enter into an
     # "Unavailable" state and need to be removed, as they cannot be
     # accessed anymore.
     $smbMappingsUnavailable = Get-SmbMapping -RemotePath $SharedStoragePath `
-        -ErrorAction SilentlyContinue | Where-Object {$_.Status -eq "Unavailable"}
+        -ErrorAction SilentlyContinue | `
+        Where-Object {$_.Status -ne "Ok"}
     if ($smbMappingsUnavailable) {
         foreach ($smbMappingUnavailable in $smbMappingsUnavailable) {
-            net use /delete $smbMappingUnavailable.LocalPath
+            $output = net use /delete $smbMappingUnavailable.LocalPath 2>&1
         }
     }
 
     $mountPoint = $null
-    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath -ErrorAction SilentlyContinue
+    $smbMapping = Get-SmbMapping -RemotePath $SharedStoragePath `
+        -ErrorAction SilentlyContinue
     if ($smbMapping) {
         if ($smbMapping.LocalPath -is [array]){
             return $smbMapping.LocalPath[0]
@@ -163,15 +172,20 @@ function Mount-Share {
     for ([byte]$c = [char]'G'; $c -le [char]'Z'; $c++) {
         $mountPoint = [char]$c + ":"
         try {
-            net.exe use $mountPoint $SharedStoragePath /u:"AZURE\$ShareUser" "$SharePassword" | Out-Null
+            $netOutput = net.exe use $mountPoint $SharedStoragePath `
+                /u:"AZURE\$ShareUser" "$SharePassword" 2>&1
             if ($LASTEXITCODE) {
-                throw "Failed to mount share $SharedStoragePath to $mountPoint."
+                throw ("Failed to mount share {0} to {1} with error {2}" `
+                    -f @($SharedStoragePath, $mountPoint, $netOutput))
             } else {
-                Write-Host "Successfully monted SMB share on $mountPoint"
+                Get-PSDrive | Out-Null
+                Get-SmbMapping | Out-Null
                 return $mountPoint
             }
         } catch {
-            Write-Host $_
+            if ($_ -like "*System error 67 has occurred.*") {
+                throw $_
+            }
         }
     }
     if (!$mountPoint) {
@@ -179,12 +193,11 @@ function Mount-Share {
         throw "Failed to mount $SharedStoragePath to $mountPoint"
     }
 }
-
 function Publish-ToPowerBI {
     param(
         [String] $DBConfFilePath
     )
-    cd "${env:WORKSPACE}\scripts\linux_containers_on_windows\db_parser"
+    pushd "${env:WORKSPACE}\scripts\linux_containers_on_windows\db_parser"
     pip install -r requirements.txt
 
     Copy-Item -Path $DBConfFilePath -Destination .
@@ -204,7 +217,7 @@ function Main {
     $currentPath = (Get-Item -Path ".\" -Verbose).FullName
     $currentPath = "$currentPath\artifacts"
 
-    $mountPath = Mount-Share $SmbSharePath $SmbShareUser $SmbSharePass
+    $mountPath = Mount-SMBShare $SmbSharePath $SmbShareUser $SmbSharePass
     Write-Host "Mount point is: $mountPath"
     $artifactsPath = "$mountPath\lcow_builds\"
     Write-Host "Mount path is: $artifactsPath"
@@ -228,7 +241,11 @@ function Main {
     Start-DockerdService
     Start-DockerTests $DockerClientPath $GopathBuildDir $buildFullPath
 
-    Publish-ToPowerBI $DBConfFilePath
+    try {
+        Publish-ToPowerBI $DBConfFilePath
+    } catch {
+        Write-Host "Could not publish test results to PowerBI"
+    }
 }
 
 Main
