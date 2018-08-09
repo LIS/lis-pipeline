@@ -110,20 +110,22 @@ function Copy-Artifacts {
         New-Item $Destination -ItemType Directory -ErrorAction SilentlyContinue
     }
 
-    Copy-Item "$ArtifactPath\initrd_artifact\initrd.img" $Destination -Force
+    $initrdImagePath = Join-Path $Destination "initrd.img"
+    Copy-Item "$ArtifactPath\initrd_artifact\initrd.img" $initrdImagePath -Force
     if ($LastExitCode) {
-        throw "Cannot copy $ArtifactPath\initrd_artifact\initrd.img to $Destination"
+        throw "Cannot copy $ArtifactPath\initrd_artifact\initrd.img to $initrdImagePath"
     } else {
-        Write-Host "Initrd artifact copied from $ArtifactPath\initrd_artifact\initrd.img to $Destination successfully"
+        Write-Host "Initrd artifact copied from $ArtifactPath\initrd_artifact\initrd.img to $initrdImagePath successfully"
     }
 
-    Copy-Item "$ArtifactPath\bootx64.efi" $Destination -Force
+    $kernelImagePath = Join-Path $Destination "kernel"
+    Copy-Item "$ArtifactPath\bootx64.efi" $kernelImagePath -Force
     if ($LastExitCode) {
-        throw "Cannot copy $ArtifactPath\bootx64.efi to $Destination"
+        throw "Cannot copy and rename $ArtifactPath\bootx64.efi to $kernelImagePath"
     } else {
-        Write-Host "bootx64.efi artifact copied from $ArtifactPath\bootx64.efi to $Destination successfully"
+        Write-Host "bootx64.efi artifact copied and renamed from $ArtifactPath\bootx64.efi to $kernelImagePath successfully"
     }
-    Write-Host "Artifact copied successfully"
+    Write-Host "Artifacts copied successfully"
 }
 
 function Clean-Up {
