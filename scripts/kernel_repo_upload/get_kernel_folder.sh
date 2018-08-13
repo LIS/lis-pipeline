@@ -64,6 +64,8 @@ function main {
               -d "${MOUNT_POINT}/${line}/deb/meta_packages" ]]; then
              echo "$line has all the required files in it";
              echo "$line" > "${KERNEL_TRANSLATED_FOLDER_PATH}"
+             mv -f "${BASEDIR}/deb" "${BASEDIR}/deb.bak" || true
+             cp -r "${MOUNT_POINT}/${line}/deb" "${BASEDIR}/deb"
              found=1
              break;
         fi
