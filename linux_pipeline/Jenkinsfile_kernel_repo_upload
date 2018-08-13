@@ -26,6 +26,7 @@ node("meta_slave") {
                          usernamePassword(credentialsId: 'smb_share_user_pass',
                                           passwordVariable: 'SMB_SHARE_PASSWORD',
                                           usernameVariable: 'SMB_SHARE_USERNAME')]) {
+            cleanWs()
             checkout scm
             echo "Get the kernel files from the repo."
             sh '''
@@ -36,6 +37,7 @@ node("meta_slave") {
             script {
               env.KERNEL_TRANSLATED_FOLDER = readFile "${env.WORKSPACE}/${env.BUILD_NUMBER}-${env.BRANCH_NAME}/kernel_translated_folder"
             }
+            stash includes: 'scripts/kernel_repo_upload/deb/**', name: 'kernel_files'
           }
     }
     stage('send_email') {
@@ -67,25 +69,21 @@ node("meta_slave") {
 
 node("hyper-v") {
     stage('upload_kernel') {
-      withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                       string(credentialsId: 'REPO_URL', variable: 'REPO_URL'),
+      withCredentials([string(credentialsId: 'REPO_URL', variable: 'REPO_URL'),
                        string(credentialsId: 'REPO_API_KEY', variable: 'REPO_API_KEY'),
                        file(credentialsId: 'REPO_CERT', variable: 'REPO_CERT_PATH'),
-                       usernamePassword(credentialsId: 'smb_share_user_pass',
-                                        passwordVariable: 'SMB_SHARE_PASSWORD',
-                                        usernameVariable: 'SMB_SHARE_USERNAME')]) {
+                       ]) {
+        cleanWs()
         checkout scm
+        unstash 'kernel_files'
         echo "Uploading kernel to repo."
         PowerShellWrapper('''
           & "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\upload_kernel_folder.ps1"
-              -KernelFolderPath ${env:KERNEL_TRANSLATED_FOLDER}
+              -KernelFolderPath "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\deb"
               -RepoType ${env:Repo_TYPE}
               -RepoUrl ${env:REPO_URL}
               -RepoApiKey ${env:REPO_API_KEY}
               -RepoCertPath ${env:REPO_CERT_PATH}
-              -SmbShareUrl ${env:SMB_SHARE_URL}
-              -SmbShareUsername ${env:SMB_SHARE_USERNAME}
-              -SmbSharePassword ${env:SMB_SHARE_PASSWORD}
         ''')
       }
     }
