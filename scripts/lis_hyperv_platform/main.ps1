@@ -258,7 +258,7 @@ function Main {
             $commandParams += @{"suite" = $LisaTestSuite}
         }
         & .\lisa.ps1 @commandParams
-        if ($LASTEXITCODE) {
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 2) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
         } else {
             Write-Host "Finished running LISA with exit code: ${LASTEXITCODE}"
