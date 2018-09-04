@@ -48,14 +48,15 @@ function Run-Lisa {
         [String] $LisaPath,
         [parameter(Mandatory=$true)]
         [hashtable] $LisaParams,
-        [String] $LisaLogPath
+        [String] $LisaLogPath,
+        [switch] $ThrowOnError
     )
 
     Push-Location $LisaPath
     try {
         $ErrorActionPreference = "Continue"
         & .\lisa.ps1 @LisaParams
-        if ($LASTEXITCODE) {
+        if ($LASTEXITCODE -ne 0 -and ($LASTEXITCODE -ne 2 -or $ThrowOnError)) {
             throw "Failed running LISA with exit code: ${LASTEXITCODE}"
         } else {
             Write-Host "Finished running LISA with exit code: ${LASTEXITCODE}"
@@ -108,34 +109,30 @@ function Main {
         -TestDependenciesFolders @("bin", "Infrastructure", "tools", "ssh") `
         -LISARelPath $LISARelPath
 
-    # Edit XML
+    $localVhdDestination = $VHDDestination
     if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
+        # Edit XML
         Push-Location $LISARelPath
         Write-Host "Editing XML for Perf"
         $xmlPath = Resolve-Path -Path ".\xml\${XmlTest}"
         Edit-PerfXML -Path $xmlPath -Options $LisaPerfOptions
         Write-Host "Finished editing XML for Perf"    
         Pop-Location
-    }
-
-    # Image Build
-
-    if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
-        $VhdDestination = Join-Path $jobPath "vhd-destination"
-        New-Item -ItemType "Directory" -Path $VhdDestination
+        $localVhdDestination = Join-Path $jobPath "vhd-destination"
+        New-Item -ItemType "Directory" -Path $localVhdDestination
     }
     $vhdName = "$kernelName.vhdx"
 
     $testParams = ("distro={0};vhdStore={1};uploadName={2};localPath={3}" `
-        -f @($VHDType, $VHDDestination, $vhdName, $LocalKernelFolder))
+        -f @($VHDType, $localVhdDestination, $vhdName, $LocalKernelFolder))
     $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\build-vhdx-msft.xml"; `
         "dbgLevel" = "9";"CLImageStorDir" = $imageFolder;"testParams" = $testParams}
-    Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams
+    Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -ThrowOnError
 
     # Perf Run
     if ([String]::IsNullOrWhiteSpace($VHDDestination)) {
         $NetPath = ("\\{0}\{1}$\{2}" `
-            -f @($(hostname), $VhdDestination.split(":")[0], $VhdDestination.split(":")[1]))
+            -f @($(hostname), $localVhdDestination.split(":")[0], $localVhdDestination.split(":")[1]))
         $LisaTestParams = @{"cmdVerb" = "run";"cmdNoun" = ".\xml\${XmlTest}"; `
             "dbgLevel" = "6";"CLImageStorDir" = $NetPath}
         Run-Lisa -LisaPath $LISARelPath -LisaParams $LisaTestParams -LisaLogPath $jobPath
