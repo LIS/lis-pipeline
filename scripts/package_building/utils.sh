@@ -425,13 +425,6 @@ function change_spec_version() {
     fi
 }
 
-function remove_line() {
-    target_file="$1"
-    target_line="$2"
-
-    grep -v "${target_line}" "${target_file}" > temp && mv temp "${target_file}"
-}
-
 function check_spec_file() {
     spec_path="$(readlink -f $1)"
     ini_path="$(readlink -f $2)"
@@ -441,8 +434,8 @@ function check_spec_file() {
     for section in $crudini_sections;do
         spec_line="$(crudini --get ${ini_path} ${section} spec)"
         rel_path="$(crudini --get ${ini_path} ${section} file)"
-        if [[ ! -e "${work_dir}/${rel_path}" ]];then
-            remove_line "$spec_path" "$spec_line"
+        if [[ -e "${work_dir}/${rel_path}" ]];then
+            echo "$spec_line" >> "$spec_path"
         fi
     done
 }
