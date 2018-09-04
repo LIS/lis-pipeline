@@ -302,7 +302,7 @@ function build_rhel {
     fi
 
     pushd "$repository"
-    make rpm -j"$thread_number"
+    make rpm-pkg -j"$thread_number"
     sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"
     popd
     copy_artifacts "$artifacts_dir" "$destination_path"
