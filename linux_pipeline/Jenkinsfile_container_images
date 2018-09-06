@@ -5,246 +5,181 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
-pipeline {
-  parameters {
-    choice(choices: "True\nFalse", description: 'Cleanup environment', name: 'CLEAN_ENV')
-    string(defaultValue: "x3", description: 'Number of cores', name: 'BUILD_THREAD_NUMBER')
-    string(defaultValue: "prepare_build_env, build_linux_kernel, build_opengcs_tools, generate_kernel_initrd, build_dockerd_daemon, run_docker_tests, publish_artifacts",
-            description: 'What stages to run. By default all stages are enabled', name: 'ENABLED_STAGES')
-  }
-  environment {
-    KERNEL_GIT_BRANCH = 'master'
-    KERNEL_VERSION = '4.12'
-    OPENGCS_GIT_URL = 'https://github.com/Microsoft/opengcs.git'
-    OPENGCS_GIT_BRANCH = 'master'
-    DOCKER_GIT_REPO = 'https://github.com/moby/moby.git'
-    DOCKER_GIT_BRANCH = 'master'
-    DOCKER_TESTS_GIT_REPO = 'https://github.com/ader1990/docker-testing-framework.git'
-    DOCKER_TESTS_GIT_BRANCH = 'master'
-    USE_CCACHE = 'True'
-    CHECKOUT_COMMIT = '6f7da290413ba713f0cdd9ff1a2a9bb129ef4f6c'
-    CHERRY_PICK_COMMIT = 'fd96b8da68d32a9403726db09b229f4b5ac849c7'
-    ARTIFACTS_PATH = '/smb_azure_share/lcow_builds'
-    BUILD_PATH = '/mnt/building_dir'
-    EXTRA_PACKAGE_PATH = '/mnt/building_dir/extra_packages/temp'
-    COMMITS_LIST = '5181302de497cb7d5de37bbc84e01eca676f20d8,b54a12c4e3f18cd48314fd3851f5651446b0e6ee,866488f04fc4d8ff513697db2f80263e90277291,fdd8e16c855a6c7238c654d7217dcf51c5533307,b02ea409f1fceeaac6fd971db5d095ecc903de2d,27e512021e36c67dd1c773a52b23d71896c80602,e2c1d1b8e8d17cc9b423688d59ad486c5f38deca,e015b0a767dcab79b8b8361516f3f4322cdc90a7,b9cc90e62104bd001b05d897f84cb7d30d1780bb,022c888e809721a67ecd3072e6331cbdaab45536,81304747d9bcba135c9a9d534f3a3190bca92339,db40d92a09ff6b84b6c47e96d0a8d1cb1f83cd36,0465d97030768485eec5a69a98963e3da7402826,7592de58cbf8d199d721503385c20a02743425a9,02d07a9dcdb042f33248fd3aeb1e5c2eca6d3d49,f315dfcf9c3b4b32f43a21664762cbacd8f05d6a,d6f7158fdbac10f9935a506451e3d54d2d50a7c7,c15d7f606f813b8d1f1ce02979929fd875da228b,b6ffb4393fb266711b37ed056487665d8650f31a'
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'KERNEL_URL',
+            defaultValue: "",
+            description: 'Url to the kernel to be tested'],
+        [$class: 'StringParameterDefinition',
+            name: 'INITRD_URL',
+            defaultValue: "",
+            description: 'Url to the initrd to be tested'],
+        [$class: 'StringParameterDefinition',
+            name: 'TESTS',
+            defaultValue: "linuxkit,opengcs_build,docker_stress",
+            description: 'Tests to be run'],
+        [$class: 'StringParameterDefinition',
+            name: 'HOST_VERSION',
+            defaultValue: "RS4",
+            description: 'Windows host versions.']
+        ]
+    ]
+])
 
-  }
+env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
+env.BINARIES_DESTINATION = "C:\\lcow-bin"
+env.LINUXKIT_REPO = "https://github.com/linuxkit/lcow"
+env.LINUXKIT_BRANCH = "master"
+env.OPENGCS_REPO = "https://github.com/Microsoft/opengcs.git"
+env.OPENGCS_BRANCH = "master"
+env.DOCKER_STRESS_REPO = "https://github.com/progrium/docker-stress.git"
+env.DOCKER_STRESS_BRANCH = "master"
 
-  options {
-    buildDiscarder(logRotator(numToKeepStr: '1000'))
-    overrideIndexTriggers(false)
-  }
+versionsMap = ["RS4":"lcow-win-rs4"]
+testMap = ["functional":"linuxkit","stress":"docker_stress,opengcs_build"]
+def hostName = versionsMap[env.HOST_VERSION]
 
-  agent {
-    node {
-      label 'master'
-    }
-  }
+def runTests(versionsMap, hostName){
+    def testNames = env.TESTS.split(",")
 
-  stages {
-      stage('prepare_build_env') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('prepare_build_env') }
+    testMap.keySet().each {
+        def section = it
+        def sectionTests = testMap[section].split(",")
+
+        stage (section) {
+            def runs = [:]
+            sectionTests.each {
+                if (testNames.contains(it)) {
+                    runs[it] = {
+                        node (hostName) {
+                            runTestStage(it)
+                        }
+                    }
+                }
+            }
+            parallel runs
         }
-        agent {
-          node {
-            label 'container_kernel_build'
-          }
-        }        
-        steps {
-            withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL')]) {
-                sh '''#!/bin/bash
-                    set -xe -o pipefail
+    }
+}
 
-                    echo "Prepare Ubuntu build environment"
-                    pushd "$WORKSPACE/scripts/linux_containers_on_windows/"
+def runTestStage(testName) {
+    switch (testName) {
+        case "linuxkit":
+            runLinuxKitTesting()
+            break
+        case "opengcs_build":
+            buildOpenGCS()
+            break
+        case "docker_stress":
+            runStressTest()
+            break
+        default:
+            println ("Test: ${testName} not defined. Skipping.")
+    }
+}
 
-                    bash install_deps.sh \\
-                        --linux_git_url ${KERNEL_GIT_URL} \\
-                        --linux_git_branch ${KERNEL_GIT_BRANCH} \\
-                        --opengcs_git_url ${OPENGCS_GIT_URL} \\
-                        --opengcs_git_branch ${OPENGCS_GIT_BRANCH} \\
-                        --build_base_dir ${BUILD_PATH} \\
-                        --clean_env ${CLEAN_ENV}
+def runLinuxKitTesting() {
+    dir ("lcow-linuxkit-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Starting linuxkit testing'
+        PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Run-LinuxKit.ps1"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -TestRepo "${env:LINUXKIT_REPO}"
+                -TestBranch "${env:LINUXKIT_BRANCH}"
+                -WorkDir "C:\\lcow-testing\\workdir-linuxkit-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\linuxkit-logs"
+            ''')
+        archiveArtifacts artifacts: "linuxkit-logs\\*", allowEmptyArchive: true
+        deleteDir()
+    }
+}
 
-                    popd
-                    '''
+def buildOpenGCS() {
+    dir ("lcow-opengcs-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Building OpenGCS'
+        PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Build-OpenGCS.ps1"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -TestRepo "${env:OPENGCS_REPO}"
+                -TestBranch "${env:OPENGCS_BRANCH}"
+                -WorkDir "C:\\lcow-testing\\workdir-gcs-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\opengcs-logs"
+            ''')
+        archiveArtifacts artifacts: "opengcs-logs\\*", allowEmptyArchive: true
+        deleteDir()
+    }
+}
+
+def runStressTest() {
+    dir ("lcow-docker-stress-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Starting stress testing'
+        PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Run-StressTest.ps1"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -TestRepo "${env:DOCKER_STRESS_REPO}"
+                -TestBranch "${env:DOCKER_STRESS_BRANCH}"
+                -WorkDir "C:\\lcow-testing\\workdir-stress-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\stress-logs"
+            ''')
+        archiveArtifacts artifacts: "stress-logs\\*", allowEmptyArchive: true
+        deleteDir()
+    }
+}
+
+stage ("check_kernel") {
+    node ("ws2016") {
+        withCredentials(bindings: [string(credentialsId: 'TEST_ARTIFACTS_PATH', variable: 'TEST_ARTIFACTS_PATH')]) {
+            dir ("lcow-artifacts-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                checkout scm
+                PowerShellWrapper('''
+                    & ".\\scripts\\lcow\\Copy-Artifacts.ps1"
+                        -KernelUrl "${env:KERNEL_URL}"
+                        -InitrdUrl "${env:INITRD_URL}"
+                        -Destination ".\\lcow-artifacts"
+                ''')
+                stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
+                deleteDir()
             }
         }
-      }
-    
+    }
+}
 
-      stage('build_linux_kernel') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('build_linux_kernel') }
-        }
-        agent {
-          node {
-            label 'container_kernel_build'
-          }
-        }        
-        steps {
-          sh '''#!/bin/bash
-            set -xe -o pipefail
-
-            echo "Building LCOW Linux Kernel"
-            pushd "$WORKSPACE/scripts/linux_containers_on_windows/"
-
-            bash build_linux_kernel.sh \\
-                --build_base_dir ${BUILD_PATH} \\
-                --linux_artifacts_destination_path ${ARTIFACTS_PATH} \\
-                --thread_num ${BUILD_THREAD_NUMBER} \\
-                --kernel_version ${KERNEL_VERSION} \\
-                --checkout_commit ${CHECKOUT_COMMIT} \\
-                --cherry_pick_commit ${CHERRY_PICK_COMMIT} \\
-                --commits_list ${COMMITS_LIST}
-            popd
-            '''
-        }
-      }
-
-      stage('build_opengcs_tools') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('build_opengcs_tools') }
-        }
-        agent {
-          node {
-            label 'container_kernel_build'
-          }
-        }        
-        steps {
-          sh '''#!/bin/bash
-            set -xe -o pipefail
-
-            echo "Building opengcs tool and injecting them into the LCOW Linux kernel"
-            pushd "$WORKSPACE/scripts/linux_containers_on_windows/"
-
-            bash build_opengcs_tools.sh \\
-                --build_base_dir ${BUILD_PATH} \\
-                --opengcs_artifacts_destination_path ${ARTIFACTS_PATH} \\
-                --thread_num ${BUILD_THREAD_NUMBER}
-            popd
-            '''
-        }
-      }
-
-      stage('generate_kernel_initrd') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('generate_kernel_initrd') }
-        }
-        agent {
-          node {
-            label 'container_kernel_build'
-          }
-        }        
-        steps {
-          sh '''#!/bin/bash
-            set -xe -o pipefail
-
-            echo "Generating the Kernel initrd with opengcs injected"
-            pushd "$WORKSPACE/scripts/linux_containers_on_windows/"
-
-            bash generate_kernel_initrd.sh \\
-                --kernel_artifacts_path ${ARTIFACTS_PATH} \\
-                --build_extra_artifacts ${EXTRA_PACKAGE_PATH} \\
-                --build_base_dir ${BUILD_PATH} \\
-                --kernel_version ${KERNEL_VERSION} \\
-                --clean_env ${CLEAN_ENV}
-            popd
-            '''
-        }
-      }
-
-      stage('build_dockerd_daemon') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('build_dockerd_daemon') }
-        }
-        agent {
-          node {
-            label 'lcow_windows_rs3'
-          }
-        }        
-        steps {
-            echo 'Building dockerd daemon'
+stage ("prepare_environment") {
+    node (hostName) {
+        dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            checkout scm
+            echo "Preparing the host:${hostName} for testing"
+            unstash 'lcow_artifacts'
             PowerShellWrapper('''
-                & ".\\scripts\\linux_containers_on_windows\\build_dockerd.ps1
-                    -DockerGitRepo "${env:DOCKER_GIT_REPO}"
-                    -DockerGitBranch "${env:DOCKER_GIT_BRANCH}"
-                    -ClonePath "\\go\\src\\github.com\\docker"
-                    -GoPath "\\go"
-                    -DockerTestsGitRepo "${env:DOCKER_TESTS_GIT_REPO}"
-                    -DockerTestsGitBranch "${env:DOCKER_TESTS_GIT_BRANCH}"
-            ''')
-            echo 'Finished building dockerd daemon'
+                & ".\\scripts\\lcow\\Prepare-Env.ps1"
+                    -BinariesDestination "${env:BINARIES_DESTINATION}"
+                    -ArtifactsPath ".\\lcow-artifacts"
+                    -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
+                ''')
+            deleteDir()
         }
-      }
+    }
+}
 
-      stage('run_docker_tests') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('run_docker_tests') }
-        }
-        agent {
-          node {
-            label 'lcow_windows_rs3'
-          }
-        }        
-        steps {
-          withCredentials(bindings: [string(credentialsId: 'SMB_SHARE_PATH', variable: 'SMB_SHARE_PATH'),
-                                     file(credentialsId: 'DB_CONF', variable: 'DB_CONF'),
-                                     usernamePassword(credentialsId: 'SMB_SHARE_USER_PASS',
-                                                      passwordVariable: 'PASSWORD',
-                                                      usernameVariable: 'USERNAME')]) {
-            echo 'Running Docker tests'
+runTests(versionsMap, hostName)
+
+stage ("clear_environment") {
+    node (hostName) {
+        dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            checkout scm
+            echo "Cleaning host:${hostName} after testing"
             PowerShellWrapper('''
-                & ".\\scripts\\linux_containers_on_windows\\run_docker_tests.ps1
-                    -GopathBuildDir "\\go\\src\\github.com\\docker"
-                    -DockerTestsGitRepo "${env:DOCKER_TESTS_GIT_REPO}"
-                    -DockertestsGitBranch "${env:DOCKER_TESTS_GIT_BRANCH}"
-                    -SmbSharePath "${env:SMB_SHARE_PATH}"
-                    -SmbShareUser "${env:USERNAME}"
-                    -SmbSharePass "${env:PASSWORD}"
-                    -DockerClientPath "\\go\\src\\github.com\\docker\\docker\\bundles"
-                    -DBConfFilePath "${env:DB_CONF}"
-            ''')
-            echo 'Finished running Docker tests'
-            stash includes: 'artifacts\\*', name: 'artifacts'
-          }
+                & ".\\scripts\\lcow\\Clear-Env.ps1"
+                    -BinariesPath "${env:BINARIES_DESTINATION}"
+                    -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
+                    -DockerdPath "C:\\Docker-Workspace"
+                ''')
+            deleteDir()
         }
-        post {
-          always {
-            archiveArtifacts 'results\\*'
-          }
-          success {
-            echo 'Cleaning up the environment...'
-            PowerShellWrapper('Remove-Item results -Force -Recurse')
-          }
-        }
-      }
-      stage('publish_artifacts') {
-        when {
-          beforeAgent true
-          expression { params.ENABLED_STAGES.contains('publish_artifacts') }
-        }
-        agent {
-          node {
-            label 'windows_meta_slave'
-          }
-        }
-        steps {
-          dir("artifacts") {
-            unstash "artifacts"
-          }
-          withCredentials(bindings: [string(credentialsId: 'MS_RD_SHARE_PATH', variable: 'MS_RD_SHARE_PATH')]) {
-            PowerShellWrapper('& ".\\scripts\\linux_containers_on_windows\\copy_artifacts.ps1 -SharedStoragePath ${env:MS_RD_SHARE_PATH} -Location "artifacts" -Destination "${env:MS_RD_SHARE_PATH}\\${env:BUILD_NUMBER}"')
-          }
-        }
-      }
     }
 }

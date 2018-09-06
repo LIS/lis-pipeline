@@ -4,6 +4,26 @@ Import-Module Dism
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
+function Download {
+    param (
+        [String] $From,
+        [String] $To
+    )
+
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $wc = New-Object system.net.webclient
+    $wc.DownloadFile($From,$To)
+}
+
+function Remove-Dir {
+    param (
+        [String] $Dir
+    )
+    
+    $rmCmd = 'rmdir /s /q "' + $Dir + '"'
+    cmd /c "${rmCmd}"
+}
+
 function login_azure {
     param (
         [string] $rg = "", 
@@ -256,5 +276,6 @@ function Copy-LisaTestDependencies {
 
 Export-ModuleMember login_azure, make_cred, make_cred_initial,
     Assert-PathExists, Assert-URLExists, Execute-WithRetry, Mount-SMBShare,
-    Parse-IcaLog, Get-LisaCode, Copy-LisaTestDependencies
+    Parse-IcaLog, Get-LisaCode, Copy-LisaTestDependencies, Download,
+    Remove-Dir
 
