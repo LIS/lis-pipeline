@@ -72,6 +72,7 @@ pipeline {
     USE_KERNEL_FOLDER_PREFIX = 'True'
     THREAD_NUMBER = 'x3'
     AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
+    LISA_SRIOV_TEST_XML = 'kernel_pipeline_sriov.xml'
   }
   options {
     overrideIndexTriggers(false)
@@ -712,7 +713,7 @@ pipeline {
                                        string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
               echo 'Running LISA - performance...'
               unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              
+
               PowerShellWrapper('''
                   & ".\\scripts\\lis_hyperv_platform\\main_perf.ps1"
                       -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-perf"
@@ -729,6 +730,43 @@ pipeline {
           post {
             always {
               archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-perf\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*"
+            }
+          }
+        }
+        stage('validation_sriov_hyperv') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_sriov_hyperv') }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+          }
+          agent {
+            node {
+              label 'sriov_mlnx'
+            }
+          }
+          steps {
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
+              echo 'Running LISA - sriov...'
+              unstash "${env.KERNEL_ARTIFACTS_PATH}"
+
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\main_perf.ps1"
+                      -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-sriov"
+                      -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-p"
+                      -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
+                      -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]"
+                      -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_SRIOV_TEST_XML}"
+                      -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                      -LocalKernelFolder "scripts\\package_building\\${env:BUILD_NUMBER}-${env:BRANCH_NAME}-${env:KERNEL_ARTIFACTS_PATH}\\**\\deb"
+                 ''')
+              echo 'Finished running validation_sriov_hyperv ...'
+            }
+          }
+          post {
+            always {
+               archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-sriov\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*"
+               junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-sriov\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*.xml"
             }
           }
         }
