@@ -38,7 +38,7 @@ env.DOCKER_STRESS_REPO = "https://github.com/progrium/docker-stress.git"
 env.DOCKER_STRESS_BRANCH = "master"
 
 versionsMap = ["RS4":"lcow-win-rs4"]
-testMap = ["functional":"linuxkit","stress":"docker_stress,opengcs_build"]
+testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build"]
 def hostName = versionsMap[env.HOST_VERSION]
 
 def runTests(versionsMap, hostName){
@@ -149,7 +149,7 @@ stage ("check_kernel") {
     }
 }
 
-stage ("prepare_environment") {
+stage ("prepare_env") {
     node (hostName) {
         dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
             checkout scm
@@ -168,7 +168,7 @@ stage ("prepare_environment") {
 
 runTests(versionsMap, hostName)
 
-stage ("clear_environment") {
+stage ("clear_env") {
     node (hostName) {
         dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
             checkout scm
