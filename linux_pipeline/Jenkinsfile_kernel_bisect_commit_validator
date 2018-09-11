@@ -22,7 +22,7 @@ properties ([
             defaultValue: 'HEAD',
             description: 'Kernel repo commit id'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Ubuntu_16.04.3\nCentOS_7.4',
+            choices: 'Ubuntu_16.04.5\nCentOS_7.4',
             name: 'DISTRO_VERSION',
             description: 'Distro version'],
         [$class: 'ChoiceParameterDefinition',
