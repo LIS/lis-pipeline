@@ -50,7 +50,7 @@ pipeline {
         BUILD_NAME = 'd'
         FOLDER_PREFIX = 'dev'
         OS_TYPE = 'ubuntu'
-        OS_VERSION = '16.04.3'
+        OS_VERSION = '16.04.5'
         THREAD_NUMBER = 'x3'
         CLONE_DEPTH = '1'
         CREATE_CHANGELOG = 'False'

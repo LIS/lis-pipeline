@@ -41,7 +41,7 @@ PLATFORM_ALL = "all"
 HYPERV_PARAMS_AZURE = "azure_kernel=yes; azure_kernel_edge=no"
 HYPERV_PARAMS_AZURE_EDGE = "azure_kernel=no; azure_kernel_edge=yes"
 HYPERV_XML = "ubuntu_azure_kernel_fvt.xml"
-XENIAL_VERSION = "ubuntu_16.04.3"
+XENIAL_VERSION = "ubuntu_16.04.5"
 BIONIC_VERSION = "Ubuntu_18.04"
 
 AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
