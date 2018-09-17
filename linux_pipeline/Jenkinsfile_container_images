@@ -16,10 +16,19 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
-        [$class: 'StringParameterDefinition',
-            name: 'TESTS',
-            defaultValue: "linuxkit,opengcs_build,docker_stress,kernel_builder",
-            description: 'Tests to be run'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Tests', 
+            name: 'linuxkit'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            name: 'docker_stress'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            name: 'opengcs_build'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            name: 'kernel_builder'],
         [$class: 'StringParameterDefinition',
             name: 'HOST_VERSION',
             defaultValue: "RS4",
@@ -44,8 +53,6 @@ testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_bui
 def hostName = versionsMap[env.HOST_VERSION]
 
 def runTests(versionsMap, hostName){
-    def testNames = env.TESTS.split(",")
-
     testMap.keySet().each {
         def section = it
         def sectionTests = testMap[section].split(",")
@@ -53,7 +60,7 @@ def runTests(versionsMap, hostName){
         stage (section) {
             def runs = [:]
             sectionTests.each {
-                if (testNames.contains(it)) {
+                if (env[it] == "true") {
                     runs[it] = {
                         node (hostName) {
                             runTestStage(it)
