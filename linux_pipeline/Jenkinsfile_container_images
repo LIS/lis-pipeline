@@ -18,7 +18,7 @@ properties ([
             description: 'Url to the initrd to be tested'],
         [$class: 'StringParameterDefinition',
             name: 'TESTS',
-            defaultValue: "linuxkit,opengcs_build,docker_stress",
+            defaultValue: "linuxkit,opengcs_build,docker_stress,kernel_builder",
             description: 'Tests to be run'],
         [$class: 'StringParameterDefinition',
             name: 'HOST_VERSION',
@@ -36,9 +36,11 @@ env.OPENGCS_REPO = "https://github.com/Microsoft/opengcs.git"
 env.OPENGCS_BRANCH = "master"
 env.DOCKER_STRESS_REPO = "https://github.com/progrium/docker-stress.git"
 env.DOCKER_STRESS_BRANCH = "master"
+env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
+env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 
 versionsMap = ["RS4":"lcow-win-rs4"]
-testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build"]
+testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 
 def runTests(versionsMap, hostName){
@@ -74,6 +76,9 @@ def runTestStage(testName) {
             break
         case "docker_stress":
             runStressTest()
+            break
+		case "kernel_builder":
+            runKernelBuildTest()
             break
         default:
             println ("Test: ${testName} not defined. Skipping.")
@@ -130,6 +135,24 @@ def runStressTest() {
         deleteDir()
     }
 }
+
+ def runKernelBuildTest() {
+         dir ("lcow-kernel-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+             checkout scm
+             echo 'Starting kernel builder test'
+             PowerShellWrapper('''
+                 & ".\\scripts\\lcow\\Run-KernelBuild.ps1"
+                     -BinariesPath "${env:BINARIES_DESTINATION}"
+                     -TestRepo "${env:DOCKER_KERNEL_BUILDER_REPO}"
+                     -TestBranch "${env:DOCKER_KERNEL_BUILDER_BRANCH}"
+                     -WorkDir "C:\\lcow-testing\\workdir-Kbuild-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                     -LogDestination ".\\Kbuild-logs"
+                 ''')
+             archiveArtifacts artifacts: "Kbuild-logs\\*", allowEmptyArchive: true
+             deleteDir()
+         }
+     }
+
 
 stage ("check_kernel") {
     node ("ws2016") {
