@@ -547,13 +547,13 @@ function patch_kernel() {
         protocol=${patch%%://*}
         url=${patch#*//}
         case $protocol in
-            http|https)
-                git_patch_msg=$(curl -s "$patch" | git am 2>&1)
-                ;;
             scp)
                 host=${url%%:*}
                 path=${url#*:}
                 git_patch_msg=$(ssh $host -o StrictHostKeyChecking=no "cat $path" | git am 2>&1)
+                ;;
+            http|https|*)
+                git_patch_msg=$(curl -s "$patch" | git am 2>&1)
                 ;;
         esac
         if [[ ${PIPESTATUS[0]} -ne 0 ]] || [[ ${PIPESTATUS[1]} -ne 0 ]]; then
