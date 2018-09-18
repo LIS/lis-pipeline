@@ -39,7 +39,7 @@ pipeline {
     choice(choices: 'Ubuntu_16.04.5\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_jessie_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -445,6 +445,61 @@ pipeline {
               echo 'Cleaning up LISA environment...'
               PowerShellWrapper('''
                   & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
+                ''')
+            }
+          }
+        }
+        stage('validation_functional_jessie_hyperv') {
+          when {
+            beforeAgent true
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+            expression { params.ENABLED_STAGES.contains('validation_functional_jessie_hyperv') }
+          }
+          agent {
+            node {
+              label 'hyper-v'
+            }
+          }
+          steps {
+            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
+                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
+                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
+                                       string(credentialsId: 'DB_CONFIG_KERNEL', variable: 'DB_CONFIG_KERNEL'),
+                                       string(credentialsId: 'LISA_KERNEL_LOG_DESTINATION', variable: 'LISA_KERNEL_LOG_DESTINATION'),
+                                       file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
+                                            variable: 'DBConfigPath')]) {
+                echo 'Running LISA for Debian Jessie...'
+                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    unstash 'kernel_version_ini'
+                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+                }
+                PowerShellWrapper('''
+                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
+                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
+                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
+                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
+                        -VHDType "Debian" -OSVersion "8.11" -WorkingDirectory "C:\\workspace"
+                        -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
+                        -AzureToken "${env:AZURE_SAS}" -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
+                        -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
+                        -PipelineName "pipeline-msft-kernel-validation/${env:BRANCH_NAME}"
+                        -DBConfigPath "${env:DBConfigPath}"
+                        -LisaLogDBConfigPath "${env:DB_CONFIG_KERNEL}"
+                        -LogsPath "${env:LISA_KERNEL_LOG_DESTINATION}"
+                  ''')
+                echo 'Finished running LISA for Debian Jessie.'
+              }
+            }
+          post {
+            always {
+              archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}jessie\\TestResults\\**\\*"
+              junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}jessie\\TestResults\\**\\*.xml"
+            }
+            success {
+              echo 'Cleaning up LISA environment...'
+              PowerShellWrapper('''
+                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
                 ''')
             }
           }
