@@ -6,6 +6,7 @@ def PowerShellWrapper(psCmd) {
 }
 
 properties ([
+    pipelineTriggers([cron('H * * * *')]),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
@@ -16,10 +17,22 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
-        [$class: 'StringParameterDefinition',
-            name: 'TESTS',
-            defaultValue: "linuxkit,opengcs_build,docker_stress,kernel_builder",
-            description: 'Tests to be run'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Run full linuxkit test suite', 
+            name: 'linuxkit'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true,
+            description: 'Run docker-stress test', 
+            name: 'docker_stress'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true,
+            description: 'Build latest opengcs from github', 
+            name: 'opengcs_build'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true,
+            description: 'Build kernel in docker container', 
+            name: 'kernel_builder'],
         [$class: 'StringParameterDefinition',
             name: 'HOST_VERSION',
             defaultValue: "RS4",
@@ -28,6 +41,7 @@ properties ([
     ]
 ])
 
+env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
 env.BINARIES_DESTINATION = "C:\\lcow-bin"
 env.LINUXKIT_REPO = "https://github.com/linuxkit/lcow"
@@ -42,10 +56,9 @@ env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 versionsMap = ["RS4":"lcow-win-rs4"]
 testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
+skipBuild = false
 
 def runTests(versionsMap, hostName){
-    def testNames = env.TESTS.split(",")
-
     testMap.keySet().each {
         def section = it
         def sectionTests = testMap[section].split(",")
@@ -53,7 +66,7 @@ def runTests(versionsMap, hostName){
         stage (section) {
             def runs = [:]
             sectionTests.each {
-                if (testNames.contains(it)) {
+                if (env[it] == "true") {
                     runs[it] = {
                         node (hostName) {
                             runTestStage(it)
@@ -155,54 +168,70 @@ def runStressTest() {
 
 
 stage ("check_kernel") {
-    node ("ws2016") {
-        withCredentials(bindings: [string(credentialsId: 'TEST_ARTIFACTS_PATH', variable: 'TEST_ARTIFACTS_PATH')]) {
+    node (hostName) {
+        withCredentials(bindings: [string(credentialsId: 'LCOW_STORAGE_ACCOUNT', variable: 'STORAGE_ACCOUNT'),
+                                   string(credentialsId: 'LCOW_STORAGE_KEY', variable: 'STORAGE_KEY'),
+                                   string(credentialsId: 'LCOW_CONTAINER_NAME', variable: 'CONTAINER_NAME')]) {
             dir ("lcow-artifacts-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                 checkout scm
                 PowerShellWrapper('''
-                    & ".\\scripts\\lcow\\Copy-Artifacts.ps1"
+                    & ".\\scripts\\lcow\\Get-Artifacts.ps1"
+                        -StorageAccName "${env:STORAGE_ACCOUNT}"
+                        -StorageAccKey "${env:STORAGE_KEY}"
+                        -ContainerName "${env:CONTAINER_NAME}"
+                        -LastVersionFile "${env:LAST_VERSION_FILE}"
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
                         -Destination ".\\lcow-artifacts"
                 ''')
-                stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
+
+                buildName = readFile "./build_name"
+                if (buildName != "" ) {
+                    currentBuild.displayName = buildName
+                    stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
+                } else {
+                    echo "No new artifacts found"
+                    skipBuild = true
+                }
                 deleteDir()
             }
         }
     }
 }
 
-stage ("prepare_env") {
-    node (hostName) {
-        dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-            checkout scm
-            echo "Preparing the host:${hostName} for testing"
-            unstash 'lcow_artifacts'
-            PowerShellWrapper('''
-                & ".\\scripts\\lcow\\Prepare-Env.ps1"
-                    -BinariesDestination "${env:BINARIES_DESTINATION}"
-                    -ArtifactsPath ".\\lcow-artifacts"
-                    -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
-                ''')
-            deleteDir()
+if (!skipBuild) {
+    stage ("prepare_env") {
+        node (hostName) {
+            dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                checkout scm
+                echo "Preparing the host:${hostName} for testing"
+                unstash 'lcow_artifacts'
+                PowerShellWrapper('''
+                    & ".\\scripts\\lcow\\Prepare-Env.ps1"
+                        -BinariesDestination "${env:BINARIES_DESTINATION}"
+                        -ArtifactsPath ".\\lcow-artifacts"
+                        -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
+                    ''')
+                deleteDir()
+            }
         }
     }
-}
 
-runTests(versionsMap, hostName)
+    runTests(versionsMap, hostName)
 
-stage ("clear_env") {
-    node (hostName) {
-        dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-            checkout scm
-            echo "Cleaning host:${hostName} after testing"
-            PowerShellWrapper('''
-                & ".\\scripts\\lcow\\Clear-Env.ps1"
-                    -BinariesPath "${env:BINARIES_DESTINATION}"
-                    -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
-                    -DockerdPath "C:\\Docker-Workspace"
-                ''')
-            deleteDir()
+    stage ("clear_env") {
+        node (hostName) {
+            dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                checkout scm
+                echo "Cleaning host:${hostName} after testing"
+                PowerShellWrapper('''
+                    & ".\\scripts\\lcow\\Clear-Env.ps1"
+                        -BinariesPath "${env:BINARIES_DESTINATION}"
+                        -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
+                        -DockerdPath "C:\\Docker-Workspace"
+                    ''')
+                deleteDir()
+            }
         }
     }
 }
