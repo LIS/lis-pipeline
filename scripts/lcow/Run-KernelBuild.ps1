@@ -49,7 +49,7 @@ function Execute-Test {
     )
 
     try {
-        docker run --rm --platform linux $ContainerName $(pwd)/.config:/tmp/.config moul/kernel-builder /bin/bash -xec ' git fetch --tags && git checkout v3.19 && cp /tmp/.config .config && make oldconfig && cp .config /tmp/.config '
+        docker run --rm --platform linux  moul/kernel-builder /bin/bash -xec 'git checkout v4.3 && cores=$(cat /proc/cpuinfo | grep --count processor) && threads=$(expr $cores*2 | bc) && make oldconfig && make -j $threads'
     } catch {
         throw $_
     }
