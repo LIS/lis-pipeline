@@ -23,7 +23,7 @@ function Get-Container {
     )
     
     $repoPath = Join-Path $WorkDir "docker-stress"
-    git clone -b $TestBranch $TestRepo $repoPath
+    git clone -q -b $TestBranch $TestRepo $repoPath
     
     $dockerFilePath = Join-Path $repoPath "Dockerfile"
     if (-not (Test-Path $dockerFilePath)) {

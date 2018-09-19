@@ -33,9 +33,9 @@ properties ([
             defaultValue: true,
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
-        [$class: 'StringParameterDefinition',
+        [$class: 'ChoiceParameterDefinition',
+            choices: "RS4\nRS5",
             name: 'HOST_VERSION',
-            defaultValue: "RS4",
             description: 'Windows host versions.']
         ]
     ]
@@ -53,10 +53,14 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 
-versionsMap = ["RS4":"lcow-win-rs4"]
+versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
 testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
+
+if (env.HOST_VERSION == "RS5") {
+    env["linuxkit"] = "false"
+}
 
 def runTests(versionsMap, hostName){
     testMap.keySet().each {

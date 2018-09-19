@@ -22,7 +22,7 @@ function Get-Tests {
 
     $repoPath = Join-Path $WorkDir "opengcs"
 
-    git clone -b $TestBranch $TestRepo $repoPath
+    git clone -q -b $TestBranch $TestRepo $repoPath
 
     if (-not (Test-Path $repoPath)) {
         Write-Output "Error: cannot find tests folder. Wrong repo."

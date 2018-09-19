@@ -21,7 +21,7 @@ function Get-Tests {
     )
     
     $repoPath = Join-Path $WorkDir "linuxkit"
-    git clone -b $TestBranch $TestRepo $repoPath
+    git clone -q -b $TestBranch $TestRepo $repoPath
     
     $testsDir = Join-Path $repoPath "tests"
     if (-not (Test-Path $testsDir)) {
