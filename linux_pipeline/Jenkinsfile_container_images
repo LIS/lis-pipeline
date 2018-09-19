@@ -187,7 +187,7 @@ stage ("check_kernel") {
 
                 buildName = readFile "./build_name"
                 if (buildName != "" ) {
-                    currentBuild.displayName = buildName
+                    currentBuild.displayName = buildName + "-${env.BUILD_NUMBER}"
                     stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
                 } else {
                     echo "No new artifacts found"

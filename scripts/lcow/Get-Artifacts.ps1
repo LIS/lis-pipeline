@@ -105,6 +105,8 @@ function Download-Artifacts {
 
     Download -From $KernelUrl -To $kernelDest
     Download -From $InitrdUrl -To $initrdDest
+
+    Set-Content -Value "manual-run" -Path ".\build_name"
 }
 
 function Main {
