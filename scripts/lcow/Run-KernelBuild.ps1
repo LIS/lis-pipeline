@@ -33,11 +33,6 @@ function Get-Container {
         Push-Location $repoPath
     }
     
-    docker build -t $ContainerName .
-    if ($LASTEXITCODE -ne 0) {
-        Write-Output "Error: docker build failed."
-        exit 1
-    }
     Pop-Location 
 }
 
