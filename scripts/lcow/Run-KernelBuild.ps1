@@ -8,7 +8,6 @@ param (
 )
 
 $TEST_CONTAINER_NAME = "kernel_builder"
-$ErrorActionPreference = "Stop"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $commonModulePath = Join-Path $scriptPath "CommonFunctions.psm1"
