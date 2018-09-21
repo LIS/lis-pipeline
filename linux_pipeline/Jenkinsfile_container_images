@@ -58,10 +58,6 @@ testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_bui
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
 
-if (env.HOST_VERSION == "RS5") {
-    env["linuxkit"] = "false"
-}
-
 def runTests(versionsMap, hostName){
     testMap.keySet().each {
         def section = it
