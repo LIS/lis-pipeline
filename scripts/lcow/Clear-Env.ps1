@@ -4,8 +4,6 @@ param (
     [String] $DockerdPath
 )
 
-$ErrorActionPreference = "Stop"
-
 $scriptPath = Get-Location
 $helpersPath = Join-Path $scriptPath "scripts\utils\powershell\helpers.psm1"
 Import-Module $helpersPath
