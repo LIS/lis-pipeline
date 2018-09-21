@@ -34,7 +34,7 @@ properties ([
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
         [$class: 'ChoiceParameterDefinition',
-            choices: "RS4\nRS5",
+            choices: "RS5\nRS4",
             name: 'HOST_VERSION',
             description: 'Windows host versions.']
         ]
