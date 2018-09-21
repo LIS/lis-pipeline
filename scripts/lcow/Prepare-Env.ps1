@@ -8,7 +8,7 @@ $TEST_DEPENDENCIES = @{
     "dockerd.exe" = "https://master.dockerproject.org/windows/x86_64/dockerd.exe";
     "docker.exe" = "https://master.dockerproject.org/windows/x86_64/docker.exe";
     "docker-compose.exe" = "https://github.com/docker/compose/releases/download/1.21.0-rc1/docker-compose-Windows-x86_64.exe";
-    "rtf.exe" = "https://69-89472225-gh.circle-artifacts.com/0/rtf-windows-amd64.exe"
+    "rtf.exe" = "https://kernelstorageacc.blob.core.windows.net/lcow-bin/rtf.exe"
 }
 
 $ErrorActionPreference = "Stop"

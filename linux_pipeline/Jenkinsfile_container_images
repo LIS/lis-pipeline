@@ -34,7 +34,7 @@ properties ([
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
         [$class: 'ChoiceParameterDefinition',
-            choices: "RS4\nRS5",
+            choices: "RS5\nRS4",
             name: 'HOST_VERSION',
             description: 'Windows host versions.']
         ]
@@ -57,10 +57,6 @@ versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
 testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
-
-if (env.HOST_VERSION == "RS5") {
-    env["linuxkit"] = "false"
-}
 
 def runTests(versionsMap, hostName){
     testMap.keySet().each {
