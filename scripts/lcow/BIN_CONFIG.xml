@@ -1,0 +1,8 @@
+<binaries>
+    <defaultVersionParameter>--version</defaultVersionParameter>
+    <bin Version="v1.27.2" VersionParam=" " ParseCommand="| head -n 1">busybox</bin>
+    <bin Version="1.43.8" VersionParam="-V" ParseCommand="2&gt;&amp;1">mke2fs</bin>
+    <bin Version="1.43.8" VersionParam="-V" ParseCommand="2&gt;&amp;1">e2image</bin>
+    <bin Version="1.0.0-rc5+dev">runc</bin>
+    <bin Version="1.43.8" VersionParam="-V">e2fsck</bin>
+</binaries>

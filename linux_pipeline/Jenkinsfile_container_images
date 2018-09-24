@@ -17,6 +17,14 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
+        [$class: 'StringParameterDefinition',
+            name: 'DOCKER_IMAGE_URL',
+            defaultValue: "",
+            description: 'Url to the docker image to be tested'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Run full linuxkit test suite', 
+            name: 'binaries_check'],
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run full linuxkit test suite', 
@@ -44,6 +52,7 @@ properties ([
 env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
 env.BINARIES_DESTINATION = "C:\\lcow-bin"
+env.DOCKER_IMAGE_DESTINATION = "C:\\lcow-bin-image"
 env.LINUXKIT_REPO = "https://github.com/linuxkit/lcow"
 env.LINUXKIT_BRANCH = "master"
 env.OPENGCS_REPO = "https://github.com/Microsoft/opengcs.git"
@@ -54,7 +63,7 @@ env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
 
@@ -93,8 +102,28 @@ def runTestStage(testName) {
 		case "kernel_builder":
             runKernelBuildTest()
             break
+        case "binaries_check":
+            runBinariesCheck()
+            break
         default:
             println ("Test: ${testName} not defined. Skipping.")
+    }
+}
+
+def runBinariesCheck () {
+    dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Starting linuxkit testing'
+        PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Run-BinariesCheck.ps1"
+                -XmlConfig ".\\scripts\\lcow\\BIN_CONFIG.xml"
+                -ImageDir "${env:DOCKER_IMAGE_DESTINATION}"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -WorkDir "C:\\lcow-testing\\workdir-bin-check-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\bin-check-logs"
+            ''')
+        archiveArtifacts artifacts: "bin-check-logs\\*", allowEmptyArchive: true
+        deleteDir()
     }
 }
 
@@ -182,7 +211,9 @@ stage ("check_kernel") {
                         -LastVersionFile "${env:LAST_VERSION_FILE}"
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
+                        -DockerImgUrl "${env:DOCKER_IMAGE_URL}"
                         -Destination ".\\lcow-artifacts"
+                        -DockerDestination "${env:DOCKER_IMAGE_DESTINATION}"
                 ''')
 
                 buildName = readFile "./build_name"
