@@ -20,8 +20,12 @@ sudo cp -r %{SOURCE0} .
 cd ./tools/perf
 make DESTDIR=%{buildroot}%{_usr} install install-doc
 mv %{buildroot}%{_usr}/etc %{buildroot}
+mkdir -p %{buildroot}%{_usr}/lib/
+pushd %{buildroot}
+find ./usr/lib -type f | sed 's\^.\\' > %{_topdir}/generated-files
+popd
 
-%files
+%files -f %{_topdir}/generated-files
 %defattr(-,root,root)
 %{_bindir}/perf
 %dir %{_libdir}/traceevent/plugins
@@ -33,4 +37,3 @@ mv %{buildroot}%{_usr}/etc %{buildroot}
 %{_bindir}/trace
 %{_usr}/share/*
 %{_usr}/lib64/libperf-jvmti.so
-%{_usr}/lib/*
