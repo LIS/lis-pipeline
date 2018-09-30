@@ -83,7 +83,12 @@ def runTests(versionsMap, hostName){
                     }
                 }
             }
-            parallel runs
+
+            try {
+                parallel runs
+            } catch (exc) {
+                currentBuild.result = 'SUCCESS'
+            }
         }
     }
 }
