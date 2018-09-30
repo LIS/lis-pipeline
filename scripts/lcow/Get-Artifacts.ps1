@@ -16,10 +16,10 @@ $scriptPath = Get-Location
 $helpersPath = Join-Path $scriptPath "scripts\utils\powershell\helpers.psm1"
 Import-Module $helpersPath
 
-$ARTIFACTS_NAME = "lcow*.tar.bz"
+$ARTIFACTS_NAME = "lcow*.tar"
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
-$BIN_CHECK_IMAGE = "core-image-minimal-lcow.tar.bz2"
+$BIN_CHECK_IMAGE = "core-image-minimal-lcow-dbg.tar.gz"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $TEMP_DIR = "D:\lcow-temp"
 

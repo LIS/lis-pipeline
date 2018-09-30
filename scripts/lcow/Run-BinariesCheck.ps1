@@ -11,8 +11,8 @@ $commonModulePath = Join-Path $scriptPath "CommonFunctions.psm1"
 Import-Module $commonModulePath
 
 $TEST_IMAGE_NAME = "bin-check-img"
-$BZ_PATH = "C:\Program Files\git\usr\bin\bzip2.exe"
-$IMAGE_NAME = "core-image-minimal-lcow.tar.bz2"
+$GZ_PATH = "C:\Program Files\git\usr\bin\gzip.exe"
+$IMAGE_NAME = "core-image-minimal-lcow-dbg.tar.gz"
 
 function Get-TestCommand {
     param (
@@ -57,7 +57,7 @@ function Import-Image {
     }
     
     Copy-Item -Path $tarFile -Destination "."
-    & $BZ_PATH -dk $IMAGE_NAME
+    & $GZ_PATH -dk $IMAGE_NAME
     $imageName = $IMAGE_NAME.Substring(0, $IMAGE_NAME.LastIndexOf('.'))
     
     $imageID = $(docker import --platform linux $imageName)
