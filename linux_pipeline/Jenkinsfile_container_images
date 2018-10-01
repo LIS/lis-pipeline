@@ -23,12 +23,16 @@ properties ([
             description: 'Url to the docker image to be tested'],
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
-            description: 'Run full linuxkit test suite', 
+            description: 'Run binaries version test', 
             name: 'binaries_check'],
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run full linuxkit test suite', 
             name: 'linuxkit'],
+		[$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Run full hyper-v docker test',
+            name: 'docker_test'],
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
             description: 'Run docker-stress test', 
@@ -61,9 +65,10 @@ env.DOCKER_STRESS_REPO = "https://github.com/progrium/docker-stress.git"
 env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
+env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit","test_stress":"docker_stress,opengcs_build,kernel_builder"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
 
@@ -105,6 +110,9 @@ def runTestStage(testName) {
         case "binaries_check":
             runBinariesCheck()
             break
+		case "docker_test":
+            runDockerTest()
+            break
         default:
             println ("Test: ${testName} not defined. Skipping.")
     }
@@ -126,6 +134,23 @@ def runBinariesCheck () {
         deleteDir()
     }
 }
+
+def runDockerTest() {
+     dir ("lcow-docker-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+         checkout scm
+         echo 'Starting hyperv docker test'
+         PowerShellWrapper('''
+             & ".\\scripts\\lcow\\Run-hypervtest.ps1"
+                 -BinariesPath "${env:BINARIES_DESTINATION}"
+				 -TestRepo "${env.DOCKER_HYPERV_TEST_REPO}"
+                 -WorkDir "C:\\lcow-testing\\workdir-hypervtest-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                 -LogDestination ".\\hypervtest-logs"
+             ''')
+         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
+         deleteDir()
+     }
+ }
+
 
 def runLinuxKitTesting() {
     dir ("lcow-linuxkit-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
