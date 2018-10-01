@@ -83,7 +83,12 @@ def runTests(versionsMap, hostName){
                     }
                 }
             }
-            parallel runs
+
+            try {
+                parallel runs
+            } catch (exc) {
+                currentBuild.result = 'SUCCESS'
+            }
         }
     }
 }
@@ -113,7 +118,7 @@ def runTestStage(testName) {
 def runBinariesCheck () {
     dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
-        echo 'Starting linuxkit testing'
+        echo 'Starting binaries checking'
         PowerShellWrapper('''
             & ".\\scripts\\lcow\\Run-BinariesCheck.ps1"
                 -XmlConfig ".\\scripts\\lcow\\BIN_CONFIG.xml"

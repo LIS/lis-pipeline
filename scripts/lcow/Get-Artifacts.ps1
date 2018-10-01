@@ -16,10 +16,10 @@ $scriptPath = Get-Location
 $helpersPath = Join-Path $scriptPath "scripts\utils\powershell\helpers.psm1"
 Import-Module $helpersPath
 
-$ARTIFACTS_NAME = "lcow*.tar.bz"
+$ARTIFACTS_NAME = "lcow*.tar"
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
-$BIN_CHECK_IMAGE = "core-image-minimal-lcow.tar.bz2"
+$BIN_CHECK_IMAGE = "core-image-minimal-lcow-dbg.tar.gz"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $TEMP_DIR = "D:\lcow-temp"
 
@@ -113,11 +113,14 @@ function Download-Artifacts {
 
     $kernelDest = Join-Path $Destination "kernel"
     $initrdDest = Join-Path $Destination "initrd.img"
-    $dockerImgDest = Join-Path $DockerDestination $BIN_CHECK_IMAGE
 
     Download -From $KernelUrl -To $kernelDest
     Download -From $InitrdUrl -To $initrdDest
-    Download -From $DockerImg -To $dockerImgDest
+
+    if ($DockerImg) {
+        $dockerImgDest = Join-Path $DockerDestination $BIN_CHECK_IMAGE
+        Download -From $DockerImg -To $dockerImgDest
+    }
 
     Set-Content -Value "manual-run" -Path ".\build_name"
 }
@@ -135,7 +138,7 @@ function Main {
     $Destination = Resolve-Path $Destination
     New-Item ".\build_name"
 
-    if ($KernelUrl -and $InitrdUrl -and $DockerImgUrl) {
+    if ($KernelUrl -and $InitrdUrl) {
         Download-Artifacts -KernelUrl $KernelUrl -InitrdUrl $InitrdUrl `
             -Destination $Destination -DockerDestination $DockerDestination `
             -DockerImg $DockerImgUrl
