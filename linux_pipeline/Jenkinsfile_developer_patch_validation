@@ -307,11 +307,11 @@ pipeline {
                 stage('validation_perf_hyperv') {
                     when {
                         beforeAgent true
-                        expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') && LISA_PERF_TEST_XML != "null" }
+                        expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') && params.LISA_PERF_TEST_XML != "null" }
                     }
                     agent {
                         node {
-                            label GetPerfServer(LISA_PERF_TEST_XML)
+                            label GetPerfServer(params.LISA_PERF_TEST_XML)
                         }
                     }
                     steps {
