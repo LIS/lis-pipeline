@@ -1,6 +1,5 @@
 param (
     [String] $XmlConfig,
-    [String] $ImageDir,
     [String] $WorkDir,
     [String] $BinariesPath,
     [String] $LogDestination
@@ -11,8 +10,9 @@ $commonModulePath = Join-Path $scriptPath "CommonFunctions.psm1"
 Import-Module $commonModulePath
 
 $TEST_IMAGE_NAME = "bin-check-img"
+$CPIO_PATH = "C:\Program Files\Linux Containers\initrd.img"
 $GZ_PATH = "C:\Program Files\git\usr\bin\gzip.exe"
-$IMAGE_NAME = "core-image-minimal-lcow-dbg.tar.gz"
+$IMAGE_NAME = "core-binaries-check"
 
 function Get-TestCommand {
     param (
@@ -46,21 +46,39 @@ function Get-TestCommand {
     return $comm
 }
 
-function Import-Image {
+function Convert-CpioToTar {
     param (
-        [String] $ImageDir
+        [String] $CpioPath
     )
-    
-    $tarFile = Join-Path $ImageDir $IMAGE_NAME
-    if (-not (Test-Path $tarFile)) {
-        throw "Cannot find an image named: $TEST_IMAGE_NAME"
+
+    if (-not (Test-Path $CpioPath)) {
+        throw "Cannot find cpio image"
     }
     
-    Copy-Item -Path $tarFile -Destination "."
-    & $GZ_PATH -dk $IMAGE_NAME
-    $imageName = $IMAGE_NAME.Substring(0, $IMAGE_NAME.LastIndexOf('.'))
+    New-Item -Type "Directory" -Path "./convert-temp" | Out-Null
+    $convertDir = Resolve-Path "./convert-temp"
+    $tempCpioPath = Join-Path $convertDir "${IMAGE_NAME}.cpio"
+    Copy-Item -Path $CpioPath -Destination $tempCpioPath | Out-Null
+
+    $convertCommand = "apt update || true && apt install cpio -y && cd /tmp && mkdir temp-dir && cd temp-dir && cat ../${IMAGE_NAME}.cpio | cpio -idv && tar -cvf ../${IMAGE_NAME}.tar *"
+    docker run -v "${convertDir}:/tmp" --platform linux debian sh -xec $convertCommand | Out-Null
     
-    $imageID = $(docker import --platform linux $imageName)
+    $tempTarPath = Join-Path $convertDir "${IMAGE_NAME}.tar"
+    
+    return $tempTarPath
+}
+
+
+function Import-Image {
+    param (
+        [String] $ImagePath
+    )
+    
+    if (-not (Test-Path $ImagePath)) {
+        throw "Cannot find test image: $ImagePath"
+    }
+    
+    $imageID = $(docker import --platform linux $ImagePath)
     if ($(docker ps -a -q)) {
         docker rm $(docker ps -a -q) --force | Out-Null
     }
@@ -145,7 +163,9 @@ function Main {
     
     Prepare-Env -BinariesPath $BinariesPath
     
-    $containerID = Import-Image -ImageDir $ImageDir
+    $tarPath = Convert-CpioToTar -CpioPath $CPIO_PATH
+    
+    $containerID = Import-Image -ImagePath $tarPath
 
     Execute-Test -ContainerID $containerID -XmlConfig $XmlConfig `
         -LogDestination $LogDestination

@@ -130,7 +130,6 @@ def runBinariesCheck () {
         PowerShellWrapper('''
             & ".\\scripts\\lcow\\Run-BinariesCheck.ps1"
                 -XmlConfig ".\\scripts\\lcow\\BIN_CONFIG.xml"
-                -ImageDir "${env:DOCKER_IMAGE_DESTINATION}"
                 -BinariesPath "${env:BINARIES_DESTINATION}"
                 -WorkDir "C:\\lcow-testing\\workdir-bin-check-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\bin-check-logs"
