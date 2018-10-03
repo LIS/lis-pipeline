@@ -60,8 +60,10 @@ function Convert-CpioToTar {
     $tempCpioPath = Join-Path $convertDir "${IMAGE_NAME}.cpio"
     Copy-Item -Path $CpioPath -Destination $tempCpioPath | Out-Null
 
-    $convertCommand = "apt update || true && apt install cpio -y && cd /tmp && mkdir temp-dir && cd temp-dir && cat ../${IMAGE_NAME}.cpio | cpio -idv && tar -cvf ../${IMAGE_NAME}.tar *"
-    docker run -v "${convertDir}:/tmp" --platform linux debian sh -xec $convertCommand | Out-Null
+    $convertCommand = "cd /tmp && mkdir temp-dir && cd temp-dir && cat ../${IMAGE_NAME}.cpio | cpio -idv && tar -cvf ../${IMAGE_NAME}.tar *"
+    # base debian image fails to install the cpio image if used in the command on top
+    # mbivolan/debian-cpio is a debian based image with the cpio package preinstalled
+    docker run -v "${convertDir}:/tmp" --platform linux mbivolan/debian-cpio sh -xec $convertCommand | Out-Null
     
     $tempTarPath = Join-Path $convertDir "${IMAGE_NAME}.tar"
     
