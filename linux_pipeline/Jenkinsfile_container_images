@@ -146,7 +146,7 @@ def runDockerTest() {
          PowerShellWrapper('''
              & ".\\scripts\\lcow\\Run-hypervtest.ps1"
                  -BinariesPath "${env:BINARIES_DESTINATION}"
-				 -TestRepo "${env.DOCKER_HYPERV_TEST_REPO}"
+				 -TestRepo "${env:DOCKER_HYPERV_TEST_REPO}"
                  -WorkDir "C:\\lcow-testing\\workdir-hypervtest-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                  -LogDestination ".\\hypervtest-logs"
              ''')
