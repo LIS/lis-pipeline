@@ -6,6 +6,7 @@ def PowerShellWrapper(psCmd) {
 }
 
 properties ([
+    disableConcurrentBuilds(),
     pipelineTriggers([cron('H * * * *')]),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
