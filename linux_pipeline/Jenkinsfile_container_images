@@ -265,6 +265,7 @@ if (!skipBuild) {
                         -BinariesDestination "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath ".\\lcow-artifacts"
                         -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
+                        -WorkDir "C:\\lcow-testing"
                     ''')
                 deleteDir()
             }
@@ -283,6 +284,7 @@ if (!skipBuild) {
                         -BinariesPath "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
                         -DockerdPath "C:\\Docker-Workspace"
+                        -WorkDir "C:\\lcow-testing"
                     ''')
                 deleteDir()
             }

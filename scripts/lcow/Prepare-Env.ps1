@@ -1,7 +1,8 @@
 param (
     [String] $BinariesDestination,
     [String] $ArtifactsPath,
-    [String] $ArtifactsDestination
+    [String] $ArtifactsDestination,
+    [String] $WorkDir
 )
 
 $TEST_DEPENDENCIES = @{
@@ -77,6 +78,12 @@ function Get-TestDependencies {
 }
 
 function Main {
+    if (Test-Path $WorkDir) {
+        & 'C:\Program Files\git\usr\bin\rm.exe' -rf "${WorkDir}\*"
+    } else {
+        New-Item -Type Directory -Path $WorkDir
+    }
+
     Get-Kernel -ArtifactsPath $ArtifactsPath -Destination $ArtifactsDestination
     Get-TestDependencies -Binaries $TEST_DEPENDENCIES -Destination $BinariesDestination
 }
