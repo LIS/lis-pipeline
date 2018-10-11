@@ -42,6 +42,10 @@ properties ([
             defaultValue: true,
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Test kernel in Hyper-V',
+            name: 'kernel_hyperv_test'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -62,9 +66,10 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
+HYPERV_TEST_JOB = "lcow-hyperv-testing"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
 
@@ -114,8 +119,22 @@ def runTestStage(testName) {
 		case "docker_test":
             runDockerTest()
             break
+        case "kernel_hyperv_test":
+            runHypervTest()
+            break
         default:
             println ("Test: ${testName} not defined. Skipping.")
+    }
+}
+
+def runHypervTest() {
+    dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        echo 'Starting Hyper-V test job'
+        fileName = "rpm-" + buildName.split("-")[1] + ".tgz"
+        testRun = build job: HYPERV_TEST_JOB, parameters: [
+            string(name: 'ARCHIVE_NAME', value: "${fileName}"),
+            string(name: 'TEST_XML', value: "test_kernel_pipeline.xml")], wait: false;
+        deleteDir()
     }
 }
 
