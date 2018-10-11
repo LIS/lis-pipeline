@@ -133,7 +133,7 @@ def runHypervTest() {
         fileName = "rpm-" + buildName.split("-")[1] + ".tgz"
         testRun = build job: HYPERV_TEST_JOB, parameters: [
             string(name: 'ARCHIVE_NAME', value: "${fileName}"),
-            string(name: 'TEST_XML', value: "test_kernel_pipeline.xml")], wait: false;
+            string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
         deleteDir()
     }
 }
