@@ -1,7 +1,8 @@
 param (
     [String] $BinariesPath,
     [String] $ArtifactsPath,
-    [String] $DockerdPath
+    [String] $DockerdPath,
+    [String] $WorkDir
 )
 
 $scriptPath = Get-Location
@@ -17,6 +18,9 @@ function Main {
     }
     if (Test-Path $DockerdPath) {
         Remove-Dir $DockerdPath
+    }
+    if (Test-Path $WorkDir) {
+        & 'C:\Program Files\git\usr\bin\rm.exe' -rf "${WorkDir}\*"
     }
 }
 

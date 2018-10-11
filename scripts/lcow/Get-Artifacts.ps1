@@ -5,9 +5,7 @@ param (
     [String] $LastVersionFile,
     [String] $KernelUrl,
     [String] $InitrdUrl,
-    [String] $DockerImgUrl,
-    [String] $Destination,
-    [String] $DockerDestination
+    [String] $Destination
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,7 +17,6 @@ Import-Module $helpersPath
 $ARTIFACTS_NAME = "lcow*.tar"
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
-$BIN_CHECK_IMAGE = "core-image-minimal-lcow-dbg.tar.gz"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $TEMP_DIR = "D:\lcow-temp"
 
@@ -29,8 +26,7 @@ function Check-AzureShare  {
         [String] $StorageAccKey,
         [String] $ContainerName,
         [String] $LastVersionFile,
-        [String] $Destination,
-        [String] $DockerDestination
+        [String] $Destination
     )
     
     $lastVersion = ""
@@ -69,14 +65,9 @@ function Check-AzureShare  {
             $env:Path = "${BIN_PATH};" + $env:Path
             New-Item -Type Directory -Path ".\drop"
             tar -xf "${artifactTar}" -C "./drop"
-            Get-ChildItem -Path ".\drop" -Recurse -Include $KERNEL_NAME,$INITRD_NAME,$BIN_CHECK_IMAGE | `
+            Get-ChildItem -Path ".\drop" -Recurse -Include $KERNEL_NAME,$INITRD_NAME | `
                 ForEach-Object {Write-Host "Found file: $_";Copy-Item $_ .}
 
-            if (Test-Path ".\${BIN_CHECK_IMAGE}") {
-                Copy-Item ".\${BIN_CHECK_IMAGE}" "${DockerDestination}"
-            } else {
-                throw "Cannot find docker image"
-            }
             if (Test-Path ".\${KERNEL_NAME}") {
                 Copy-Item ".\${KERNEL_NAME}" "${Destination}\kernel"
             } else {
@@ -106,9 +97,7 @@ function Download-Artifacts {
     param (
         [String] $KernelUrl,
         [String] $InitrdUrl,
-        [String] $DockerImg,
-        [String] $Destination,
-        [String] $DockerDestination
+        [String] $Destination
     )
 
     $kernelDest = Join-Path $Destination "kernel"
@@ -117,11 +106,6 @@ function Download-Artifacts {
     Download -From $KernelUrl -To $kernelDest
     Download -From $InitrdUrl -To $initrdDest
 
-    if ($DockerImg) {
-        $dockerImgDest = Join-Path $DockerDestination $BIN_CHECK_IMAGE
-        Download -From $DockerImg -To $dockerImgDest
-    }
-
     Set-Content -Value "manual-run" -Path ".\build_name"
 }
 
@@ -129,23 +113,18 @@ function Main {
     if (Test-Path $Destination) {
         Remove-Item -Recurse -Force $Destination
     }
-    if (Test-Path $DockerDestination) {
-        Remove-Item -Recurse -Force $DockerDestination
-    }
+
     New-Item -Type Directory -Path $Destination
-    New-Item -Type Directory -Path $DockerDestination
-    $DockerDestination = Resolve-Path $DockerDestination
     $Destination = Resolve-Path $Destination
     New-Item ".\build_name"
 
     if ($KernelUrl -and $InitrdUrl) {
         Download-Artifacts -KernelUrl $KernelUrl -InitrdUrl $InitrdUrl `
-            -Destination $Destination -DockerDestination $DockerDestination `
-            -DockerImg $DockerImgUrl
+            -Destination $Destination
     } else {
         Check-AzureShare -StorageAccName $StorageAccName -StorageAccKey $StorageAccKey `
             -ContainerName $ContainerName -LastVersionFile $LastVersionFile `
-            -Destination $Destination -DockerDestination $DockerDestination
+            -Destination $Destination
     }
 }
 

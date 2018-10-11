@@ -6,7 +6,8 @@ def PowerShellWrapper(psCmd) {
 }
 
 properties ([
-    pipelineTriggers([cron('H * * * *')]),
+    disableConcurrentBuilds(),
+    pipelineTriggers([cron('H H/12 * * *')]),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
@@ -17,10 +18,6 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
-        [$class: 'StringParameterDefinition',
-            name: 'DOCKER_IMAGE_URL',
-            defaultValue: "",
-            description: 'Url to the docker image to be tested'],
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run binaries version test', 
@@ -45,6 +42,10 @@ properties ([
             defaultValue: true,
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Test kernel in Hyper-V',
+            name: 'kernel_hyperv_test'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -56,7 +57,6 @@ properties ([
 env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
 env.BINARIES_DESTINATION = "C:\\lcow-bin"
-env.DOCKER_IMAGE_DESTINATION = "C:\\lcow-bin-image"
 env.LINUXKIT_REPO = "https://github.com/linuxkit/lcow"
 env.LINUXKIT_BRANCH = "master"
 env.OPENGCS_REPO = "https://github.com/Microsoft/opengcs.git"
@@ -66,9 +66,10 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
+HYPERV_TEST_JOB = "lcow-hyperv-testing"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
 skipBuild = false
 
@@ -118,8 +119,22 @@ def runTestStage(testName) {
 		case "docker_test":
             runDockerTest()
             break
+        case "kernel_hyperv_test":
+            runHypervTest()
+            break
         default:
             println ("Test: ${testName} not defined. Skipping.")
+    }
+}
+
+def runHypervTest() {
+    dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        echo 'Starting Hyper-V test job'
+        fileName = "rpm-" + buildName.split("-")[1] + ".tgz"
+        testRun = build job: HYPERV_TEST_JOB, parameters: [
+            string(name: 'ARCHIVE_NAME', value: "${fileName}"),
+            string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
+        deleteDir()
     }
 }
 
@@ -207,7 +222,7 @@ def runStressTest() {
     }
 }
 
- def runKernelBuildTest() {
+def runKernelBuildTest() {
          dir ("lcow-kernel-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
              checkout scm
              echo 'Starting kernel builder test'
@@ -240,9 +255,7 @@ stage ("check_kernel") {
                         -LastVersionFile "${env:LAST_VERSION_FILE}"
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
-                        -DockerImgUrl "${env:DOCKER_IMAGE_URL}"
                         -Destination ".\\lcow-artifacts"
-                        -DockerDestination "${env:DOCKER_IMAGE_DESTINATION}"
                 ''')
 
                 buildName = readFile "./build_name"
@@ -271,6 +284,7 @@ if (!skipBuild) {
                         -BinariesDestination "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath ".\\lcow-artifacts"
                         -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
+                        -WorkDir "C:\\lcow-testing"
                     ''')
                 deleteDir()
             }
@@ -289,6 +303,7 @@ if (!skipBuild) {
                         -BinariesPath "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
                         -DockerdPath "C:\\Docker-Workspace"
+                        -WorkDir "C:\\lcow-testing"
                     ''')
                 deleteDir()
             }

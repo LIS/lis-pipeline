@@ -112,7 +112,7 @@ function Execute-Test {
             if ($LASTEXITCODE -ne 127) {
                 $msg = $($msg | Out-String)
                 if ($msg.Contains($version)) {
-                    $logMsg += " Version matches"
+                    $logMsg += " Version matches: ${version}"
                 } else {
                     $logMsg += " Version does not match `nOutput: ${msg}"
                 }
@@ -127,7 +127,7 @@ function Execute-Test {
             if (-not $LASTEXITCODE -ne 127) {
                 $msg = $($msg | Out-String)
                 if ($msg.Contains($version)) {
-                    $logMsg += "Version matches"
+                    $logMsg += "Version matches: ${version}"
                 } else {
                     $logMsg += "Version does not match `nOutput: ${msg}"
                 }
