@@ -2,6 +2,10 @@
 
 
 main() {
+    KERNEL_VERSION="$(uname -r)"
+
+    printf "Running kernel version: ${KERNEL_VERSION}\n\n"
+
     LIS_MODULES=(hv_vmbus hv_balloon hyperv_keyboard hv_netvsc hid_hyperv \
                  hv_utils hyperv_fb hv_storvsc pci_hyperv)
     if [[ "$(lsb_release -r | grep "6")" ]];then
