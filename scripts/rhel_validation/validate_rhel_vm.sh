@@ -154,10 +154,10 @@ main() {
     # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
     
-    echo "LIS modules check for ${OS_TYPE}_${OS_VERSION} with kernel ${KERNEL_VERSION}:" \
+    echo "Distro: ${OS_TYPE}_${OS_VERSION}" \
         > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "std_output" \
-        "@check_lis_modules.sh" "param=none" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
+        "@check_lis_modules.sh" "os_ver=\"$OS_VERSION\"" >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_check.log"
     popd
 }
 

@@ -71,7 +71,7 @@ function main {
     
     if [[ "$SECTION" == "install_kernel" ]];then        
         MAJOR_VERSION="${OS_VERSION%.*}"
-        if [[ "${OS_VERSION}" == "6.8" ]] || [[ "${OS_VERSION}" == "6.9" ]];then
+        if [[ "${OS_VERSION}" == "6.8" ]] || [[ "${OS_VERSION}" == "6.9" ]] || [[ "${OS_VERSION}" == "6.10" ]];then
             KERNEL_REPO="rhel-${MAJOR_VERSION}-server-rpms"
         else 
             KERNEL_REPO="rhel-${MAJOR_VERSION}-server-eus-rpms"
