@@ -20,7 +20,7 @@ function Main {
         Remove-Dir $DockerdPath
     }
     if (Test-Path $WorkDir) {
-        & 'C:\Program Files\git\usr\bin\rm.exe' -rf "${WorkDir}\*"
+        Remove-Dir $WorkDir
     }
 }
 

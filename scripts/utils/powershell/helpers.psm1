@@ -20,6 +20,18 @@ function Remove-Dir {
         [String] $Dir
     )
     
+    takeown.exe /F "${Dir}" /R
+    if ($LASTEXITCODE) {
+        Write-Host "Failed to take ownership of ${Dir}"
+        exit 1
+    }
+    Write-Host "Took ownership of ${Dir}"
+
+    icacls.exe "${Dir}" /GRANT "Administrators:F" /T
+    if ($LASTEXITCODE) {
+        Write-Host "Failed to grant full admin rights to ${Dir}"
+        exit 1
+    }
     $rmCmd = 'rmdir /s /q "' + $Dir + '"'
     cmd /c "${rmCmd}"
 }

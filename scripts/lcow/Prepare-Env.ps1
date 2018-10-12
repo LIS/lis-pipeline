@@ -79,7 +79,7 @@ function Get-TestDependencies {
 
 function Main {
     if (Test-Path $WorkDir) {
-        & 'C:\Program Files\git\usr\bin\rm.exe' -rf "${WorkDir}\*"
+        Remove-Dir $WorkDir
     } else {
         New-Item -Type Directory -Path $WorkDir
     }
