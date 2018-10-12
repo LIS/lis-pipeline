@@ -31,11 +31,6 @@
 # with the last added kernel in hash table.
 #
 ################################################################################
-################################################################################
-#
-# Main script body
-#
-################################################################################
 
 param (
     [String] $WorkDir,
@@ -49,6 +44,7 @@ param (
 $RHEL_VERSIONS_TO_KERNEL_MAP = @{"rhel_6.7" = @{"baseVer" = "2.6.32-573"; "newVer" = @()};
                                  "rhel_6.8" = @{"baseVer" = "2.6.32-642"; "newVer" = @()};
                                  "rhel_6.9" = @{"baseVer" = "2.6.32-696"; "newVer" = @()};
+                                 "rhel_6.10" = @{"baseVer" = "2.6.32-754"; "newVer" = @()};
                                  "rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
                                  "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()};
                                  "rhel_7.5" = @{"baseVer" = "3.10.0-862"; "newVer" = @()}}
@@ -84,7 +80,7 @@ function Get-VersionsHtml {
     
     $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
     $contentCookies = (Get-Content -Raw $CookiePath | ConvertFrom-Json)
-    # add cookies for our session
+    # add session cookies
     foreach($cook in $contentCookies) { 
         $cookie = New-Object System.Net.Cookie 
         $cookie.Name=$cook.name
@@ -94,7 +90,7 @@ function Get-VersionsHtml {
         $session.Cookies.Add($cookie);
     }
     # downloading page
-    Write-Host "Downloading.."
+    Write-Host "Downloading kernel page..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest $RemoteUrl -WebSession $session -UseBasicParsing -TimeoutSec 900 -OutFile $HtmlPath
     Start-Sleep 20
@@ -144,6 +140,11 @@ function Get-UpdatedVersionsList {
     return $resultList, $latestVersionsList
 }
 
+################################################################################
+#
+# Main script body
+#
+################################################################################
 function Main {
     if (!(Test-Path $WorkDir)) {
         New-Item -Type Directory -Path $WorkDir
@@ -157,7 +158,7 @@ function Main {
     
     $latestVersionsHash = Get-StoredVersions -LatestVersionsFile $LatestVersionsFile
     
-    pushd $WorkDir
+    Push-Location $WorkDir
     $cookiePath = Join-Path $UtilsDir "cookies_redhat.json"
     Get-VersionsHtml -HtmlPath ".\package.html" -RemoteUrl $RemoteHtmlLocation -CookiePath $cookiePath
 
