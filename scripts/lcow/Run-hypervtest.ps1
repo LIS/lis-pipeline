@@ -23,7 +23,7 @@ function Execute-Test {
         throw $_
     }
 	try {
-		.\Run-DockerLinuxPullAutomation.ps1 -RootDir $TestPath -ConfigFile $TestPath\LinuxAppPullImageList.xml -ImageName linux -NetworkName nat -UseNat $true -Xenon $true -UseDataVolume $true -VolumeName $TestPath\volume -DataVolumeType Local
+		.\Run-DockerLinuxPullAutomation.ps1 -RootDir $TestPath -ConfigFile $TestPath\LinuxAppPullImageList.xml -ImageName linux -NetworkName nat -UseNat $true -Xenon $true -UseDataVolume $true -VolumeName $TestPath\volume -DataVolumeType Local -Verbose:$false
 	} catch {
 		throw $_
 	}
