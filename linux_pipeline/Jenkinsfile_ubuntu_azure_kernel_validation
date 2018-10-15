@@ -12,22 +12,22 @@ def RunPowershellCommand(psCmd) {
 
 properties ([
     parameters([
-        choice (name: 'Distro', choices: 'default\nxenial\nbionic\nall', 
-                description: 'xenial - only Xenial validation <br> bionic - only Bionic validation <br> all - all distros validation <br>'),
-        choice (name: 'Kernel', choices: 'linux-azure\nlinux-azure-edge\nall',
-                description: 'linux-azure - only linux-azure kernel validation <br> linux-azure-edge - only linux-azure-edge kernel validation - KERNEL NOT SUPPORTED ON AZURE <br> all - all kernels validation <br>'),
+        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nall', 
+                description: 'trusty - only Trusty validation <br> xenial - only Xenial validation <br> bionic - only Bionic validation <br> all - all distros validation <br>'),
+        choice (name: 'Kernel', choices: 'all\nlinux-azure\nlinux-azure-edge',
+                description: ' all - all kernels validation <br> linux-azure - only linux-azure kernel validation <br> linux-azure-edge - only linux-azure-edge kernel validation - KERNEL NOT SUPPORTED ON AZURE <br>'),
         choice (name: 'Platform', choices: 'all\nhyperv\nazure',
-                description: 'hyperv - only Hyper-V validation <br> azure - only Azure validation <br> all - all platforms validation <br>')
-    ]),
-    pipelineTriggers([cron('H */12 * * *')])
+                description: '<br> all - all platforms validation <br> hyperv - only Hyper-V validation <br> azure - only Azure validation')
+    ])
 ])
 
 distroToTest = []
-DISTRO_TRIGGER = "default"
 DISTRO_BIONIC = "bionic"
 DISTRO_XENIAL = "xenial"
+DISTRO_TRUSTY = "trusty"
 DISTRO_BIONIC_EDGE = "bionic-edge"
 DISTRO_XENIAL_EDGE = "xenial-edge"
+DISTRO_TRUSTY_EDGE = "trusty-edge"
 DISTRO_ALL = "all"
 
 KERNEL_AZURE = "linux-azure"
@@ -41,80 +41,40 @@ PLATFORM_ALL = "all"
 HYPERV_PARAMS_AZURE = "azure_kernel=yes; azure_kernel_edge=no"
 HYPERV_PARAMS_AZURE_EDGE = "azure_kernel=no; azure_kernel_edge=yes"
 HYPERV_XML = "ubuntu_azure_kernel_fvt.xml"
+TRUSTY_VERSION = "Ubuntu_14.04.5"
 XENIAL_VERSION = "ubuntu_16.04.5"
 BIONIC_VERSION = "Ubuntu_18.04"
 
 AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
+ARM_TRUSTY = "Canonical UbuntuServer 14.04.5-LTS latest"
 ARM_XENIAL = "Canonical UbuntuServer 16.04-LTS latest"
 ARM_BIONIC = "Canonical UbuntuServer 18.04-LTS latest"
+PROPOSED_AZURE = "proposed"
+PROPOSED_EDGE = "proposed-edge"
 
-EXIT_CODE_ALL = 10
-EXIT_CODE_XENIAL = 11
-EXIT_CODE_BIONIC = 12
-
-def AddDistroToTest (distroBionic, distroXenial) {
+def AddDistroToTest (distroBionic, distroXenial, distroTrusty) {
     if (env.distro == DISTRO_ALL) {
         distroToTest.add(distroBionic)
         distroToTest.add(distroXenial)
-    }
-    if (env.distro == DISTRO_XENIAL) {
-        distroToTest.add(distroXenial)
+        distroToTest.add(distroTrusty)
     }
     if (env.distro == DISTRO_BIONIC) {
         distroToTest.add(distroBionic)
     }
+    if (env.distro == DISTRO_XENIAL) {
+        distroToTest.add(distroXenial)
+    }
+    if (env.distro == DISTRO_TRUSTY) {
+        distroToTest.add(distroTrusty)
+    }
 }
 
-if (env.distro == DISTRO_TRIGGER) {
-    stage ("Check for kernel update") {
-        node ("ubuntu_trigger"){
-            withCredentials(bindings: [string(credentialsId: 'AZURE_KERNEL_INFO_LOCATION', variable: 'AZURE_KERNEL_INFO_LOCATION')]) {
-                dir (env.BUILD_NUMBER + env.BRANCH_NAME) { 
-                    checkout scm
-                    echo 'Checking if there is a new kernel version'
-                    kernelCheckExitCode = PowerShellWrapper('''
-                        & ".\\scripts\\ubuntu_azure_kernel\\get_ubuntu_azure_kernel_version.ps1"
-                            -RemoteLocation "${env:AZURE_KERNEL_INFO_LOCATION}"
-                    ''')
-                    if (kernelCheckExitCode == EXIT_CODE_ALL) {
-                        echo "New kernel available for Bionic and Xenial."
-                        env.distro = DISTRO_ALL
-                        distroToTest.add(DISTRO_BIONIC)
-                        distroToTest.add(DISTRO_XENIAL)
-                    }
-                    if (kernelCheckExitCode == EXIT_CODE_XENIAL) {
-                        echo "New kernel available for Xenial."
-                        env.distro = DISTRO_XENIAL
-                        distroToTest.add(DISTRO_XENIAL)
-                    }
-                    if (kernelCheckExitCode == EXIT_CODE_BIONIC) {
-                        echo "New kernel available for Bionic."
-                        env.distro = DISTRO_BIONIC
-                        distroToTest.add(DISTRO_BIONIC)
-                    }
-                    deleteDir()
-                }
-            } 
-        }
-    }
-    if (kernelCheckExitCode == 0) {
-        echo "No new kernels found"
-        currentBuild.result = 'ABORTED'
-        return
-    }
-    if (env.distro == DISTRO_TRIGGER) {
-        echo "get_ubuntu_azure_kernel_version.ps1 failed with exit code ${kernelCheckExitCode}"
-        currentBuild.result = 'FAILED'
-        return
-    }
-} else {
-    if ((env.kernel == KERNEL_ALL) || (env.kernel == KERNEL_AZURE)) {   
-        AddDistroToTest (DISTRO_BIONIC, DISTRO_XENIAL)
-    }
+if ((env.kernel == KERNEL_ALL) || (env.kernel == KERNEL_AZURE)) {   
+    AddDistroToTest (DISTRO_BIONIC, DISTRO_XENIAL, DISTRO_TRUSTY)
 }
 
 if ((env.kernel == KERNEL_ALL) || (env.kernel == KERNEL_AZURE_EDGE)) {
-    AddDistroToTest (DISTRO_BIONIC_EDGE, DISTRO_XENIAL_EDGE)
+    AddDistroToTest (DISTRO_BIONIC_EDGE, DISTRO_XENIAL_EDGE, DISTRO_TRUSTY_EDGE)
 }
 
 stage ("Validation") {
@@ -143,6 +103,14 @@ stage ("Validation") {
                                     if ((distro == DISTRO_BIONIC_EDGE) || (distro == DISTRO_BIONIC)) {
                                         distroVersion = BIONIC_VERSION
                                         if (distro == DISTRO_BIONIC_EDGE) {
+                                            testParams = HYPERV_PARAMS_AZURE_EDGE
+                                        } else {
+                                            testParams = HYPERV_PARAMS_AZURE
+                                        }
+                                    }
+                                    if ((distro == DISTRO_TRUSTY_EDGE) || (distro == DISTRO_TRUSTY)) {
+                                        distroVersion = TRUSTY_VERSION
+                                        if (distro == DISTRO_TRUSTY_EDGE) {
                                             testParams = HYPERV_PARAMS_AZURE_EDGE
                                         } else {
                                             testParams = HYPERV_PARAMS_AZURE
@@ -178,8 +146,6 @@ stage ("Validation") {
             if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                 def runNumber = 1
                 def runs = [:]
-                distroToTest.remove(DISTRO_XENIAL_EDGE)
-                distroToTest.remove(DISTRO_BIONIC_EDGE)
                 distroToTest.each() {
                     def distro = it
                     runs["${distro}-Azure"] = {
@@ -189,11 +155,29 @@ stage ("Validation") {
                             echo "Azure is running"
                             dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                 git AZURE_LINUX_AUTOMATION_REPO
-                                if (distro == DISTRO_XENIAL) {
-                                    armVMImage = ARM_XENIAL
+                                if ((distro == DISTRO_TRUSTY_EDGE) || (distro == DISTRO_TRUSTY)) {
+                                    armVMImage = ARM_TRUSTY
+                                    if (distro == DISTRO_TRUSTY_EDGE) {
+                                        testParams = PROPOSED_EDGE
+                                    } else {
+                                        testParams = PROPOSED_AZURE
+                                    }
                                 }
-                                if (distro == DISTRO_BIONIC) {
+                                if ((distro == DISTRO_XENIAL_EDGE) || (distro == DISTRO_XENIAL)) {
+                                    armVMImage = ARM_XENIAL
+                                    if (distro == DISTRO_XENIAL_EDGE) {
+                                        testParams = PROPOSED_EDGE
+                                    } else {
+                                        testParams = PROPOSED_AZURE
+                                    }
+                                }
+                                if ((distro == DISTRO_BIONIC_EDGE) || (distro == DISTRO_BIONIC)) {
                                     armVMImage = ARM_BIONIC
+                                    if (distro == DISTRO_BIONIC_EDGE) {
+                                        testParams = PROPOSED_EDGE
+                                    } else {
+                                        testParams = PROPOSED_AZURE
+                                    }
                                 }
                                 RunPowershellCommand(".\\RunAzureTests.ps1" +
                                 " -BuildNumber '${BUILD_NUMBER}'" +
@@ -206,7 +190,7 @@ stage ("Validation") {
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -ARMImageName '${armVMImage}'" +
                                 " -OverrideVMSize 'Standard_D2_v2'" +
-                                " -customKernel 'proposed'" +
+                                " -customKernel '${testParams}'" +
                                 " -coureCountExceededTimeout '3600'" +
                                 " -ExitWithZero"
                                 )
