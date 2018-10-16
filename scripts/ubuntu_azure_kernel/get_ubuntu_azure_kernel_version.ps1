@@ -30,14 +30,16 @@
 ################################################################################
 
 param (
-    [String] $RemoteLocation
+    [String] $RemoteLocation,
+    [String] $KernelParamFile,
+    [String] $DistroParamFile
 )
 
 $URI_MAP = @{bionic_azure = "https://launchpad.net/ubuntu/bionic/+source/linux-azure";
-             xenial_azure = "https://launchpad.net/ubuntu/xenial/+source/linux-azure";}
-$EXIT_CODE_MAP = @{both = 10;
-                   xenial = 11;
-                   bionic = 12;}
+             xenial_azure = "https://launchpad.net/ubuntu/xenial/+source/linux-azure";
+             trusty_azure = "https://launchpad.net/ubuntu/trusty/+source/linux-azure";
+             xenial_azure_edge = "https://launchpad.net/ubuntu/xenial/+source/linux-azure-edge";
+             bionic_azure_edge = "https://launchpad.net/ubuntu/bionic/+source/linux-azure-edge";}
 $CURL_PATH = "C:\PortableGit\mingw64\bin\curl.exe"
 
 function Get-LatestPackageVersion {
@@ -98,27 +100,58 @@ function Write-VersionToShare {
 }
 
 function Main {
-    # Get the version from launchpad 
-    $changeTable = @{}
+    # Get the version from launchpad
+    $edgeKernelCounter = 0
+    $azureKernelCounter = 0
+    $distroToTest = New-Object System.Collections.Generic.List[System.Object]
     foreach ($distro in $URI_MAP.GetEnumerator()){
         $launchpadVersion = Get-LatestPackageVersion $distro.Value
         $sts = Write-VersionToShare $launchpadVersion $distro.Name
-        $changeTable.Add($distro.Name, $sts[-1])
+        if ($sts[-1] -eq $False) {
+            Write-Output "$($distro.Name) has a new kernel"
+            if ($distro.Name -match "edge") {
+                $edgeKernelCounter++
+            } else {
+                $azureKernelCounter++
+            }
+            $distroToTest.Add($distro.Name)
+        }
     }
-    
-    if (($changeTable.xenial_azure -eq $False) -and ($changeTable.bionic_azure -eq $False)) {
-        Write-Output "New kernel available for Bionic and Xenial."
-        exit $EXIT_CODE_MAP.both
-    } elseIf ($changeTable.xenial_azure -eq $False) {
-        Write-Output "New kernel available for Xenial."
-        exit $EXIT_CODE_MAP.xenial
-    } elseIf ($changeTable.bionic_azure -eq $False) {
-        Write-Output "New kernel available for Bionic."
-        exit $EXIT_CODE_MAP.bionic
+
+    # Set the kernel to be tested
+    if (($edgeKernelCounter -gt 0) -and ($azureKernelCounter -gt 0)) {
+        "all" | Out-File -FilePath $KernelParamFile
+    } elseIf (($edgeKernelCounter -eq 0) -and ($azureKernelCounter -gt 0)) {
+        "linux-azure" | Out-File -FilePath $KernelParamFile
+    } elseIf (($edgeKernelCounter -gt 0) -and ($azureKernelCounter -eq 0)) {
+        "linux-azure-edge" | Out-File -FilePath $KernelParamFile
     } else {
         Write-Output "No new kernels are available"
-        exit 0
+        exit 1
     }
+
+    # Set the distro to be tested
+    foreach ($distro in $distroToTest) {
+        if ($distro -match "trusty") {
+            $testTrusty = $true
+        } elseIf ($distro -match "xenial") {
+            $testXenial = $true
+        } elseIf ($distro -match "bionic") {
+            $testBionic = $true
+        }
+    }
+    if (($testTrusty -and $testXenial) -or ($testTrusty -and $testBionic) -or
+        ($testXenial -and $testBionic)) {
+        "all" | Out-File -FilePath $DistroParamFile
+    } elseif ($testTrusty) {
+        "trusty" | Out-File -FilePath $DistroParamFile
+    } elseif ($testXenial) {
+        "xenial" | Out-File -FilePath $DistroParamFile 
+    } elseif ($testBionic) {
+        "bionic" | Out-File -FilePath $DistroParamFile 
+    }
+
+    exit 0
 }
 
 Main
