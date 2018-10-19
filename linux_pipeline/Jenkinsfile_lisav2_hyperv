@@ -21,11 +21,11 @@ properties ([
             description: 'Test area to be run.'],
         [$class: 'StringParameterDefinition',
             name: 'GIT_URL',
-            defaultValue: 'https://github.com/mbivolan/LISAv2.git',
+            defaultValue: 'https://github.com/lis/LISAv2.git',
             description: 'LISAv2 repository url.'],
         [$class: 'StringParameterDefinition',
             name: 'GIT_BRANCH',
-            defaultValue: 'hyperv',
+            defaultValue: 'master',
             description: 'LISAv2 repository branch.'],
         [$class: 'StringParameterDefinition',
             name: 'HYPERV_VHD_PATH',
@@ -43,10 +43,22 @@ properties ([
             defaultValue: false,
             description: 'Economy mode for Hyper-V and Azure.',
             name: 'ECONOMY_MODE'],
-        [$class: 'BooleanParameterDefinition', 
+        [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             description: 'Whether to use VM GENERATION 2. Valid only for Hyper-V.',
-            name: 'VM_GENERATION_2']
+            name: 'VM_GENERATION_2'],
+        [$class: 'StringParameterDefinition',
+            description: 'Whether to use a specific test location. Valid only for Hyper-V.',
+            name: 'TEST_LOCATION_HYPERV'],
+        [$class: 'StringParameterDefinition',
+            description: 'Whether to use a specific test location. Valid only for Azure.',
+            name: 'TEST_LOCATION_AZURE'],
+        [$class: 'StringParameterDefinition',
+            description: 'Whether to use a specific ARM OS image. Valid only for Azure.',
+            name: 'OS_IMAGE_AZURE'],
+        [$class: 'StringParameterDefinition',
+            description: 'Whether to use a custom kernel location.',
+            name: 'CUSTOM_KERNEL']
         ]
     ]
 ])
@@ -68,6 +80,8 @@ def testIterationsAzure = "1"
 
 def regionHyperV = "hyper-v"
 def testParameter = ""
+def testParameterAzure = ""
+def testParameterHyperV = ""
 
 if (TEST_CASE) {
     testParameter = " -TestNames '${TEST_CASE}'"
@@ -84,6 +98,31 @@ if (VM_GENERATION_2 == "true") {
     testParameter += " -VMGeneration '2' "
 }
 
+if (CUSTOM_KERNEL) {
+    testParameter += " -CustomKernel '${CUSTOM_KERNEL}' "
+}
+
+testParameterHyperV = testParameter
+testParameterAzure = testParameter
+
+if (TEST_LOCATION_HYPERV) {
+    testParameterHyperV += " -TestLocation '${TEST_LOCATION_HYPERV}' "
+} else {
+    testParameterHyperV += " -TestLocation 'localhost' "
+}
+
+if (TEST_LOCATION_AZURE) {
+    testParameterAzure += " -TestLocation '${TEST_LOCATION_AZURE}' "
+} else {
+    testParameterAzure += " -TestLocation '${regionAzure}' "
+}
+
+if (OS_IMAGE_AZURE) {
+    osImageAzure = OS_IMAGE_AZURE
+}
+testParameterAzure += " -ARMImageName '${osImageAzure}' "
+
+
 stage("lisav2") {
     def runs = [:]
     if (HYPERV_TEST == "true") {
@@ -98,11 +137,10 @@ stage("lisav2") {
                                 cleanWs()
                                 git branch: params.GIT_BRANCH, url: params.GIT_URL
                                 RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                " -TestLocation 'localhost'" +
                                 " -RGIdentifier '${regionHyperV}'" +
                                 " -TestPlatform  'HyperV'" +
                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
-                                " ${testParameter}" +
+                                " ${testParameterHyperV}" +
                                 " -ForceDeleteResources" +
                                 " -UpdateGlobalConfigurationFromSecretsFile" +
                                 " -XMLSecretFile '${HyperV_Secrets_File}'" +
@@ -114,6 +152,7 @@ stage("lisav2") {
                             }
                         }
                     } catch (exc) {
+                        println exc
                         println "${regionHyperV}: STAGE_FAILED_EXCEPTION."
                         currentBuild.result = 'FAILURE'
                     } finally {
@@ -135,11 +174,9 @@ stage("lisav2") {
                                 cleanWs()
                                 git branch: params.GIT_BRANCH, url: params.GIT_URL
                                 RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                " -TestLocation '${regionAzure}'" +
                                 " -RGIdentifier '${regionAzure}'" +
                                 " -TestPlatform  'Azure'" +
-                                " -ARMImageName '${osImageAzure}'" +
-                                " ${testParameter}" +
+                                " ${testParameterAzure}" +
                                 " -TestIterations ${testIterationsAzure}" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -UpdateGlobalConfigurationFromSecretsFile" +
