@@ -248,7 +248,7 @@ function Get-LisaCode {
     if (Test-Path $LISAPath) {
         rm -Recurse -Force $LISAPath
     }
-    & $GitPath clone https://github.com/LIS/lis-test.git $LISAPath
+    & $GitPath clone https://github.com/ader1990/lis-test.git -b "fix_vhd_build" $LISAPath
 }
 
 function Copy-LisaTestDependencies {
