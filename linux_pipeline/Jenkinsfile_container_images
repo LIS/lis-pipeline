@@ -54,6 +54,13 @@ properties ([
     ]
 ])
 
+// This value represents the number of Passed tests in the base kernel
+// and it's used to validate newer versions of the LCOW kernel.
+// If the number of Passed tests is lower than the base one,
+// the stage will fail.
+// Kernel Version: 4.14.29-linuxkit
+env.LINUXKIT_BASE_NUMBER = "58"
+
 env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
 env.BINARIES_DESTINATION = "C:\\lcow-bin"
@@ -182,6 +189,7 @@ def runLinuxKitTesting() {
                 -TestBranch "${env:LINUXKIT_BRANCH}"
                 -WorkDir "C:\\lcow-testing\\workdir-linuxkit-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\linuxkit-logs"
+                -BaseNumber "${env:LINUXKIT_BASE_NUMBER}"
             ''')
         archiveArtifacts artifacts: "linuxkit-logs\\*", allowEmptyArchive: true
         deleteDir()
