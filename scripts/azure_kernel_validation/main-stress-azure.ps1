@@ -249,7 +249,7 @@ function Run-LisaTest {
     
     echo $lisaParameters
 
-    powershell.exe -Command ".\RunTests.ps1" -args @lisaParameters
+    powershell.exe -Command ".\Run-LisaV2.ps1" -args @lisaParameters
     
     if ($ResultsDest){
         Copy-LatestResults -ResultsPath $resultsDir -ResultsDest $ResultsDest
