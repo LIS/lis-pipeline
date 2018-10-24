@@ -57,7 +57,7 @@ azureImages.each {
                                 echo "Current Image: ${currentImage}, Current Region: ${currentRegion}"
                                 cleanWs()
                                 git branch: gitBranchName, url: gitRemoteUrl
-                                RunPowershellCommand(".\\RunTests.ps1" +
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                 " -TestLocation '${currentRegion}'" +
                                 " -RGIdentifier '${currentRegion}'" +
                                 " -TestPlatform  'Azure'" +
