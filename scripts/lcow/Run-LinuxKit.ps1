@@ -4,8 +4,11 @@ param (
     [String] $TestRepo,
     [String] $TestBranch,
     [String] $WorkDir,
+    [String] $BaseNumber,
     [String] $LogDestination
 )
+
+$SUMMARY_JSON_REL_PATH = "_results\latest\SUMMARY.json"
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $commonModulePath = Join-Path $scriptPath "CommonFunctions.psm1"
@@ -40,6 +43,24 @@ function Copy-Logs {
     Copy-Item "${testLogs}\*" $LogDest
 }
 
+function Compare-Results {
+    param (
+        [String] $TestPath,
+        [String] $BaseNumber
+    )
+
+    $summaryFile = Join-Path $TestPath $SUMMARY_JSON_REL_PATH
+
+    if (-not (Test-Path $summaryFile)) {
+        throw "Cannot find test summary"
+    }
+
+    $summary = Get-Content $summaryFile | ConvertFrom-Json
+    $passedTests = $($summary.results | where {$_.result -eq 0}).Length
+    
+    return ($passedTests - $BaseNumber)
+}
+
 function Execute-Tests {
     param (
         [String] $TestPath,
@@ -52,7 +73,6 @@ function Execute-Tests {
         throw $_
     } finally {
         Copy-Logs -TestPath $TestPath -LogDest $LogDest
-        exit 0
     }
 }
 
@@ -79,9 +99,21 @@ function  Main {
     
     Prepare-Env -BinariesPath $BinariesPath `
         -TestPath $testRepoPath
+
     Execute-Tests -TestPath $testRepoPath -LogDest $LogDestination
     
+    $result = Compare-Results -TestPath $testRepoPath `
+        -BaseNumber $BaseNumber
+
     Pop-Location
+
+    if ($result -ge 0) {
+        Write-Output "Passed tests over base kernel: $result"
+        exit 0
+    } else {
+        Write-Output "Failed tests over base kernel: $(0 - $result)"
+        exit 1
+    }
 }
 
 Main
