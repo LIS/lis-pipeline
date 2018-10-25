@@ -1,14 +1,8 @@
 #!/usr/bin/env groovy
 
-def PowerShellWrapper(psCmd) {
-    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
-}
-
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
-
 def reportStageStatus(stageName, stageStatus) {
     script {
         env.STAGE_NAME_REPORT = stageName
@@ -32,28 +26,72 @@ def reportStageStatus(stageName, stageStatus) {
     }
 }
 
+def getVhdLocation(basePath, distroVersion) {
+    def distroFamily = distroVersion.split('_')[0]
+    return "${basePath}\\" + distroFamily + "\\" + distroVersion + "\\" + distroVersion + ".vhdx"
+}
+
+def prepareEnv(branch, remote, distroVersion, functionalTests) {
+    cleanWs()
+    git branch: branch, url: remote
+    script {
+      env.AZURE_OS_IMAGE = env.AZURE_UBUNTU_IMAGE_BIONIC
+      env.PACKAGE_TYPE = "deb"
+      if (distroVersion.toLowerCase().contains("centos")) {
+        env.AZURE_OS_IMAGE = env.AZURE_CENTOS_7_IMAGE
+        env.PACKAGE_TYPE = "rpm"
+      }
+      if (functionalTests.contains('ALL')) {
+          env.LISAV2_PARAMS = "-TestCategory 'Functional'"
+      }
+      if (functionalTests.contains('BVT')) {
+          env.LISAV2_PARAMS = "-TestCategory 'BVT'"
+      }
+      if (functionalTests.contains('FVT')) {
+          env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
+      }
+    }
+}
+
+def unstashKernel(kernelStash) {
+    unstash kernelStash
+    powershell """
+        \$rmPath = "\${env:ProgramFiles}\\Git\\usr\\bin\\rm.exe"
+        \$basePath = "./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.PACKAGE_TYPE}"
+
+        & \$rmPath -rf "\${basePath}/*dbg*"
+        & \$rmPath -rf "\${basePath}/*devel*"
+        & \$rmPath -rf "\${basePath}/*debug*"
+    """
+}
+
+
 pipeline {
   parameters {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
-    choice(choices: 'Ubuntu_16.04.5\nCentOS_7.4', description: 'Distro version.', name: 'DISTRO_VERSION')
-    choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which tests should LISA run', name: 'LISA_TEST_XML')
+    choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
+    choice(choices: 'BVT\nFVT\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_jessie_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
+    LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
+    LISAV2_BRANCH = "master"
+    LISAV2_AZURE_REGION = "westus2"
+    LISAV2_RG_IDENTIFIER = "msftk"
+    LISAV2_AZURE_VM_SIZE_SMALL = "Standard_A2"
+    LISAV2_AZURE_VM_SIZE_LARGE = "Standard_E64_v3"
     KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
-    UBUNTU_VERSION = '16'
     BUILD_PATH = '/mnt/tmp/kernel-build-folder'
     KERNEL_CONFIG = 'Microsoft/config-azure'
     CLEAN_ENV = 'False'
     USE_CCACHE = 'True'
-    AZURE_MAX_RETRIES = '60'
     BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
-    THREAD_NUMBER = 'x3'
-    AZURE_LINUX_AUTOMATION_REPO = "https://github.com/LIS/azure-linux-automation.git"
+    AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
+    AZURE_CENTOS_7_IMAGE = "OpenLogic CentOS 7.5 latest"
   }
   options {
     overrideIndexTriggers(false)
@@ -76,8 +114,8 @@ pipeline {
                 }
               }
               steps {
-                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
-                                                  variable: 'KERNEL_GIT_URL')]) {
+              withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
+                                  variable: 'KERNEL_GIT_URL')]) {
                   stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                   sh '''#!/bin/bash
                     set -xe
@@ -88,28 +126,25 @@ pipeline {
                         --git_branch "${KERNEL_GIT_BRANCH}" \\
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps "True" \\
-                        --thread_number "${THREAD_NUMBER}" \\
-                        --debian_os_version "${UBUNTU_VERSION}" \\
+                        --thread_number "x3" \\
+                        --debian_os_version "16" \\
                         --build_path "${BUILD_PATH}" \\
                         --kernel_config "${KERNEL_CONFIG}" \\
                         --clean_env "${CLEAN_ENV}" \\
                         --use_ccache "${USE_CCACHE}" \\
                         --enable_kernel_debug "${KERNEL_DEBUG}"
                     popd
-                    '''
-                    writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'Canonical UbuntuServer 16.04-LTS latest'
-                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-Canonical-UbuntuServer-16.04-LTS-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
-                    writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.deb'
-                }
-                sh '''#!/bin/bash
+                '''
+              }
+
+              sh '''#!/bin/bash
                   echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
                 '''
                 script {
                   currentBuild.displayName = readFile "./build_name"
                 }
-                stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/deb/**"),
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
@@ -118,11 +153,11 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
               post {
-                success {
-                  reportStageStatus("BuildSucceeded", 1)
-                }
                 failure {
                   reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
                 }
               }
           }
@@ -138,7 +173,8 @@ pipeline {
                 }
               }
               steps {
-                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL')]) {
+                withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL',
+                                  variable: 'KERNEL_GIT_URL')]) {
                   stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
                   sh '''#!/bin/bash
                     set -xe
@@ -149,16 +185,15 @@ pipeline {
                         --git_branch "${KERNEL_GIT_BRANCH}" \\
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps "True" \\
-                        --thread_number "${THREAD_NUMBER}" \\
+                        --thread_number "x3" \\
+                        --debian_os_version "${UBUNTU_VERSION}" \\
                         --build_path "${BUILD_PATH}" \\
                         --kernel_config "${KERNEL_CONFIG}" \\
                         --clean_env "${CLEAN_ENV}" \\
-                        --use_ccache "${USE_CCACHE}"
+                        --use_ccache "${USE_CCACHE}" \\
+                        --enable_kernel_debug "${KERNEL_DEBUG}"
                     popd
-                    '''
-                    writeFile file: 'ARM_IMAGE_NAME.azure.env', text: 'OpenLogic CentOS 7.3 latest'
-                    writeFile file: 'ARM_OSVHD_NAME.azure.env', text: "SS-AUTOBUILT-OpenLogic-CentOS-7.3-latest-${BUILD_NAME}${BUILD_NUMBER}.vhd"
-                    writeFile file: 'KERNEL_PACKAGE_NAME.azure.env', text: 'testKernel.rpm'
+                '''
                 }
                 sh '''#!/bin/bash
                   echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
@@ -166,9 +201,8 @@ pipeline {
                 script {
                   currentBuild.displayName = readFile "./build_name"
                 }
-                stash includes: '*.azure.env', name: 'azure.env'
                 stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/msft*/rpm/**"),
+                stash includes: ("scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/rpm/**"),
                       name: "${env.KERNEL_ARTIFACTS_PATH}"
                 sh '''
                     set -xe
@@ -177,11 +211,11 @@ pipeline {
                 archiveArtifacts 'scripts/package_building/kernel_versions.ini'
               }
               post {
-                success {
-                  reportStageStatus("BuildSucceeded", 1)
-                }
                 failure {
                   reportStageStatus("BuildSucceeded", 0)
+                }
+                success {
+                  reportStageStatus("BuildSucceeded", 1)
                 }
               }
     }
@@ -198,8 +232,7 @@ pipeline {
       steps {
         dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
-            withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                               string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                usernamePassword(credentialsId: 'smb_share_user_pass',
                                                 passwordVariable: 'PASSWORD',
                                                 usernameVariable: 'USERNAME')]) {
@@ -220,50 +253,87 @@ pipeline {
         beforeAgent true
         expression { params.ENABLED_STAGES.contains('boot_test') }
       }
-      agent {
-        node {
-          label 'meta_slave'
-        }
-      }
-      steps {
-        withCredentials(bindings: [string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                                   string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
-                                   usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
-                                   ]) {
-          dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            unstash 'kernel_version_ini'
-            sh 'cat scripts/package_building/kernel_versions.ini'
-          }
-          sh '''#!/bin/bash
-            OS_TYPE=${DISTRO_VERSION%_*}
-            OS_TYPE=${OS_TYPE,,}
-            bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
-                --smb_share_username $USERNAME --smb_share_password $PASSWORD \
-                --smb_share_url $SMB_SHARE_URL --vm_user_name $OS_TYPE \
-                --os_type $OS_TYPE
-            '''
-        }
-      }
       post {
-        always {
-          archiveArtifacts "${env.BUILD_NAME}${env.BUILD_NUMBER}${env.BRANCH_NAME}-boot-diagnostics/*.log"
-        }
         failure {
           reportStageStatus("BootOnAzure", 0)
-          sh 'echo "Load failure test results."'
-          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml')
         }
         success {
           reportStageStatus("BootOnAzure", 1)
-          echo "Cleaning Azure resources up..."
-          sh '''#!/bin/bash
-            pushd ./scripts/azure_kernel_validation
-            bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
-            popd
-            '''
-          nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml')
         }
+      }
+      parallel {
+        stage('boot_test_large') {
+            when {
+              beforeAgent true
+              expression { params.ENABLED_STAGES.contains('boot_test_large') }
+            }
+            agent {
+              node {
+                label 'azure'
+              }
+            }
+            steps {
+                withCredentials(bindings: [
+                  file(credentialsId: 'CBS_Azure_Secrets_File',
+                       variable: 'Azure_Secrets_File')
+                ]) {
+                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                    unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                        " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                        " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                        " -TestPlatform 'Azure'" +
+                        " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                        " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_LARGE}'" +
+                        " -ARMImageName '${env.AZURE_OS_IMAGE}'" +
+                        " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
+                        " -StorageAccount 'ExistingStorage_Standard'" +
+                        " -XMLSecretFile '${env.Azure_Secrets_File}'" +
+                        " -UseManagedDisks"
+                    )
+                }
+            }
+            post {
+              always {
+                junit "report\\*-junit.xml"
+                archiveArtifacts "TestResults\\**\\*"
+              }
+            }
+        }
+        stage('boot_test_small') {
+            agent {
+              node {
+                label 'azure'
+              }
+            }
+            steps {
+                withCredentials(bindings: [
+                  file(credentialsId: 'CBS_Azure_Secrets_File',
+                       variable: 'Azure_Secrets_File')
+                ]) {
+                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                    unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                        " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                        " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                        " -TestPlatform 'Azure'" +
+                        " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                        " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
+                        " -ARMImageName '${env.AZURE_OS_IMAGE}'" +
+                        " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
+                        " -StorageAccount 'ExistingStorage_Standard'" +
+                        " -XMLSecretFile '${env.Azure_Secrets_File}'" +
+                        " -UseManagedDisks"
+                    )
+                }
+            }
+            post {
+              always {
+                junit "report\\*-junit.xml"
+                archiveArtifacts "TestResults\\**\\*"
+              }
+            }
+          }
       }
     }
     stage('publish_artifacts') {
@@ -279,8 +349,7 @@ pipeline {
       steps {
         dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
             unstash "${env.KERNEL_ARTIFACTS_PATH}"
-            withCredentials([string(credentialsId: 'KERNEL_GIT_URL', variable: 'KERNEL_GIT_URL'),
-                               string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+            withCredentials([string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
                                usernamePassword(credentialsId: 'smb_share_user_pass', passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
                                ]) {
                 sh '''#!/bin/bash
@@ -295,105 +364,52 @@ pipeline {
         }
       }
     }
-    stage('publish_vhd') {
+    stage('publish_azure_vhd') {
       when {
         beforeAgent true
-        expression { params.ENABLED_STAGES.contains('publish_vhd') }
+        expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
       }
-      parallel {
-        stage('publish_azure_vhd') {
-          when {
-            beforeAgent true
-            expression { params.ENABLED_STAGES.contains('publish_azure_vhd') }
-            expression { params.ENABLED_STAGES.contains('validation') }
-            expression { params.ENABLED_STAGES.contains('azure') }
-          }
-          agent {
-            node {
-              label 'azure'
-            }
-          }
-          steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
-              cleanWs()
-              git env.AZURE_LINUX_AUTOMATION_REPO
-              stash includes: '**' , name: 'azure-linux-automation'
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash 'kernel_version_ini'
-              unstash 'azure.env'
-              script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -testLocation 'westus2'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'PUBLISH-VHD'" +
-              " -OverrideVMSize 'Standard_D2_v2'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ExitWithZero"
-              )
-              script {
-                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
-              }
-              RunPowershellCommand(".\\Extras\\CopyVHDtoOtherStorageAccount.ps1" +
-              " -sourceLocation westus2 " +
-              " -destinationLocations 'westus,westus2,northeurope'" +
-              " -destinationAccountType Standard" +
-              " -sourceVHDName '${ARM_OSVHD_NAME}'" +
-              " -destinationVHDName '${ARM_OSVHD_NAME}'"
-              )
-            }
-          }
+      agent {
+        node {
+          label 'azure'
         }
-        stage('publish_hyperv_vhd') {
-          when {
-            beforeAgent true
-            expression { params.ENABLED_STAGES.contains('publish_hyperv_vhd') }
-            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
-          }
-          agent {
-            node {
-              label 'hyper-v'
+      }
+      steps {
+        withCredentials(bindings: [
+          file(credentialsId: 'CBS_Azure_Secrets_File',
+               variable: 'Azure_Secrets_File')
+        ]) {
+            prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+            unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                " -TestPlatform 'Azure'" +
+                " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
+                " -ARMImageName '${env.AZURE_OS_IMAGE}'" +
+                " -TestNames 'CAPTURE-VHD-BEFORE-TEST'" +
+                " -XMLSecretFile '${env.Azure_Secrets_File}'"
+            )
+            script {
+                env.CapturedVHD = readFile 'CapturedVHD.azure.env'
             }
-          }
-          steps {
-            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
-                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
-                                       string(credentialsId: 'VHD_UPLOAD_DESTINATION', variable: 'VHD_UPLOAD_DESTINATION')]) {
-              println 'Running LISA...'
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash "kernel_version_ini"
-              PowerShellWrapper('''
-                    & ".\\scripts\\lis_hyperv_platform\\main_perf.ps1"
-                         -KernelVersionPath "scripts\\package_building\\kernel_versions.ini"
-                         -LocalKernelFolder "scripts/package_building/${env:BUILD_NUMBER}-${env:BRANCH_NAME}-${env:KERNEL_ARTIFACTS_PATH}/**/deb"
-                         -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-msft"
-                         -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-f"
-                         -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
-                         -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]"
-                         -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "None"
-                         -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
-                         -VHDDestination ${env:VHD_UPLOAD_DESTINATION}
-                      ''')
-              println 'Finished running LISA.'
-            }
-          }
+            stash includes: 'CapturedVHD.azure.env', name: 'CapturedVHD.azure.env'
+            println("Captured VHD : ${env.CapturedVHD}")
+        }
+      }
+      post {
+        always {
+          junit "report\\*-junit.xml"
+          archiveArtifacts "TestResults\\**\\*"
         }
       }
     }
+
     stage('validation') {
-     when {
-      beforeAgent true
-      expression { params.ENABLED_STAGES.contains('validation') }
-     }
-     parallel {
-      stage('validation_functional_hyperv') {
+      parallel {
+
+        stage('validation_functional_hyperv') {
           when {
             beforeAgent true
             expression { params.ENABLED_STAGES.contains('validation_functional_hyperv') }
@@ -404,56 +420,42 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
-                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
-                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
-                                       string(credentialsId: 'DB_CONFIG_KERNEL', variable: 'DB_CONFIG_KERNEL'),
-                                       string(credentialsId: 'LISA_KERNEL_LOG_DESTINATION', variable: 'LISA_KERNEL_LOG_DESTINATION'),
-                                       file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
-                                            variable: 'DBConfigPath')]) {
-                echo 'Running LISA...'
-                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-                    unstash 'kernel_version_ini'
-                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+            withCredentials(bindings: [
+              file(credentialsId: 'HyperV_Secrets_File',
+                   variable: 'HyperV_Secrets_File'),
+              string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                   variable: 'LISAV2_IMAGES_SHARE_URL')
+            ]) {
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                script {
+                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
                 }
-                PowerShellWrapper('''
-                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
-                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
-                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
-                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
-                        -VHDType "${env:DISTRO_VERSION}.ToLower().Split('_')[0]" -WorkingDirectory "C:\\workspace"
-                        -OSVersion "${env:DISTRO_VERSION}.Split('_')[1]" -LISAManageVMS:$true
-                        -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
-                        -AzureToken "${env:AZURE_SAS}"
-                        -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
-                        -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
-                        -PipelineName "pipeline-msft-kernel-validation/${env:BRANCH_NAME}"
-                        -DBConfigPath "${env:DBConfigPath}"
-                        -LisaLogDBConfigPath "${env:DB_CONFIG_KERNEL}"
-                        -LogsPath "${env:LISA_KERNEL_LOG_DESTINATION}"
-                  ''')
-                echo 'Finished running LISA.'
-              }
+                println("Current VHD: ${env.HYPERV_VHD_PATH}")
+                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                    " -TestLocation 'localhost'" +
+                    " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                    " -TestPlatform 'HyperV'" +
+                    " ${env.LISAV2_PARAMS}" +
+                    " -OsVHD '${env.HYPERV_VHD_PATH}'" +
+                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                    " -XMLSecretFile '${env.HyperV_Secrets_File}'"
+                )
             }
+          }
           post {
             always {
-              archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*"
-              junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}\\TestResults\\**\\*.xml"
-            }
-            success {
-              echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('''
-                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
-                ''')
+              junit "report\\*-junit.xml"
+              archiveArtifacts "TestResults\\**\\*"
             }
           }
         }
+
         stage('validation_functional_jessie_hyperv') {
           when {
             beforeAgent true
-            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
             expression { params.ENABLED_STAGES.contains('validation_functional_jessie_hyperv') }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
           }
           agent {
             node {
@@ -461,49 +463,37 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
-                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'AZURE_STORAGE_URL', variable: 'AZURE_STORAGE_URL'),
-                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
-                                       string(credentialsId: 'DB_CONFIG_KERNEL', variable: 'DB_CONFIG_KERNEL'),
-                                       string(credentialsId: 'LISA_KERNEL_LOG_DESTINATION', variable: 'LISA_KERNEL_LOG_DESTINATION'),
-                                       file(credentialsId: 'KERNEL_QUALITY_REPORTING_DB_CONFIG',
-                                            variable: 'DBConfigPath')]) {
-                echo 'Running LISA for Debian Jessie...'
-                dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-                    unstash 'kernel_version_ini'
-                    PowerShellWrapper('cat scripts/package_building/kernel_versions.ini')
+            withCredentials(bindings: [
+              file(credentialsId: 'HyperV_Secrets_File',
+                   variable: 'HyperV_Secrets_File'),
+              string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                   variable: 'LISAV2_IMAGES_SHARE_URL')
+            ]) {
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                script {
+                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, "Debian_8.11")
                 }
-                PowerShellWrapper('''
-                    & ".\\scripts\\lis_hyperv_platform\\main.ps1"
-                        -KernelVersionPath "kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}\\scripts\\package_building\\kernel_versions.ini"
-                        -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
-                        -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
-                        -VHDType "Debian" -OSVersion "8.11" -WorkingDirectory "C:\\workspace"
-                        -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:LISA_TEST_XML}"
-                        -AzureToken "${env:AZURE_SAS}" -AzureUrl "${env:AZURE_STORAGE_URL}${env:KERNEL_GIT_BRANCH_LABEL}-kernels"
-                        -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
-                        -PipelineName "pipeline-msft-kernel-validation/${env:BRANCH_NAME}"
-                        -DBConfigPath "${env:DBConfigPath}"
-                        -LisaLogDBConfigPath "${env:DB_CONFIG_KERNEL}"
-                        -LogsPath "${env:LISA_KERNEL_LOG_DESTINATION}"
-                  ''')
-                echo 'Finished running LISA for Debian Jessie.'
-              }
+                println("Current VHD: ${env.HYPERV_VHD_PATH}")
+                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                    " -TestLocation 'localhost'" +
+                    " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                    " -TestPlatform 'HyperV'" +
+                    " ${env.LISAV2_PARAMS}" +
+                    " -OsVHD '${env.HYPERV_VHD_PATH}'" +
+                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                    " -XMLSecretFile '${env.HyperV_Secrets_File}'"
+                )
             }
+          }
           post {
             always {
-              archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}jessie\\TestResults\\**\\*"
-              junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}jessie\\TestResults\\**\\*.xml"
-            }
-            success {
-              echo 'Cleaning up LISA environment...'
-              PowerShellWrapper('''
-                  & ".\\scripts\\lis_hyperv_platform\\tear_down_env.ps1" -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}jessie"
-                ''')
+              junit "report\\*-junit.xml"
+              archiveArtifacts "TestResults\\**\\*"
             }
           }
         }
+
         stage('validation_functional_azure') {
           when {
             beforeAgent true
@@ -515,52 +505,35 @@ pipeline {
             }
           }
           steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
-              cleanWs()
-              unstash 'azure-linux-automation'
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash 'kernel_version_ini'
-              unstash 'azure.env'
-              script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -testLocation 'westus2'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'BVTMK'" +
-              " -OverrideVMSize 'Standard_D1_v2'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -testLocation 'westus'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'DEPLOYMENT-LIMITED'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -testLocation 'westus'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testCycle 'DEPLOYMENT-LIMITED'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -StorageAccount 'ExistingStorage_Premium'" +
-              " -ExitWithZero"
-              )
+            withCredentials(bindings: [
+              file(credentialsId: 'CBS_Azure_Secrets_File',
+                   variable: 'Azure_Secrets_File')
+            ]) {
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                unstash 'CapturedVHD.azure.env'
+                script {
+                    env.CapturedVHD = readFile 'CapturedVHD.azure.env'
+                }
+                println("VHD under test : ${env.CapturedVHD}")
+                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                    " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                    " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+                    " -TestPlatform 'Azure'" +
+                    " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
+                    " ${env.LISAV2_PARAMS} " +
+                    " -OsVHD '${env.CapturedVHD}'" +
+                    " -XMLSecretFile '${env.Azure_Secrets_File}'"
+                )
+            }
+          }
+          post {
+            always {
               junit "report\\*-junit.xml"
-              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
+              archiveArtifacts "TestResults\\**\\*"
             }
           }
         }
+
         stage('validation_perf_azure_net') {
           when {
             beforeAgent true
@@ -572,124 +545,10 @@ pipeline {
             }
           }
           steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
-              cleanWs()
-              unstash 'azure-linux-automation'
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash 'kernel_version_ini'
-              unstash 'azure.env'
-              script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-LAGSCOPE'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
-              " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-NTTTCP'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
-              " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-UDPLOSS'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_UDP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'PERF-UDPLOSS'" +
-              " -EnableAcceleratedNetworking" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-LAGSCOPE'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'LAGSCOPE-TEST'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-IPERF3-SINGLE-CONNECTION'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_Single_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'IPERF-SINGLE-CONNECTION-TEST'" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-NTTTCP'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'NTTTCP-SRIOV'" +
-              " -ExitWithZero"
-              )
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -OsVHD '${ARM_OSVHD_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -testLocation 'westus2'" +
-              " -testCycle 'PERF-UDPLOSS'" +
-              " -OverrideVMSize 'Standard_D15_v2'" +
-              " -StorageAccount 'ExistingStorage_Standard'" +
-              " -ResultDBTable 'Perf_Network_UDP_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'PERF-UDPLOSS'" +
-              " -ExitWithZero"
-              )
-              junit "report\\*-junit.xml"
-              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
-            }
+            println("TBD")
           }
         }
+
         stage('validation_perf_azure_stor') {
           when {
             beforeAgent true
@@ -701,60 +560,39 @@ pipeline {
             }
           }
           steps {
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-              build job: 'tool-turn-on-slaves', parameters: [string(name: 'RoleNameAndRGname', value: 'azure-slave-1@kernel_pipeline')], wait: false
-              cleanWs()
-              unstash 'azure-linux-automation'
-              unstash "${env.KERNEL_ARTIFACTS_PATH}"
-              unstash 'kernel_version_ini'
-              unstash 'azure.env'
-              script {
-                  env.ARM_IMAGE_NAME = readFile 'ARM_IMAGE_NAME.azure.env'
-                  env.ARM_OSVHD_NAME = readFile 'ARM_OSVHD_NAME.azure.env'
-                  env.KERNEL_PACKAGE_NAME = readFile 'KERNEL_PACKAGE_NAME.azure.env'
-              }
-              RunPowershellCommand('cat scripts/package_building/kernel_versions.ini')
-              RunPowershellCommand(".\\RunAzureTests.ps1" +
-              " -ArchiveLogDirectory 'Z:\\Logs_Azure'" +
-              " -customKernel 'localfile:${KERNEL_PACKAGE_NAME}'" +
-              " -DistroIdentifier '${BUILD_NAME}${BUILD_NUMBER}'" +
-              " -ARMImageName '${ARM_IMAGE_NAME}'" +
-              " -testLocation 'centralus'" +
-              " -testCycle 'PERF-FIO'" +
-              " -OverrideVMSize 'Standard_DS14_v2'" +
-              " -ResultDBTable 'Perf_Storage_Azure_MsftKernel'" +
-              " -ResultDBTestTag 'FIO-12DISKS'" +
-              " -StorageAccount 'NewStorage_Premium'" +
-              " -ExitWithZero"
-              )
-              junit "report\\*-junit.xml"
-              RunPowershellCommand(".\\Extras\\AnalyseAllResults.ps1")
-            }
+            println("TBD")
           }
         }
+
         stage('validation_perf_hyperv') {
           when {
             beforeAgent true
-            expression { params.DISTRO_VERSION.toLowerCase().contains('centos') }
             expression { params.ENABLED_STAGES.contains('validation_perf_hyperv') }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
           }
           agent {
             node {
-              label 'jenkins-meta-slave'
+              label "net_perf"
             }
           }
           steps {
-              dir('kernel_version' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-                unstash 'kernel_version_ini'
-              }
-              script {
-                    iniPath = "${env:WORKSPACE}/kernel_version${env:BUILD_NUMBER}${env:BRANCH_NAME}/scripts/package_building/kernel_versions.ini"
-                    kernelPath = sh (script: "crudini --get ${iniPath} KERNEL_BUILT folder", returnStdout: true)
-                    build job: "performance-jobs/Pipeline_Performance", parameters: [
-                        string(name: 'KERNEL', value: "${kernelPath}")], wait: false;
-              }
-              echo "Triggered Local Hyper-V Performance tests."
-            
+            println("TBD")
+          }
+        }
+
+        stage('validation_sriov_hyperv') {
+          when {
+            beforeAgent true
+            expression { params.ENABLED_STAGES.contains('validation_sriov_hyperv') }
+            expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+          }
+          agent {
+            node {
+              label 'sriov_mlnx'
+            }
+          }
+          steps {
+            println("TBD")
           }
         }
       }
