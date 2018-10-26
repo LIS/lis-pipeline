@@ -2,7 +2,8 @@
 
 def PowerShellWrapper(psCmd) {
     psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+    def exitCode = bat (returnStatus: true, script: "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\"")
+    return exitCode
 }
 
 properties ([
@@ -149,7 +150,7 @@ def runBinariesCheck () {
     dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
         echo 'Starting binaries checking'
-        PowerShellWrapper('''
+        def exitCode = PowerShellWrapper('''
             & ".\\scripts\\lcow\\Run-BinariesCheck.ps1"
                 -XmlConfig ".\\scripts\\lcow\\BIN_CONFIG.xml"
                 -BinariesPath "${env:BINARIES_DESTINATION}"
@@ -157,6 +158,9 @@ def runBinariesCheck () {
                 -LogDestination ".\\bin-check-logs"
             ''')
         archiveArtifacts artifacts: "bin-check-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
         deleteDir()
     }
 }
@@ -165,15 +169,18 @@ def runDockerTest() {
      dir ("lcow-docker-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
          checkout scm
          echo 'Starting hyperv docker test'
-         PowerShellWrapper('''
+         def exitCode = PowerShellWrapper('''
              & ".\\scripts\\lcow\\Run-hypervtest.ps1"
                  -BinariesPath "${env:BINARIES_DESTINATION}"
 				 -TestRepo "${env:DOCKER_HYPERV_TEST_REPO}"
                  -WorkDir "C:\\lcow-testing\\workdir-hypervtest-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                  -LogDestination ".\\hypervtest-logs"
              ''')
-         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
-         deleteDir()
+        archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
+        deleteDir()
      }
  }
 
@@ -182,7 +189,7 @@ def runLinuxKitTesting() {
     dir ("lcow-linuxkit-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
         echo 'Starting linuxkit testing'
-        PowerShellWrapper('''
+        def exitCode = PowerShellWrapper('''
             & ".\\scripts\\lcow\\Run-LinuxKit.ps1"
                 -BinariesPath "${env:BINARIES_DESTINATION}"
                 -TestRepo "${env:LINUXKIT_REPO}"
@@ -192,6 +199,9 @@ def runLinuxKitTesting() {
                 -BaseNumber "${env:LINUXKIT_BASE_NUMBER}"
             ''')
         archiveArtifacts artifacts: "linuxkit-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
         deleteDir()
     }
 }
@@ -200,7 +210,7 @@ def buildOpenGCS() {
     dir ("lcow-opengcs-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
         echo 'Building OpenGCS'
-        PowerShellWrapper('''
+        def exitCode = PowerShellWrapper('''
             & ".\\scripts\\lcow\\Build-OpenGCS.ps1"
                 -BinariesPath "${env:BINARIES_DESTINATION}"
                 -TestRepo "${env:OPENGCS_REPO}"
@@ -209,6 +219,9 @@ def buildOpenGCS() {
                 -LogDestination ".\\opengcs-logs"
             ''')
         archiveArtifacts artifacts: "opengcs-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
         deleteDir()
     }
 }
@@ -217,7 +230,7 @@ def runStressTest() {
     dir ("lcow-docker-stress-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
         echo 'Starting stress testing'
-        PowerShellWrapper('''
+        def exitCode = PowerShellWrapper('''
             & ".\\scripts\\lcow\\Run-StressTest.ps1"
                 -BinariesPath "${env:BINARIES_DESTINATION}"
                 -TestRepo "${env:DOCKER_STRESS_REPO}"
@@ -226,6 +239,9 @@ def runStressTest() {
                 -LogDestination ".\\stress-logs"
             ''')
         archiveArtifacts artifacts: "stress-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
         deleteDir()
     }
 }
@@ -234,7 +250,7 @@ def runKernelBuildTest() {
          dir ("lcow-kernel-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
              checkout scm
              echo 'Starting kernel builder test'
-             PowerShellWrapper('''
+             def exitCode = PowerShellWrapper('''
                  & ".\\scripts\\lcow\\Run-KernelBuild.ps1"
                      -BinariesPath "${env:BINARIES_DESTINATION}"
                      -TestRepo "${env:DOCKER_KERNEL_BUILDER_REPO}"
@@ -242,8 +258,11 @@ def runKernelBuildTest() {
                      -WorkDir "C:\\lcow-testing\\workdir-Kbuild-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                      -LogDestination ".\\Kbuild-logs"
                  ''')
-             archiveArtifacts artifacts: "Kbuild-logs\\*", allowEmptyArchive: true
-             deleteDir()
+            archiveArtifacts artifacts: "Kbuild-logs\\*", allowEmptyArchive: true
+            if (exitCode != 0) {
+                error("Test script returned exit code: ${exitCode}")
+            }
+            deleteDir()
          }
      }
 
@@ -255,7 +274,7 @@ stage ("check_kernel") {
                                    string(credentialsId: 'LCOW_CONTAINER_NAME', variable: 'CONTAINER_NAME')]) {
             dir ("lcow-artifacts-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                 checkout scm
-                PowerShellWrapper('''
+                def exitCode = PowerShellWrapper('''
                     & ".\\scripts\\lcow\\Get-Artifacts.ps1"
                         -StorageAccName "${env:STORAGE_ACCOUNT}"
                         -StorageAccKey "${env:STORAGE_KEY}"
@@ -265,7 +284,9 @@ stage ("check_kernel") {
                         -InitrdUrl "${env:INITRD_URL}"
                         -Destination ".\\lcow-artifacts"
                 ''')
-
+                if (exitCode != 0) {
+                    error("Test script returned exit code: ${exitCode}")
+                }
                 buildName = readFile "./build_name"
                 if (buildName != "" ) {
                     currentBuild.displayName = buildName + "-${env.BUILD_NUMBER}"
@@ -287,13 +308,16 @@ if (!skipBuild) {
                 checkout scm
                 echo "Preparing the host:${hostName} for testing"
                 unstash 'lcow_artifacts'
-                PowerShellWrapper('''
+                def exitCode = PowerShellWrapper('''
                     & ".\\scripts\\lcow\\Prepare-Env.ps1"
                         -BinariesDestination "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath ".\\lcow-artifacts"
                         -ArtifactsDestination "${env:ARTIFATCS_DESTINATION}"
                         -WorkDir "C:\\lcow-testing"
                     ''')
+                if (exitCode != 0) {
+                    error("Test script returned exit code: ${exitCode}")
+                }
                 deleteDir()
             }
         }
@@ -306,13 +330,16 @@ if (!skipBuild) {
             dir ("lcow-prepare-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                 checkout scm
                 echo "Cleaning host:${hostName} after testing"
-                PowerShellWrapper('''
+                def exitCode = PowerShellWrapper('''
                     & ".\\scripts\\lcow\\Clear-Env.ps1"
                         -BinariesPath "${env:BINARIES_DESTINATION}"
                         -ArtifactsPath "${env:ARTIFATCS_DESTINATION}"
                         -DockerdPath "C:\\Docker-Workspace"
                         -WorkDir "C:\\lcow-testing"
                     ''')
+                if (exitCode != 0) {
+                    error("Test script returned exit code: ${exitCode}")
+                }
                 deleteDir()
             }
         }
