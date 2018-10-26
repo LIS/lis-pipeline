@@ -135,6 +135,28 @@ def runTestStage(testName) {
     }
 }
 
+def createStageReport(stageName, testType, logPath, exitCode) {
+    def scirpt = ".\\scripts\\lcow\\New-Report.ps1"
+    def scriptExists = fileExists(script)
+    if (! scriptExists) {
+        error("Cannot find New-Report.ps1. Repo may not be cloned")
+    }
+
+    def exitCode = PowerShellWrapper("""
+        & '${script}'
+            -StageName '${stageName}'
+            -TestType '${testType}'
+            -LogPath '${logPath}'
+            -ExitCode '${exitCode}'
+            -ReportDestination '.\\${stageName}-Dir'
+    """)
+    if (exitCode != 0) {
+        error("Test script returned exit code: ${exitCode}")
+    }
+
+    stash includes: "${stageName}-Dir\\*", name: "${stageName}_report"
+}
+
 def runHypervTest() {
     dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         echo 'Starting Hyper-V test job'
@@ -158,6 +180,7 @@ def runBinariesCheck () {
                 -LogDestination ".\\bin-check-logs"
             ''')
         archiveArtifacts artifacts: "bin-check-logs\\*", allowEmptyArchive: true
+        createStageReport("binaries_check", "STRESS", "", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -177,6 +200,7 @@ def runDockerTest() {
                  -LogDestination ".\\hypervtest-logs"
              ''')
         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
+        createStageReport("hyperv_docker", "DOCKER_HYPERV", ".\\hypervtest-logs", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -199,6 +223,7 @@ def runLinuxKitTesting() {
                 -BaseNumber "${env:LINUXKIT_BASE_NUMBER}"
             ''')
         archiveArtifacts artifacts: "linuxkit-logs\\*", allowEmptyArchive: true
+        createStageReport("linuxkit", "LINUXKIT", ".\\linuxkit-logs", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -219,6 +244,7 @@ def buildOpenGCS() {
                 -LogDestination ".\\opengcs-logs"
             ''')
         archiveArtifacts artifacts: "opengcs-logs\\*", allowEmptyArchive: true
+        createStageReport("opengcs_build", "STRESS", "", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -239,6 +265,7 @@ def runStressTest() {
                 -LogDestination ".\\stress-logs"
             ''')
         archiveArtifacts artifacts: "stress-logs\\*", allowEmptyArchive: true
+        createStageReport("docker_stress", "STRESS", "", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -259,6 +286,7 @@ def runKernelBuildTest() {
                      -LogDestination ".\\Kbuild-logs"
                  ''')
             archiveArtifacts artifacts: "Kbuild-logs\\*", allowEmptyArchive: true
+            createStageReport("kernel_builder", "STRESS", "", exitCode)
             if (exitCode != 0) {
                 error("Test script returned exit code: ${exitCode}")
             }
