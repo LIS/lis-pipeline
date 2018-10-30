@@ -2,7 +2,7 @@
 
 def PowerShellWrapper(psCmd) {
     psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
-    def exitCode = bat (returnStatus: true, script: "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\"")
+    def exitCode = bat (returnStatus: true, script: "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\"")
     return exitCode
 }
 
@@ -79,6 +79,7 @@ HYPERV_TEST_JOB = "lcow-hyperv-testing"
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
 testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
 def hostName = versionsMap[env.HOST_VERSION]
+ignoreReport = "kernel_hyperv_test"
 skipBuild = false
 
 def runTests(versionsMap, hostName){
@@ -136,22 +137,23 @@ def runTestStage(testName) {
 }
 
 def createStageReport(stageName, testType, logPath, exitCode) {
-    def scirpt = ".\\scripts\\lcow\\New-Report.ps1"
+    def script = ".\\scripts\\lcow\\New-Report.ps1"
     def scriptExists = fileExists(script)
     if (! scriptExists) {
         error("Cannot find New-Report.ps1. Repo may not be cloned")
     }
 
-    def exitCode = PowerShellWrapper("""
+    def eCode = PowerShellWrapper("""
         & '${script}'
             -StageName '${stageName}'
             -TestType '${testType}'
             -LogPath '${logPath}'
             -ExitCode '${exitCode}'
             -ReportDestination '.\\${stageName}-Dir'
+            -BuildNumber '${env.BUILD_NUMBER}'
     """)
     if (exitCode != 0) {
-        error("Test script returned exit code: ${exitCode}")
+        error("Test script returned exit code: ${eCode}")
     }
 
     stash includes: "${stageName}-Dir\\*", name: "${stageName}_report"
@@ -352,6 +354,32 @@ if (!skipBuild) {
     }
 
     runTests(versionsMap, hostName)
+
+    stage ("report_results") {
+        node ("jenkins-meta-slave") {
+            withCredentials(bindings: [file(credentialsId: 'LCOW_DB_CONFIG', variable: 'LCOW_DB_CONFIG')]) {
+                dir ("lcow-report-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                    checkout scm
+                    dir ("lcow-reports") {
+                        testMap.keySet().each {
+                            testMap[it].split(",").each {
+                                if ((! ignoreReport.contains(it)) && (env[it] == "true")) {
+                                    unstash "${it}_report"
+                                }
+                            }
+                        }
+                    }
+                    sh 'ls -R ./lcow-reports'
+                    sh """
+                        bash ./scripts/reporting/report_lcow_result.sh \\
+                            --report_dir './lcow-reports' \\
+                            --db_config '${LCOW_DB_CONFIG}'
+                    """
+                    deleteDir()
+                }
+            }
+        }
+    }
 
     stage ("clear_env") {
         node (hostName) {
