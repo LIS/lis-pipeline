@@ -35,7 +35,7 @@ function main {
     for report in $JSON_REPORTS;do
         echo "Uploading: $(basename $report)"
         python "$PARSER_PATH" --test_results "${report}" --db_config "${DB_CONFIG}" \
-            --composite_keys "BuildNumber,TestStage"
+            --composite_keys "BuildNumber,TestName"
     done
 }
 

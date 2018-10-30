@@ -71,7 +71,7 @@ function Parse-HyperVDockerResults {
         $test["TestStage"] = $StageName
         $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
         $test["TestName"] = $result[0].Trim()
-        if ($result[12].Split(":") -ne "0") {
+        if ($result[12].Split(":")[1].Trim() -ne "0") {
             $test["TestResult"] = "FAIL"
         } else {
             $test["TestResult"] = "PASS"
@@ -126,8 +126,9 @@ function Main {
                 -BuildNumber $BuildNumber
             break
         }
-        "HYPERV_DOCKER" {
-            $results = Parse-HyperVDockerResults -LogPath $LogPath -StageName $StageName
+        "DOCKER_HYPERV" {
+            $results = Parse-HyperVDockerResults -LogPath $LogPath -StageName $StageName `
+                -BuildNumber $BuildNumber
             break
         }
         default {

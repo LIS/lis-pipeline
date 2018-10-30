@@ -152,7 +152,7 @@ def createStageReport(stageName, testType, logPath, exitCode) {
             -ReportDestination '.\\${stageName}-Dir'
             -BuildNumber '${env.BUILD_NUMBER}'
     """)
-    if (exitCode != 0) {
+    if (eCode != 0) {
         error("Test script returned exit code: ${eCode}")
     }
 
@@ -202,7 +202,7 @@ def runDockerTest() {
                  -LogDestination ".\\hypervtest-logs"
              ''')
         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
-        createStageReport("hyperv_docker", "DOCKER_HYPERV", ".\\hypervtest-logs", exitCode)
+        createStageReport("docker_test", "DOCKER_HYPERV", ".\\hypervtest-logs", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
