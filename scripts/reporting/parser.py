@@ -1,8 +1,10 @@
 from envparse import env
 from string import Template
 
+import argparse
 import json
 import logging
+import os
 import pyodbc
 import sys
 
@@ -16,6 +18,23 @@ formatter = logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
+def get_params():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--db_config",
+                        help="--db_config <config path>")
+    parser.add_argument("--test_results",
+                        help="'--test_results <results path>")
+    parser.add_argument("--composite_keys",
+                        help="'--composite_keys <results path>")
+    params = parser.parse_args()
+
+    if not os.path.isfile(params.test_results):
+        sys.exit("You need to specify an existing test results path")
+    if not os.path.isfile(params.db_config):
+        sys.exit("You need to specify an existing db_config path")
+
+    return params
 
 
 def init_connection():
@@ -144,15 +163,19 @@ def update_values(cursor, values_dict, composite_keys):
 
 
 def main():
-    env.read_envfile('db.config')
+    params = get_params()
+
+    env.read_envfile(params.db_config)
     logger.debug('Initializing database connection')
     db_connection, db_cursor = init_connection()
 
-    data = json.load(open('tests.json'))
-
+    data = json.load(open(params.test_results))
+    
+    composite_keys = params.composite_keys.split(",")
+    
     for row in data:
         print(row)
-        update_values(db_cursor, row, ('PipelineName', 'PipelineBuildNumber'))
+        update_values(db_cursor, row, composite_keys)
 
     logger.debug('Executing db commands')
     db_connection.commit()
