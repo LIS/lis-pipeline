@@ -8,6 +8,7 @@ param (
 )
 
 $LINUXKIT_SUMMARY = "SUMMARY.json"
+$HYPERV_DOCKER_SUMMARY = "AppSummary.csv"
 
 function Parse-LinuxKitResults {
     param (
@@ -47,10 +48,39 @@ function Parse-LinuxKitResults {
 function Parse-HyperVDockerResults {
     param (
         [String] $LogPath,
-        [String] $StageName
+        [String] $StageName,
+        [String] $BuildNumber
     )
     
-    echo "NoOp"
+    $results = @()
+    $summaryPath = Join-Path $LogPath $HYPERV_DOCKER_SUMMARY
+    if (Test-Path $summaryPath) {
+        $summaryContent = Get-Content $summaryPath -Raw
+    } else {
+        throw "Cannot find summary file: ${$HYPERV_DOCKER_SUMMARY}"
+    }
+
+    $testResults = $($summaryContent -split "`r`n`r`n")
+    foreach ($result in $testResults) {
+        if ($result -eq "" ) {
+            continue
+        }
+        $result =  $result.Split("`n")
+        $test = @{}
+        $test["BuildNumber"] = $BuildNumber
+        $test["TestStage"] = $StageName
+        $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
+        $test["TestName"] = $result[0].Trim()
+        if ($result[12].Split(":") -ne "0") {
+            $test["TestResult"] = "FAIL"
+        } else {
+            $test["TestResult"] = "PASS"
+        }
+
+        $results += $test
+    }
+
+    return $results
 }
 
 function New-JsonReport {
