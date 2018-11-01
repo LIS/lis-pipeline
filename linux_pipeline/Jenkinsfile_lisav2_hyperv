@@ -142,7 +142,6 @@ stage("lisav2") {
                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
                                 " ${testParameterHyperV}" +
                                 " -ForceDeleteResources" +
-                                " -UpdateGlobalConfigurationFromSecretsFile" +
                                 " -XMLSecretFile '${HyperV_Secrets_File}'" +
                                 " -ExitWithZero" +
                                 economyModeFlag
@@ -179,7 +178,6 @@ stage("lisav2") {
                                 " ${testParameterAzure}" +
                                 " -TestIterations ${testIterationsAzure}" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
-                                " -UpdateGlobalConfigurationFromSecretsFile" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                 " -UseManagedDisks" +
                                 " -ForceDeleteResources" +
