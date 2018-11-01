@@ -2,6 +2,7 @@
 
 upstreamLinuxTree = "git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
 netNextTree = "https://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git"
+ubuntuLinuxAzure = "git://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure"
 
 env.kernelTree;
 
@@ -19,7 +20,7 @@ properties ([
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
-            choices: 'linux-next\nazure_kernel\nnet-next',
+            choices: 'linux-next\nazure_kernel\nnet-next\nubuntu-linux-azure',
             name: 'KERNEL_TREE',
             description: 'What Kernel tree to be used.'],
         [$class: 'StringParameterDefinition',
@@ -129,6 +130,9 @@ def resolveGitRepo(String gitURL) {
             break;
         case "net-next":
             env.kernelTree = netNextTree;
+            break;
+        case "ubuntu-linux-azure":
+            env.kernelTree = ubuntuLinuxAzure;
             break;
         default:
             env.kernelTree = gitURL;
