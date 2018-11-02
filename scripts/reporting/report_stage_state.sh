@@ -100,7 +100,8 @@ EOF
     cat ./tests.json
     cp -f "${BASEDIR}/parser.py" "./parser.py"
     cp -f "${DB_CONFIG}" "./db.config"
-    python parser.py
+    python parser.py --test_results "./tests.json" --db_config "./db.config" \
+        --composite_keys 'PipelineName,PipelineBuildNumber'
 }
 
 main $@

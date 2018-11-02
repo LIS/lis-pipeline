@@ -58,7 +58,7 @@ function Main {
         -TestPath $WorkDir
         
     Execute-Test -TestPath $WorkDir 
-    Copy-Item $WorkDir/log* -Destination $LogDestination -Recurse
+    Copy-Item $WorkDir\log*\* -Destination $LogDestination -Recurse
 
     Pop-Location
 }
