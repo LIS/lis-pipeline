@@ -19,18 +19,29 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
+        // Binaries Check
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run binaries version test', 
             name: 'binaries_check'],
+        // Functional
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run full linuxkit test suite', 
             name: 'linuxkit'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Test docker using wsl scripts',
+            name: 'docker_wsl'],
 		[$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run full hyper-v docker test',
             name: 'docker_test'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Test kernel in Hyper-V VM',
+            name: 'kernel_hyperv_test'],
+        // Stress
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
             description: 'Run docker-stress test', 
@@ -43,10 +54,11 @@ properties ([
             defaultValue: true,
             description: 'Build kernel in docker container', 
             name: 'kernel_builder'],
-        [$class: 'BooleanParameterDefinition',
+        // Performace
+        [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
-            description: 'Test kernel in Hyper-V',
-            name: 'kernel_hyperv_test'],
+            description: 'Run lkp tests in docker container', 
+            name: 'docker_lkp'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -74,10 +86,11 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
-HYPERV_TEST_JOB = "lcow-hyperv-testing"
+HYPERV_TEST_JOB = "lcow-hyperv-testing,docker_wsl,docker_lkp"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test","test_stress":"docker_stress,opengcs_build,kernel_builder"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,docker_wsl",
+           "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"docker_lkp"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test"
 skipBuild = false
@@ -130,6 +143,12 @@ def runTestStage(testName) {
             break
         case "kernel_hyperv_test":
             runHypervTest()
+            break
+        case "docker_wsl":
+            runDockerWsl()
+            break
+        case "docker_lkp":
+            runDockerLkp()
             break
         default:
             println ("Test: ${testName} not defined. Skipping.")
@@ -233,6 +252,27 @@ def runLinuxKitTesting() {
     }
 }
 
+def runDockerWsl() {
+    withCredentials(bindings: [string(credentialsId: 'LCOW_WSL_PATH', variable: 'ARCHIVE_PATH')]) {
+        dir ("lcow-docker-wsl-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            checkout scm
+            echo 'Starting wsl testing'
+            def exitCode = PowerShellWrapper('''
+                & ".\\scripts\\lcow\\Run-WslTest.ps1"
+                    -ArchivePath "${env:ARCHIVE_PATH}"
+                    -BinariesPath "${env:BINARIES_DESTINATION}"
+                    -WorkDir "C:\\lcow-testing\\workdir-docker-wsl-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                    -LogDestination ".\\docker-wsl-logs"
+                ''')
+            archiveArtifacts artifacts: "docker-wsl-logs\\*", allowEmptyArchive: true
+            if (exitCode != 0) {
+                error("Test script returned exit code: ${exitCode}")
+            }
+            deleteDir()
+        }
+    }
+}
+
 def buildOpenGCS() {
     dir ("lcow-opengcs-build-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         checkout scm
@@ -296,6 +336,23 @@ def runKernelBuildTest() {
          }
      }
 
+def runDockerLkp() {
+    dir ("lcow-docker-lkp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Starting lkp testing'
+        def exitCode = PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Run-LkpTest.ps1"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -WorkDir "C:\\lcow-testing\\workdir-lkp-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\lkp-logs"
+            ''')
+        archiveArtifacts artifacts: "lkp-logs\\*", allowEmptyArchive: true
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
+        deleteDir()
+    }
+}
 
 stage ("check_kernel") {
     node (hostName) {
