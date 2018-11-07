@@ -1,0 +1,78 @@
+#!/usr/bin/env groovy
+
+properties ([
+    pipelineTriggers([cron('H 6 * * *')])
+])
+
+env.VERSION_TO_TEST = "/home/lisa/version_to_test.sh"
+env.PIPELINE_NAME = "pipeline-ubuntu-azure-kernel-validation"
+LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
+SEND_MAIL = "no"
+MESSAGE_LIST = ""
+
+node ("meta_slave") {
+    stage ("ubuntu_azure_kernel_watcher") {
+        dir ("watcher-ubuntu-azure-kernel-${env.BUILD_NUMBER}") {
+            checkout scm
+            echo 'Checking if there is a new kernel version'
+            sh '''#!/bin/bash
+                bash ./scripts/ubuntu_azure_kernel/ubuntu_azure_kernel_watcher.sh
+            '''
+            String versions_info_list = readFile (LATEST_VERSION_LOCATION)
+            def all_versions_info = versions_info_list.split("\n")
+
+            String kernels_info_list = readFile (env.VERSION_TO_TEST)
+            kernels_info_list = kernels_info_list.trim()
+            def kernels_info = kernels_info_list.split(';') as List
+
+            kernels_info.each {
+                int index = kernels_info.indexOf(it)
+                version_info = all_versions_info[index]
+                latest_kernel_version = version_info.split("=")[1]
+
+                String single_kernel_info = it.trim()
+                def kernel_info = single_kernel_info.split(",") as List
+                distro = kernel_info[0]
+                kernel = kernel_info[1]
+                will_test = kernel_info[2]
+                if (will_test == "yes") {
+                    SEND_MAIL = "yes"
+                    println "TRIGGERING the testing for ${distro} distro, ${kernel} kernel - ${latest_kernel_version}"
+                    MESSAGE_LIST = MESSAGE_LIST + "${distro} ${latest_kernel_version} ${kernel} kernel, "
+                    build (job: "${env.PIPELINE_NAME}/master",
+                        parameters: [
+                            string(name: 'Distro', value: "${distro}"),
+                            string(name: 'Kernel', value: "${kernel}"),
+                            string(name: 'Platform', value: "all"),
+                            string(name: 'Performance', value: "yes"),
+                            string(name: 'sendMail', value: "yes"),
+                        ],
+                        wait: false, propagate: false)
+                } else {
+                    println "Not triggering testing for ${distro} distro, ${kernel} kernel"
+                }
+            }
+            deleteDir()
+        }
+    }
+}
+
+if (SEND_MAIL == "yes"){
+    node ("meta_slave") {
+        stage('Send-email') {
+            withCredentials([string(credentialsId: 'TEST_EMAIL_LIST', variable: 'MAIL_LIST')]) {
+                echo "Sending email with the new kernels found"
+                emailext (
+                    subject: "Ubuntu-Azure-Pipeline: New proposed kernels detected: ${MESSAGE_LIST}",
+                    to: "${env.MAIL_LIST}",
+                    mimeType : "text/html",
+                    body: """
+                        Hello,<br/><br/>
+                        New kernels have been detected and testing has been triggered for: ${MESSAGE_LIST}<br/><br/>
+                        Thank you,<br/>Jenkins CI
+                    """
+                )
+            }
+        }
+    }
+}
