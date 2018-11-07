@@ -356,20 +356,25 @@ def runDockerLkp() {
 
 stage ("check_kernel") {
     node (hostName) {
-        withCredentials(bindings: [string(credentialsId: 'LCOW_STORAGE_ACCOUNT', variable: 'STORAGE_ACCOUNT'),
-                                   string(credentialsId: 'LCOW_STORAGE_KEY', variable: 'STORAGE_KEY'),
-                                   string(credentialsId: 'LCOW_CONTAINER_NAME', variable: 'CONTAINER_NAME')]) {
+        withCredentials(bindings: [string(credentialsId: 'LCOW_VSTS_USERNAME', variable: 'LCOW_VSTS_USERNAME'),
+                                   string(credentialsId: 'LCOW_VSTS_TOKEN', variable: 'LCOW_VSTS_TOKEN'),
+                                   string(credentialsId: 'VSTS_REST_URL', variable: 'VSTS_REST_URL'),
+                                   string(credentialsId: 'LCOW_VSTS_INSTANCE', variable: 'LCOW_VSTS_INSTANCE'),
+                                   string(credentialsId: 'LCOW_VSTS_FEED', variable: 'LCOW_VSTS_FEED')]) {
             dir ("lcow-artifacts-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                 checkout scm
                 def exitCode = PowerShellWrapper('''
                     & ".\\scripts\\lcow\\Get-Artifacts.ps1"
-                        -StorageAccName "${env:STORAGE_ACCOUNT}"
-                        -StorageAccKey "${env:STORAGE_KEY}"
-                        -ContainerName "${env:CONTAINER_NAME}"
-                        -LastVersionFile "${env:LAST_VERSION_FILE}"
+                        -UserName "${env:LCOW_VSTS_USERNAME}"
+                        -Token "${env:LCOW_VSTS_TOKEN}"
+                        -VstsUrl "${env:VSTS_REST_URL}"
+                        -VstsFeed "${env:LCOW_VSTS_FEED}"
+                        -VstsInstance "${env:LCOW_VSTS_INSTANCE}"
+                        -PackageName "lsg-linux-build-lcow"
+                        -VersionsFile "${env:LAST_VERSION_FILE}"
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
-                        -Destination ".\\lcow-artifacts"
+                        -ArtifactsDestination ".\\lcow-artifacts"
                 ''')
                 if (exitCode != 0) {
                     error("Test script returned exit code: ${exitCode}")
