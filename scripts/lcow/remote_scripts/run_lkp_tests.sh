@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PACKAGES="lsb-release sudo build-essential git wget"
-RUN_TESTS=("dd-write.yaml", "fio-basic-1hdd-write.yaml", "aim7-fs-raid.yaml", "hackbench.yaml")
+RUN_TESTS=("analyze_suspend.yaml" "autotest.yaml" "dbench.yaml" "ebizzy.yaml" "pm-qa.yaml" "trinity.yaml")
 
 set -x
 
@@ -18,25 +18,25 @@ function copy_logs {
     test_name="$3"
     
     mkdir "${log_dir}/${test_name}"
-    cp "$results_path/*" "${log_dir}/${test_name}"
+    cp ${results_path}* "${log_dir}/${test_name}"
 }
 
 function run_tests {
     log_dir="$1"
 
-    git clone https://github.com/01org/lkp-tests.git .
+    git clone https://github.com/fengguang/lkp-tests.git .
     make install
     if [[ $? -ne 0 ]];then
         echo "lkp make failed"
         exit 1
     fi
-    lkp install
+    yes | lkp install
     if [[ $? -ne 0 ]];then
         echo "lkp deps install failed"
         exit 1
     fi
     
-    for test in $(RUN_TESTS[@]);do
+    for test in ${RUN_TESTS[@]};do
         test_path="./jobs/${test}"
         test_name="${test%.*}"
         
@@ -46,7 +46,9 @@ function run_tests {
         if [[ -d "$results_path" ]];then
             copy_logs "$results_path" "$log_dir" "$test_name"
         else
+            echo "${test}" >> "$log_dir/ABORT" 
             echo "Cannot find logs dir for test: $test_name"
+            continue
         fi
     done
 }
@@ -86,8 +88,7 @@ function main {
     
     pushd "$WORK_DIR"
 
-    run_tests
-    copy_logs "$LOG_DIR"
+    run_tests "$LOG_DIR"
     popd
 }
 

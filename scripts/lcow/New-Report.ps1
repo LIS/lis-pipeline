@@ -9,6 +9,7 @@ param (
 
 $LINUXKIT_SUMMARY = "SUMMARY.json"
 $HYPERV_DOCKER_SUMMARY = "AppSummary.csv"
+$WSL_SUMMARY = "summary.log"
 
 function Parse-LinuxKitResults {
     param (
@@ -117,6 +118,43 @@ function Parse-LTPResults {
     return $results
 }
 
+function Parse-WSLResults {
+    param (
+        [String] $LogPath,
+        [String] $StageName,
+        [String] $BuildNumber
+    )
+    
+    $results = @()
+    $summaryPath = Join-Path $LogPath $WSL_SUMMARY
+    if (Test-Path $summaryPath) {
+        $summaryContent = Get-Content $summaryPath
+    } else {
+        throw "Cannot find summary file: ${$WSL_SUMMARY}"
+    }
+    
+    foreach ($result in $summaryContent) {
+        if ($result -eq "") {
+            continue
+        }
+        
+        $test = @{}
+        $test["BuildNumber"] = $BuildNumber
+        $test["TestStage"] = $StageName
+        $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
+        $test["TestName"] = $result.Split(" ")[0]
+        if ($result.Split(" ")[2].Split(":")[1].Trim() -eq "0") {
+            $test["TestResult"] = "PASS"
+        } else {
+            $test["TestResult"] = "FAIL"
+        }
+        
+        $results += $test
+    }
+    
+    return $results
+}
+
 function New-JsonReport {
     param (
         [String] $ReportDestination,
@@ -167,6 +205,11 @@ function Main {
         }
         "LTP" {
             $results = Parse-LTPResults -LogPath $LogPath -StageName $StageName `
+                -BuildNumber $BuildNumber
+            break
+        }
+        "WSL" {
+            $results = Parse-WSLResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }

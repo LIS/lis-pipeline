@@ -32,7 +32,7 @@ properties ([
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Test docker using wsl scripts',
-            name: 'docker_wsl'],
+            name: 'WSL_Docker'],
 		[$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run full hyper-v docker test',
@@ -44,7 +44,7 @@ properties ([
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run ltp tests in docker container',
-            name: 'ltp_docker'],
+            name: 'LTP_Docker'],
         // Stress
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
@@ -62,7 +62,7 @@ properties ([
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
             description: 'Run lkp tests in docker container', 
-            name: 'docker_lkp'],
+            name: 'LKP_Docker'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -90,13 +90,13 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
-HYPERV_TEST_JOB = "lcow-hyperv-testing,docker_wsl,docker_lkp"
+HYPERV_TEST_JOB = "lcow-hyperv-testing"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,docker_wsl,ltp_docker",
-           "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"docker_lkp"]
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,WSL_Docker,LTP_Docker",
+           "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP_Docker"]
 def hostName = versionsMap[env.HOST_VERSION]
-ignoreReport = "kernel_hyperv_test"
+ignoreReport = "kernel_hyperv_test,LKP_Docker"
 skipBuild = false
 
 def runTests(versionsMap, hostName){
@@ -148,13 +148,13 @@ def runTestStage(testName) {
         case "kernel_hyperv_test":
             runHypervTest()
             break
-        case "docker_wsl":
+        case "WSL_Docker":
             runDockerWsl()
             break
-        case "docker_lkp":
+        case "LKP_Docker":
             runDockerLkp()
             break
-        case "ltp_docker":
+        case "LTP_Docker":
             runLtpDocker()
             break
         default:
@@ -247,7 +247,7 @@ def runLtpDocker() {
                 -LogDestination ".\\ltp-logs"
             ''')
         archiveArtifacts artifacts: "ltp-logs\\*", allowEmptyArchive: true
-        createStageReport("ltp_docker", "LTP", ".\\ltp-logs", exitCode)
+        createStageReport("LTP_Docker", "LTP", ".\\ltp-logs", exitCode)
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
@@ -290,6 +290,7 @@ def runDockerWsl() {
                     -LogDestination ".\\docker-wsl-logs"
                 ''')
             archiveArtifacts artifacts: "docker-wsl-logs\\*", allowEmptyArchive: true
+            createStageReport("WSL_Docker", "WSL", ".\\docker-wsl-logs", exitCode)
             if (exitCode != 0) {
                 error("Test script returned exit code: ${exitCode}")
             }
@@ -371,7 +372,7 @@ def runDockerLkp() {
                 -WorkDir "C:\\lcow-testing\\workdir-lkp-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\lkp-logs"
             ''')
-        archiveArtifacts artifacts: "lkp-logs\\*", allowEmptyArchive: true
+        archiveArtifacts artifacts: "lkp-logs\\**\\*", allowEmptyArchive: true
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
         }
