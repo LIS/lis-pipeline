@@ -41,6 +41,10 @@ properties ([
             defaultValue: true,
             description: 'Test kernel in Hyper-V VM',
             name: 'kernel_hyperv_test'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            description: 'Run ltp tests in docker container',
+            name: 'ltp_docker'],
         // Stress
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true,
@@ -89,7 +93,7 @@ env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/
 HYPERV_TEST_JOB = "lcow-hyperv-testing,docker_wsl,docker_lkp"
 
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,docker_wsl",
+testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,docker_wsl,ltp_docker",
            "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"docker_lkp"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test"
@@ -149,6 +153,9 @@ def runTestStage(testName) {
             break
         case "docker_lkp":
             runDockerLkp()
+            break
+        case "ltp_docker":
+            runLtpDocker()
             break
         default:
             println ("Test: ${testName} not defined. Skipping.")
@@ -229,6 +236,24 @@ def runDockerTest() {
      }
  }
 
+def runLtpDocker() {
+    dir ("lcow-ltp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        checkout scm
+        echo 'Starting ltp testing'
+        def exitCode = PowerShellWrapper('''
+            & ".\\scripts\\lcow\\Run-LtpTest.ps1"
+                -BinariesPath "${env:BINARIES_DESTINATION}"
+                -WorkDir "C:\\lcow-testing\\workdir-linuxkit-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
+                -LogDestination ".\\ltp-logs"
+            ''')
+        archiveArtifacts artifacts: "ltp-logs\\*", allowEmptyArchive: true
+        createStageReport("ltp_docker", "LTP", ".\\ltp-logs", exitCode)
+        if (exitCode != 0) {
+            error("Test script returned exit code: ${exitCode}")
+        }
+        deleteDir()
+    }
+}
 
 def runLinuxKitTesting() {
     dir ("lcow-linuxkit-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {

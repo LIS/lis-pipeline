@@ -83,6 +83,40 @@ function Parse-HyperVDockerResults {
     return $results
 }
 
+function Parse-LTPResults {
+    param (
+        [String] $LogPath,
+        [String] $StageName,
+        [String] $BuildNumber
+    )
+    
+    $results = @()
+    $summaryPath = $(Get-ChildItem ${LogPath}\LTP_RUN*.log)
+    if (Test-Path $summaryPath) {
+        $summaryContent = Get-Content $summaryPath
+    } else {
+        throw "Cannot find summary file: ${$HYPERV_DOCKER_SUMMARY}"
+    }
+    
+    $testResults = $($summaryContent | Where-Object {$_ -cmatch "PASS" -or $_ -cmatch "FAIL"})
+    foreach ($result in $testResults) {
+        if ($result -eq "" ) {
+            continue
+        }
+        $result = $($result -replace '\s+', ' ')
+        $test = @{}
+        $test["BuildNumber"] = $BuildNumber
+        $test["TestStage"] = $StageName
+        $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
+        $test["TestName"] = $result.Split(" ")[0]
+        $test["TestResult"] = $result.Split(" ")[1]
+        
+        $results += $test
+    }
+    
+    return $results
+}
+
 function New-JsonReport {
     param (
         [String] $ReportDestination,
@@ -128,6 +162,11 @@ function Main {
         }
         "DOCKER_HYPERV" {
             $results = Parse-HyperVDockerResults -LogPath $LogPath -StageName $StageName `
+                -BuildNumber $BuildNumber
+            break
+        }
+        "LTP" {
+            $results = Parse-LTPResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }
