@@ -73,6 +73,11 @@ def unstashKernel(kernelStash) {
 
 
 pipeline {
+  agent {
+    node {
+      label 'meta_slave'
+    }
+  }
   parameters {
     choice(choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git', description: 'Kernel tree repo (upstream, net-next, linux stable)', name: 'KERNEL_GIT_URL')
     string(defaultValue: "master", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
@@ -106,11 +111,6 @@ pipeline {
   }
   options {
     overrideIndexTriggers(false)
-  }
-  agent {
-    node {
-      label 'meta_slave'
-    }
   }
   stages {
           stage('build_artifacts_ubuntu') {
