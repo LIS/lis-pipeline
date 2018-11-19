@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 properties ([
-    pipelineTriggers([cron('H 6 * * *')])
+    pipelineTriggers([cron('H */6 * * *')])
 ])
 
 env.VERSION_TO_TEST = "/home/lisa/version_to_test.sh"
