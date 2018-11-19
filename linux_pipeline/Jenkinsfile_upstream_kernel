@@ -446,7 +446,6 @@ pipeline {
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
-                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                 script {
                   env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
                 }
@@ -456,7 +455,6 @@ pipeline {
                     " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'HyperV'" +
                     "${LISAV2_PARAMS}" +
-                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                     " -OsVHD '${HYPERV_VHD_PATH}'" +
                     " -XMLSecretFile '${HyperV_Secrets_File}'"
                 )
