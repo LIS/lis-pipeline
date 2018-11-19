@@ -146,7 +146,6 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -OsVHD '${HYPERV_VHD_PATH}'" +
                                             " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
-                                            " -ForceDeleteResources" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
