@@ -163,7 +163,7 @@ stage("lisav2") {
     }
     if (AZURE_TEST == "true") {
         runs["azure"] = {
-            node('azure-slave-2-executor-1') {
+            node('azure') {
                 stage("azure") {
                     try {
                         timeout (10800) {
