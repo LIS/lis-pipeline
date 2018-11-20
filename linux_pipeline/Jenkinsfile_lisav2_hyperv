@@ -73,7 +73,7 @@ if (ECONOMY_MODE == "true") {
 }
 
 
-def regionAzure = "westus2"
+def regionAzure = "staginglisav2"
 def osImageAzure = "RedHat RHEL 7-RAW 7.5.2018050901"
 def vmSizeAzure = "Standard_D14_v2"
 def testIterationsAzure = "1"
@@ -114,7 +114,7 @@ if (TEST_LOCATION_HYPERV) {
 if (TEST_LOCATION_AZURE) {
     testParameterAzure += " -TestLocation '${TEST_LOCATION_AZURE}' "
 } else {
-    testParameterAzure += " -TestLocation '${regionAzure}' "
+    testParameterAzure += " -TestLocation 'westus2' "
 }
 
 if (OS_IMAGE_AZURE) {
@@ -179,7 +179,6 @@ stage("lisav2") {
                                 " -TestIterations ${testIterationsAzure}" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
-                                " -UseManagedDisks" +
                                 " -ForceDeleteResources" +
                                 " -ExitWithZero" +
                                 economyModeFlag
