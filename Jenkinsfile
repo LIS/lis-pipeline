@@ -77,9 +77,9 @@ pipeline {
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
-    LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-    LISAV2_BRANCH = "master"
-    LISAV2_AZURE_REGION = "westus2"
+    LISAV2_REMOTE = "https://github.com/asofron/LISAv2.git"
+    LISAV2_BRANCH = "bvt-fix"
+    LISAV2_AZURE_REGION = "westeurope"
     LISAV2_RG_IDENTIFIER = "msftk"
     LISAV2_AZURE_VM_SIZE_SMALL = "Standard_A2"
     LISAV2_AZURE_VM_SIZE_LARGE = "Standard_E64_v3"
