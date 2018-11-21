@@ -183,7 +183,7 @@ stage("lisav2") {
                                 " -ExitWithZero" +
                                 economyModeFlag
                                 )
-                                junit "report\\*-junit.xml"
+                                junit "Report\\*-junit.xml"
                                 archiveArtifacts "TestResults\\**\\*"
                             }
                         }
