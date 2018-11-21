@@ -19,19 +19,19 @@ function Execute-Test {
     $remoteScriptName = $REMOTE_SCRIPT.Split("\")[-1]
     
     try {
-        docker run --rm --platform linux -v "$WorkDir:/tests" `
+        docker run --rm --platform linux -v "${WorkDir}:/tests" `
             $TEST_CONTAINER bash -xec "apt update && apt install -y dos2unix && dos2unix /tests/$remoteScriptName && bash /tests/$remoteScriptName --work_dir /tests/lkp-workdir --log_dir /tests/logs"
     } catch {
         throw $_
     } finally {
         $logPath = Join-Path $WorkDir "logs"
-        Copy-Item "$logPath\*" $LogDestination
+        Copy-Item -Recurse "$logPath\*" $LogDestination
     }
 }
 
 function Main {
     if (-not $WorkDir) {
-        $WorkDir = "docker-wsl"
+        $WorkDir = "docker-lkp"
     }
     if (Test-Path $WorkDir) {
         Remove-Item -Recurse $WorkDir
@@ -45,6 +45,7 @@ function Main {
     New-Item -Type Directory -Path $LogDestination
     $LogDestination = Resolve-Path $LogDestination
     $RemoteScript = Resolve-Path $REMOTE_SCRIPT
+    $BinariesPath = Resolve-Path $BinariesPath
 
     Push-Location $WorkDir
     

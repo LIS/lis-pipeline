@@ -48,8 +48,9 @@ function Execute-Test {
     } catch {
         throw $_
     } finally {
-        $logPath = Join-Path $WorkDir "logs"
-        Copy-Item "$logPath\*" $LogDestination
+        $logPath = Join-Path $WorkDir "testscripts\$TESTS_FOLDER"
+        Copy-Item "$logPath\summary.log" $LogDestination
+        Copy-Item "$logPath\*_exec.log" $LogDestination
     }
 }
 
@@ -69,6 +70,7 @@ function Main {
     New-Item -Type Directory -Path $LogDestination
     $LogDestination = Resolve-Path $LogDestination
     $RemoteScript = Resolve-Path $REMOTE_SCRIPT
+    $BinariesPath = Resolve-Path $BinariesPath
 
     Push-Location $WorkDir
     

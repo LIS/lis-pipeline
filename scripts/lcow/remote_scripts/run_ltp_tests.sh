@@ -3,7 +3,8 @@
 PACKAGES=(git lsb-release sudo build-essential wget autoconf automake m4 libaio-dev libattr1
           libcap-dev bison libdb4.8 libberkeleydb-perl flex expect)
 
-TESTS = "fs,fs_bind,fs_ext4,fs_perms_simple,fs_readonly"
+IGNORE_TESTS="shmctl05 fanotify01 mlockall01 inotify09 mtest06 memcg_stress controllers cpuset_inherit cpuset_hotplug"
+IGNORE_TESTS="$(echo $IGNORE_TESTS | tr " " "\n")"
 
 set -x
 WORK_DIR="/opt/ltp"
@@ -17,6 +18,14 @@ function copy_logs {
     log_dir="$1"
 
     cp ${WORK_DIR}/results/*.log "$log_dir"
+}
+
+function create_skip_file {
+    file_path="$1"
+    
+    cat << EOF > "$file_path"
+$IGNORE_TESTS
+EOF
 }
 
 function main {
@@ -75,8 +84,13 @@ function main {
     popd
     
     pushd "$WORK_DIR"
+    
+    if [[ "$IGNORE_TESTS" != "" ]];then
+        create_skip_file "${WORK_DIR}/SKIP_TESTS"
+    fi
+    
     touch /dev/kmsg
-    bash ./runltp -f "$TESTS"
+    bash ./runltp -S "${WORK_DIR}/SKIP_TESTS"
     copy_logs "$LOG_DIR"
     popd
 }
