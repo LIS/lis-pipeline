@@ -3,7 +3,6 @@ param(
     [String] $AzureSecretsPath,
     [parameter(Mandatory=$true)]
     [String] $TestCase,
-    [parameter(Mandatory=$true)]
     [String] $AzureAuthXml,
     [String] $Identifier,
     [String] $WorkingDir = ".",
@@ -178,8 +177,7 @@ function Prepare-Env {
         [String] $AzureXmlPath,
         [String] $KernelDir,
         [String] $Location,
-        [String] $StorageAccount,
-        [String] $AzureAuthXml
+        [String] $StorageAccount
     )
     
     $AzureXmlPath = Resolve-Path $AzureXmlPath
@@ -191,7 +189,6 @@ function Prepare-Env {
         -XmlSecretsFilePath $AzureXmlPath
     Set-DeployStorageAccount -RegionsXml $regionsXml `
         -Location $Location -StorageAccount $StorageAccount
-    & .\Utilities\AddAzureRmAccountFromSecretsFile.ps1 -customSecretsFilePath $AzureAuthXml
     
     # Note (mbivolan): The kernel package must be in a path relative to the LISA folder
     # For simplicity it will be copied in the LISA folder
@@ -275,7 +272,7 @@ function Main {
     Get-LisaCode -LisaPath $LisaDir
     Prepare-Env -LisaPath $LisaDir -AzureXmlPath $AzureSecretsPath `
         -KernelDir $KernelDir -Location $AzureLocation `
-        -StorageAccount $StorageAccount -AzureAuthXml $AzureAuthXml
+        -StorageAccount $StorageAccount
     
     Run-LisaTest -LisaPath $LisaDir -TestCase "CAPTURE-VHD-BEFORE-TEST" `
         -CustomKernel $true -ARMImage $BaseImage -Location $AzureLocation `

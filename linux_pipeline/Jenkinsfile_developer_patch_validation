@@ -352,14 +352,12 @@ pipeline {
                     }
                     steps {
                         withCredentials(bindings: [file(credentialsId: 'Dev_Azure_Secrets_File', variable: 'Dev_Azure_Secrets_File'),
-                                                   file(credentialsId: 'AZURE_AUTH_XML', variable: 'AZURE_AUTH_XML'),
                                                    string(credentialsId: 'AZURE_STORAGE_ACC', variable: 'AZURE_STORAGE_ACC'),
                                                    string(credentialsId: 'AZURE_RESOURCE_GROUP', variable: 'AZURE_RESOURCE_GROUP')]) {
                             echo 'Running LISA...'
                             unstash "SHORT_KERNEL_PATH"
                             PowerShellWrapper('''
                             & ".\\scripts\\azure_kernel_validation\\main-stress-azure.ps1"
-                                -AzureAuthXml "${env:AZURE_AUTH_XML}"
                                 -AzureSecretsPath "${env:Dev_Azure_Secrets_File}"
                                 -Identifier "kernel-val-${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}"
                                 -WorkingDir "C:\\workspace"
