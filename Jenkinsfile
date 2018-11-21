@@ -295,7 +295,7 @@ pipeline {
             }
             post {
               always {
-                junit "report\\*-junit.xml"
+                junit "Report\\*-junit.xml"
                 archiveArtifacts "TestResults\\**\\*"
               }
             }
@@ -329,7 +329,7 @@ pipeline {
             }
             post {
               always {
-                junit "report\\*-junit.xml"
+                junit "Report\\*-junit.xml"
                 archiveArtifacts "TestResults\\**\\*"
               }
             }
@@ -400,7 +400,7 @@ pipeline {
       }
       post {
         always {
-          junit "report\\*-junit.xml"
+          junit "Report\\*-junit.xml"
           archiveArtifacts "TestResults\\**\\*"
         }
       }
@@ -445,7 +445,7 @@ pipeline {
           }
           post {
             always {
-              junit "report\\*-junit.xml"
+              junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
             }
           }
@@ -488,7 +488,7 @@ pipeline {
           }
           post {
             always {
-              junit "report\\*-junit.xml"
+              junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
             }
           }
@@ -528,7 +528,7 @@ pipeline {
           }
           post {
             always {
-              junit "report\\*-junit.xml"
+              junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
             }
           }

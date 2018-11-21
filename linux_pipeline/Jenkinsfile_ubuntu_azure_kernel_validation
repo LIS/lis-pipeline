@@ -84,7 +84,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
-                                        junit "report\\*-junit.xml"
+                                        junit "Report\\*-junit.xml"
                                         archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }
@@ -149,7 +149,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
-                                        junit "report\\*-junit.xml"
+                                        junit "Report\\*-junit.xml"
                                         archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }
@@ -199,7 +199,7 @@ if (env.performance == "yes") {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
-                                        junit "report\\*-junit.xml"
+                                        junit "Report\\*-junit.xml"
                                         archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }

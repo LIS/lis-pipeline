@@ -71,7 +71,7 @@ azureImages.each {
                                 " -ForceDeleteResources" +
                                 " -ExitWithZero"
                                 )
-                                junit "report\\*-junit.xml"
+                                junit "Report\\*-junit.xml"
                             }
                         }
                     }
