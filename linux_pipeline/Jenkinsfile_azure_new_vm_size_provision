@@ -13,23 +13,11 @@ env.OLD_FILE = "Z:\\Jenkins_Shared_Do_Not_Delete\\userContent\\shared\\azure-vm-
 env.VM_OUTPUT_FILE = "todaysNewVMs.txt"
 env.TEST_CMD = "BVT-VERIFY-DEPLOYMENT-PROVISION"
 
-stage("Checkout"){
-    timeout(120) {
-        node("meta_slave"){
-            git "https://github.com/LIS/lis-pipeline.git"
-            stash includes: '**', name: 'lis-pipeline'
-            cleanWs()
-            git "https://github.com/LIS/LISAv2.git"
-            stash includes: '**', name: 'LISAv2'
-        }
-    }
-}
-
-stage ("Check for new sizes"){
-    node ("azure"){
-        unstash 'lis-pipeline'
-        unstash 'LISAv2'
-        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]){
+stage ("Check for new sizes") {
+    node ("azure") {
+        git "https://github.com/LIS/lis-pipeline.git"
+        git "https://github.com/LIS/LISAv2.git"
+        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
             RunPowershellCommand(".\\scripts\\azure_new_vm_size_provision\\watcher-new-azure-vm-size.ps1"+
             " -LisaPath '.'" +
             " -NewFile '${NEW_FILE}'" +
@@ -40,25 +28,25 @@ stage ("Check for new sizes"){
         }
         env.NEW_VMS_EMV = readFile (env.VM_OUTPUT_FILE)
         println(env.NEW_VMS_EMV)
+        cleanWs()
     }
 }
-stage ("Execute Tests"){
-    node ("azure"){
-        if (env.NEW_VMS_EMV == 'NO_NEW_VMS')
-        {
+stage ("Execute Tests") {
+    node ("azure") {
+        if (env.NEW_VMS_EMV == 'NO_NEW_VMS') {
             println ("No new VMs today.")
             return
         }
         println ("Testing new VMs... ")
         def Counter = 1
         TODAY_SIZES = env.NEW_VMS_EMV.split(",")
-        for( item in TODAY_SIZES){
+        for( item in TODAY_SIZES) {
             cleanWs()
-            unstash 'LISAv2'
+             git "https://github.com/LIS/LISAv2.git"
             CURRENT_REGION = item.split(" ")[0]
             CURRENT_SIZE = item.split(" ")[1]
             EMAIL_BODY += "${Counter}.\t\t${CURRENT_SIZE}\t\t${CURRENT_REGION}\n"
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]){
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
                 echo "LisaV2: Runing provision tests in ${CURRENT_REGION} with VM size ${CURRENT_SIZE}..."
                 RunPowershellCommand(".\\Run-LisaV2.ps1" +
                 " -RGIdentifier 'NewVM'" +
