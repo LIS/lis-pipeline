@@ -1,0 +1,122 @@
+#!/usr/bin/env groovy
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+properties ([
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'CLUSTER_NAME',
+            defaultValue: '',
+            description: 'Name of the Azure cluster'],
+        [$class: 'StringParameterDefinition',
+            name: 'HOST_BUILD_PATH',
+            defaultValue: '',
+            description: 'Path to the host build file (optional)'],
+        [$class: 'StringParameterDefinition',
+            name: 'AGENT_PACKAGE_PATH',
+            defaultValue: "",
+            description: 'Path to the agent package (optional)'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: "HPC\nGPU",
+            name: 'TEST_TYPE',
+            description: 'Test to be ran on deployed VMs',],
+        [$class: 'StringParameterDefinition',
+            name: 'VM_SIZE',
+            defaultValue: "",
+            description: 'Size of the vm to be deployed'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_LOCATION',
+            defaultValue: "",
+            description: 'Azure test location']
+        ]
+    ]
+])
+
+IMAGE_MAP = ["HPC": ["Openlogic CentOS-HPC 6.5 latest", "Openlogic CentOS-HPC 6.8 latest", \
+                     "Openlogic CentOS-HPC 7.1 latest", "Openlogic CentOS-HPC 7.3 latest", \
+                     "Openlogic CentOS-HPC 7.4 latest"], \
+             "GPU": ["Canonical UbuntuServer 16.04-LTS latest", "Canonical UbuntuServer 18.04-LTS latest"]]
+TEST_MAP = ["HPC": "VERIFY-INFINIBAND-INTEL-MPI-2VM-STANDARD-A8", \
+            "GPU": "VERIFY-NVIDIA-CUDA-DRIVER-FOR-NC24r-VM"]
+AZURE_ID = "HVP"
+            
+SESSION_ID = ""
+    
+def runLISAv2 (imageName) {
+    def displayName = imageName.replace(" ", "-")
+    stage (diplayName) {
+        file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+            dir ("${env.TEST_TYPE}-${displayName}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                git url: "https://github.com/LIS/LISAv2.git", branch: "master"
+                println ("Using image: ${imageName}")
+                println ("Running tests: ${env.TEST_MAP[env.TEST_TYPE]}")
+                
+                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                    " -TestLocation '${env.TEST_LOCATION}'" +
+                    " -RGIdentifier '${env.AZURE_ID}'" +
+                    " -TestPlatform 'Azure'" +
+                    " -ARMImageName '${imageName}'" +
+                    " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                    " -TiPSessionId '${SESSION_ID}'" +
+                    " -TiPCluster '${env.CLUSTER_NAME}'" +
+                    " -TestNames '${env.TEST_MAP[env.TEST_TYPE]}'"
+                )
+                
+                junit "Report\\*-junit.xml"
+                archiveArtifacts "TestResults\\**\\*"
+                deleteDir()
+            }
+        }
+    }
+}
+
+node ("ws2016") {
+    if (IMAGE_MAP[env.TEST_TYPE] == null) {
+        error ("Coud not find images for test type: ${env.TEST_TYPE}")
+    }
+    if (TEST_MAP[env.TEST_TYPE] == null) {
+        error ("Cloud not find tests for test type: ${env.TEST_TYPE}") 
+    }
+
+    stage ("Create TiP Session") {
+        dir ("new-session-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            checkout scm
+            println ("Creating TiP Session on cluster: ${env.CLUSTER_NAME}")
+            println ("Using host build path: ${env.HOST_BUILD_PATH}")
+            println ("Using agent package path: ${env.AGENT_PACKAGE_PATH}")
+            
+            RunPowershellCommand(".\\scripts\\host_validation\\Create-TipSession.ps1" +
+                " -ClusterName '${env.CLUSTER_NAME}'" +
+                " -TestLocation '${env.TEST_LOCATION}'" +
+                " -HostBuildPath '${env.HOST_BUILD_PATH}'" +
+                " -AgentPackagePath '${env.AGENT_PACKAGE_PATH}'" +
+                " -OutputFile '.\\session_id'"
+            )
+            
+            SESSION_ID = readfile "./session_id"
+            SESSION_ID = SESSION_ID.trim()
+            if (SESSION_ID != "") {
+                println ("TiP Session created with id: ${SESSION_ID}")
+            } else {
+                error ("Could not find session id")
+            }
+            
+            deleteDir()
+        }
+    }
+    
+    IMAGE_MAP[env.TEST_TYPE].each() {
+        try {
+            runLISAv2(it, SESSION_ID)
+        } catch (exc) {
+            currentBuild.result = 'SUCCESS'
+        }
+    }
+    
+    stage ("Cleanup Session") {
+        println("NoOp")
+    }
+}
