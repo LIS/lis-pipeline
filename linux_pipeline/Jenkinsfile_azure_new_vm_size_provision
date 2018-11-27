@@ -1,0 +1,80 @@
+#!/usr/bin/env groovy
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+env.NEW_VMS_EMV = ""
+env.TODAY_SIZES = ""
+env.CURRENT_SIZE = ""
+env.CURRENT_REGION = ""
+env.EMAIL_BODY = "SR\t\tSize\t\tRegion\n"
+env.NEW_FILE = "Z:\\Jenkins_Shared_Do_Not_Delete\\userContent\\shared\\azure-vm-sizes.txt"
+env.OLD_FILE = "Z:\\Jenkins_Shared_Do_Not_Delete\\userContent\\shared\\azure-vm-sizes-base.txt"
+env.VM_OUTPUT_FILE = "todaysNewVMs.txt"
+env.TEST_CMD = "BVT-VERIFY-DEPLOYMENT-PROVISION"
+
+stage("Checkout"){
+    timeout(120) {
+        node("meta_slave"){
+            git "https://github.com/LIS/lis-pipeline.git"
+            stash includes: '**', name: 'lis-pipeline'
+            cleanWs()
+            git "https://github.com/LIS/LISAv2.git"
+            stash includes: '**', name: 'LISAv2'
+        }
+    }
+}
+
+stage ("Check for new sizes"){
+    node ("azure"){
+        unstash 'lis-pipeline'
+        unstash 'LISAv2'
+        withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]){
+            RunPowershellCommand(".\\scripts\\azure_new_vm_size_provision\\watcher-new-azure-vm-size.ps1"+
+            " -LisaPath '.'" +
+            " -NewFile '${NEW_FILE}'" +
+            " -OldFile '${OLD_FILE}'" +
+            " -VmOutputFile '${VM_OUTPUT_FILE}'" +
+            " -SecretsFile '${Azure_Secrets_File}'"
+            )
+        }
+        env.NEW_VMS_EMV = readFile (env.VM_OUTPUT_FILE)
+        println(env.NEW_VMS_EMV)
+    }
+}
+stage ("Execute Tests"){
+    node ("azure"){
+        if (env.NEW_VMS_EMV == 'NO_NEW_VMS')
+        {
+            println ("No new VMs today.")
+            return
+        }
+        println ("Testing new VMs... ")
+        def Counter = 1
+        TODAY_SIZES = env.NEW_VMS_EMV.split(",")
+        for( item in TODAY_SIZES){
+            cleanWs()
+            unstash 'LISAv2'
+            CURRENT_REGION = item.split(" ")[0]
+            CURRENT_SIZE = item.split(" ")[1]
+            EMAIL_BODY += "${Counter}.\t\t${CURRENT_SIZE}\t\t${CURRENT_REGION}\n"
+            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]){
+                echo "LisaV2: Runing provision tests in ${CURRENT_REGION} with VM size ${CURRENT_SIZE}..."
+                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                " -RGIdentifier 'NewVM'" +
+                " -TestLocation '${CURRENT_REGION}'" +
+                " -TestPlatform 'Azure'" +
+                " -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'" +
+                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                " -StorageAccount 'ExistingStorage_Standard'" +
+                " -OverrideVMSize '${CURRENT_SIZE}'" +
+                " -ExitWithZero"+
+                " -TestNames ${TEST_CMD}"
+                )
+                 junit "Report\\*-junit.xml"
+                archiveArtifacts "TestResults\\**\\*"
+                }
+            }
+            emailext body: "${EMAIL_BODY}", subject: 'Jenkins CI - lisav2-azure-new-vm-size-provision : New VM size(s) found', to: "${Email}"
+        }
+    }
