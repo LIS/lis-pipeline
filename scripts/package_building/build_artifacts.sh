@@ -558,10 +558,10 @@ function patch_kernel() {
                 get_cmd="curl -s $patch"
                 ;;
         esac
-        git_patch_msg==$($get_cmd 2>&1 | git am 2>&1 || $get_cmd 2>&1 | git apply 2>&1)
+        git_patch_msg=$($get_cmd 2>&1 | git apply 2>&1 || $get_cmd 2>&1 | git am 2>&1)
         if [[ ${PIPESTATUS[0]} -ne 0 ]] || [[ ${PIPESTATUS[1]} -ne 0 ]]; then
             echo "Patch failed with error message: $git_patch_msg"
-            exit $(( ${PIPESTATUS[0]} + ${PIPESTATUS[1]} ))
+            exit 1
         fi
     done
 
