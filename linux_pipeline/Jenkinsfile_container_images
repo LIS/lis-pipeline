@@ -99,6 +99,7 @@ testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP_Docker"
 skipBuild = false
+BUILD_NAME = ""
 
 def runTests(versionsMap, hostName){
     testMap.keySet().each {
@@ -177,7 +178,7 @@ def createStageReport(stageName, testType, logPath, exitCode) {
             -LogPath '${logPath}'
             -ExitCode '${exitCode}'
             -ReportDestination '.\\${stageName}-Dir'
-            -BuildNumber '${env.BUILD_NUMBER}'
+            -BuildNumber '${BUILD_NAME}'
     """)
     if (eCode != 0) {
         error("Test script returned exit code: ${eCode}")
@@ -233,7 +234,7 @@ def sendMailReport(reportStage) {
 def runHypervTest() {
     dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         echo 'Starting Hyper-V test job'
-        fileName = "rpm-" + buildName.split("-")[1] + ".tgz"
+        fileName = "rpm-" + BUILD_NAME.split("-")[1] + ".tgz"
         testRun = build job: HYPERV_TEST_JOB, parameters: [
             string(name: 'ARCHIVE_NAME', value: "${fileName}"),
             string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
@@ -455,13 +456,14 @@ stage ("check_kernel") {
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
                         -ArtifactsDestination ".\\lcow-artifacts"
+                        -BuildIDDestination ".\\build_name"
                 ''')
                 if (exitCode != 0) {
                     error("Test script returned exit code: ${exitCode}")
                 }
-                buildName = readFile "./build_name"
-                if (buildName != "" ) {
-                    currentBuild.displayName = buildName + "-${env.BUILD_NUMBER}"
+                BUILD_NAME = readFile "./build_name"
+                if (BUILD_NAME != "" ) {
+                    currentBuild.displayName = BUILD_NAME.trim() + "-${env.BUILD_NUMBER}"
                     stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
                 } else {
                     echo "No new artifacts found"

@@ -1,5 +1,6 @@
 param (
     [String] $ArtifactsDestination,
+    [String] $BuildIdDestination,
     [String] $UserName,
     [String] $Token,
     [String] $VstsUrl,
@@ -17,6 +18,7 @@ Import-Module $helpersPath
 
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
+$BUILD_ID = "reporting_metadata"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $VSTS_PATH = "C:\Program Files (x86)\Microsoft SDKs\VSTS\CLI\wbin\"
 $env:Path = "${BIN_PATH};${VSTS_PATH};" + $env:Path
@@ -72,7 +74,8 @@ function Download-VstsArtifacts {
         [String] $Instance,
         [String] $PackageName,
         [String] $Version,
-        [String] $Destination
+        [String] $Destination,
+        [String] $BuildIdDestination
     )
     
     if (Test-Path $TEMP_DIR) {
@@ -86,7 +89,7 @@ function Download-VstsArtifacts {
     Write-Host "vsts package universal download --instance $Instance --feed $Feed --name $PackageName --version $Version --path ."
     vsts package universal download --instance $Instance --feed $Feed --name $PackageName --version $Version --path "."
 
-    Get-ChildItem -Path "." -Recurse -Include $KERNEL_NAME,$INITRD_NAME | `
+    Get-ChildItem -Path "." -Recurse -Include $KERNEL_NAME,$INITRD_NAME,$BUILD_ID | `
         ForEach-Object {Write-Host "Found file: $_";Copy-Item $_ .}
 
     if (Test-Path ".\${KERNEL_NAME}") {
@@ -101,6 +104,13 @@ function Download-VstsArtifacts {
     } else {
         throw "Cannot find initrd image"
     }
+    if (Test-Path ".\${BUILD_ID}") {
+        Write-Host "Using unique build id"
+        Copy-Item ".\${BUILD_ID}" $BuildIdDestination  
+    } else {
+        Write-Host "Using package version"
+        Set-Content -Value $Version -Path $BuildIdDestination
+    }
 
     Pop-Location
 }
@@ -114,7 +124,8 @@ function Get-UniversalPackage {
         [String] $Instance,
         [String] $PackageName,
         [String] $VersionsFile,
-        [String] $ArtifactsDestination
+        [String] $ArtifactsDestination,
+        [String] $BuildIdDestination
     )
 
     $latestVersion = Get-LatestVersion -Username $Username -Token $Token `
@@ -135,9 +146,9 @@ function Get-UniversalPackage {
         Write-Host "Newer Version: $latestVersion"
         Download-VstsArtifacts -Token $Token -Feed $Feed `
             -PackageName $PackageName -Version $latestVersion `
-            -Instance $Instance -Destination $ArtifactsDestination
+            -Instance $Instance -Destination $ArtifactsDestination `
+            -BuildIdDestination $BuildIdDestination
         Set-Content -Value $latestVersion -Path $VersionsFile
-        Set-Content -Value "lcow-${latestVersion}" -Path ".\build_name"
     } else {
         Write-Host "Cannot find newer version"
     }
@@ -149,7 +160,8 @@ function Download-Artifacts {
     param (
         [String] $KernelUrl,
         [String] $InitrdUrl,
-        [String] $Destination
+        [String] $Destination,
+        [String] $BuildIdDestination
     )
 
     $kernelDest = Join-Path $Destination "kernel"
@@ -158,7 +170,7 @@ function Download-Artifacts {
     Download -From $KernelUrl -To $kernelDest
     Download -From $InitrdUrl -To $initrdDest
 
-    Set-Content -Value "manual-run" -Path ".\build_name"
+    Set-Content -Value "manual-run" -Path $BuildIdDestination
 }
 
 # Main
@@ -167,19 +179,25 @@ function Main {
     if (Test-Path $ArtifactsDestination) {
         Remove-Item -Recurse -Force $ArtifactsDestination
     }
-
+    if (Test-Path $BuildIdDestination) {
+        Remove-Item -Force $BuildIdDestination
+    }
+    
+    New-Item -Path $BuildIdDestination
     New-Item -Type Directory -Path $ArtifactsDestination
     $ArtifactsDestination = Resolve-Path $ArtifactsDestination
-    New-Item ".\build_name"
+    $BuildIdDestination = Resolve-Path $BuildIdDestination
 
     if ($KernelUrl -and $InitrdUrl) {
         Download-Artifacts -KernelUrl $KernelUrl -InitrdUrl $InitrdUrl `
-            -Destination $ArtifactsDestination
+            -Destination $ArtifactsDestination `
+            -BuildIdDestination $BuildIdDestination
     } else {
         Get-UniversalPackage -Username $UserName -Token $Token `
             -URL $VstsUrl -Feed $VstsFeed -Instance $VstsInstance `
             -PackageName $PackageName -VersionsFile $VersionsFile `
-            -ArtifactsDestination $ArtifactsDestination
+            -ArtifactsDestination $ArtifactsDestination `
+            -BuildIdDestination $BuildIdDestination
     }
 }
 
