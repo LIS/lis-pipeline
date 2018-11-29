@@ -248,7 +248,11 @@ function Get-LisaCode {
     if (Test-Path $LISAPath) {
         rm -Recurse -Force $LISAPath
     }
-    & $GitPath clone https://github.com/LIS/lis-test.git $LISAPath
+    try {
+        & $GitPath clone https://github.com/LIS/lis-test.git $LISAPath
+    } catch {
+        Write-Host "Failed to run git properly. Continue, as this might be a transient error"
+    }
 }
 
 function Copy-LisaTestDependencies {

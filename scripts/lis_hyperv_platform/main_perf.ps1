@@ -85,11 +85,13 @@ function Main {
         $kernelName = Get-IniFileValue -Path $KernelVersionPath `
             -Section "KERNEL_BUILT" -Key "folder"
     }
-    if (!(Test-Path $LocalKernelFolder)) {
-        throw "Kernel folder does not exist"
-    } else {
-        $LocalKernelFolder = Resolve-Path $LocalKernelFolder
-    }
+    #if (!(Test-Path $LocalKernelFolder)) {
+    #    throw "Kernel folder does not exist"
+    #} else {
+    #    $LocalKernelFolder = Resolve-Path $LocalKernelFolder
+    #}
+    $kernelName = "linux-next-4.15.0-1fec57a-17012018"
+    $LocalKernelFolder = 'C:\kernel\linux-next-4.15.0-1fec57a-17012018\deb'
     if (!(Test-Path $WorkingDirectory)) {
         New-Item -ItemType "Directory" -Path $WorkingDirectory
     }

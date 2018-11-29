@@ -318,7 +318,7 @@ pipeline {
                         withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
                                                    string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
                             echo 'Running LISA...'
-                            unstash "${env.KERNEL_ARTIFACTS_PATH}"
+                            // unstash "${env.KERNEL_ARTIFACTS_PATH}"
                             PowerShellWrapper('''
                             & ".\\scripts\\lis_hyperv_platform\\main_perf.ps1"
                                 -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-perf"
