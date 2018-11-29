@@ -35,7 +35,7 @@ def AZURE_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
     FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
     FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
 def AZURE_PERFORMANCE_TESTS_HASH = [PERFORMANCE_NETWORK:"-TestCategory 'Performance' -TestArea 'Network'",
-    PERFORMANCE_STORAGE:"-TestCategory 'Performance' -TestArea 'Storage'"]
+    PERFORMANCE_STORAGE:"-TestNames 'PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K' -StorageAccount 'ExistingStorage_Premium'"]
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 PLATFORM_HYPERV = "hyperv"
 PLATFORM_AZURE = "azure"
