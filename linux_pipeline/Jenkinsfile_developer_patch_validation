@@ -33,7 +33,7 @@ pipeline {
         string(defaultValue: "", description: 'Azure stress test parameter for provision number', name: 'AZURE_STRESS_PROVISION_NUMBER')
         string(defaultValue: "", description: 'Lisa test suite', name: 'LISA_TEST_SUITE')
         choice(choices: "kernel_pipeline_bvt.xml\nkernel_pipeline_fvt.xml\ntest_kernel_pipeline.xml", description: 'Which xml should LISA run for functional test', name: 'LISA_TEST_XML')
-        choice(choices: "TCP_SRIOV_v4.xml\nUDP_SRIOV_v4.xml\nFIO_RAID0_Pipeline.xml", description: 'Which xml should LISA run for performance test', name: 'LISA_PERF_TEST_XML')
+        choice(choices: "TCP_SRIOV_v4_ecg_servers.xml", description: 'Which xml should LISA run for performance test', name: 'LISA_PERF_TEST_XML')
         string(defaultValue: "", description: 'Options for perf test.', name: 'LISA_PERF_OPTIONS')
         string(defaultValue: "", description: 'Custom build tag for artifacts', name: 'CUSTOM_BUILD_TAG')
         string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_functional, validation_perf, validation_functional_hyperv, validation_perf_hyperv",
