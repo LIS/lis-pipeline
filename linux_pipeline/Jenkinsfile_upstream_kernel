@@ -31,7 +31,6 @@ def reportStageStatus(stageName, stageStatus) {
     }
 }
 
-
 def getVhdLocation(basePath, distroVersion) {
     def distroFamily = distroVersion.split('_')[0]
     return "${basePath}\\" + distroFamily + "\\" + distroVersion + "\\" + distroVersion + ".vhdx"
@@ -70,7 +69,6 @@ def unstashKernel(kernelStash) {
         & \$rmPath -rf "\${basePath}/*debug*"
     """
 }
-
 
 pipeline {
   parameters {
@@ -340,7 +338,8 @@ pipeline {
                         " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
                         " -StorageAccount 'ExistingStorage_Standard'" +
                         " -XMLSecretFile '${Azure_Secrets_File}'" +
-                        " -UseManagedDisks"
+                        " -UseManagedDisks" +
+                        " -DoNotDeleteVMs"
                     )
                 }
             }
@@ -348,6 +347,19 @@ pipeline {
               always {
                 junit "Report\\*-junit.xml"
                 archiveArtifacts "TestResults\\**\\*"
+              }
+              success {
+                withCredentials(bindings: [
+                  file(credentialsId: 'CBS_Azure_Secrets_File',
+                       variable: 'Azure_Secrets_File')
+                ]) {
+                  RunPowershellCommand(".\\Utilities\\Get-VMInfoFromTestLog.ps1" +
+                    " -LogPath TestResults" +
+                    " -UploadToDatabase" +
+                    " -LockResourceGroup" +
+                    " -AzureSecretsFile '${Azure_Secrets_File}'"
+                  )
+                }
               }
             }
           }
