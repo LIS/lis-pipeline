@@ -1,307 +1,186 @@
 #!/usr/bin/env groovy
 
+env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
+env.SEND_EMAIL = true
+env.BUILD_KERNEL_ARTIFACTS = true
+env.KERNEL_ARTIFACTS_SMB_PATH = ""
+
 properties ([
+    overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\n
-                        git://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\n
-                        git://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure\n
-                        azure_kernel""",
             name: 'KERNEL_GIT_URL',
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel""",
             description: 'Kernel tree repo'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
             defaultValue: 'master',
             description: 'Branch to be built'],
         [$class: 'StringParameterDefinition',
-            defaultValue: '',
             name: 'KERNEL_PATCH',
+            defaultValue: "",
             description: 'Valid examples: \n scp://my-scp-hostname:/home/my-username/patch.p1 \n scp://my-username@my-scp-hostname:/home/my-username/patch.p1 \n http://my-website.com/patch.p1 \n Use the space separator for multiple patches.'],
         [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             name: 'SKIP_UNPATCHED',
-            description: 'Skip unpatched kernel validation'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true, 
-            description: 'Azure VM boot test', 
-            name: 'AZURE_BOOT'],
-        [$class: 'StringParameterDefinition',
-            name: 'AZURE_VM_SIZE',
-            defaultValue: 'Standard_A2',
-            description: 'Azure VM size'],
+            description: 'Whether to skip unpatched run. No result comparison will be possible.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
                         canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
                         japaneast\njapanwest\nkoreacentral\nkoreasouth\nnorthcentralus\nnortheurope
                         southcentralus\nsoutheastasia\nsouthindia\nuksouth\nukwest\nwestcentralus
                         westeurope\nwestindia\nwestus\nsepremium""",
-            name: 'AZURE_REGION',
-            description: 'Azure Region',],
+            name: 'LISAV2_AZURE_REGION',
+            description: 'Azure Region'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            name: 'RUN_AZURE_BOOT_TEST',
+            description: 'Whether to run Azure Boot test'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_AZURE_BOOT_STRESS_TEST',
+            description: 'Whether to run Azure Boot Stress test'],
+        [$class: 'ChoiceParameterDefinition',
+            name: 'AZURE_BOOT_STRESS_VM_SIZE',
+            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
+            description: 'Kernel tree repo'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_AZURE_BVT_TESTS',
+            description: 'Whether to run Azure basic validation tests'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_HYPERV_BVT_TESTS',
+            description: 'Whether to run HYPERV basic validation tests'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_HYPERV_PERF_TESTS',
+            description: 'Whether to run HYPERV performance tests'],
         [$class: 'StringParameterDefinition',
-            name: 'AZURE_STRESS_PROVISION_NUMBER',
-            defaultValue: '100',
-            description: 'Azure stress test parameter for provisions number'],
-        [$class: 'StringParameterDefinition',
-            name: 'AZURE_STRESS_REBOOT_NUMBER',
-            defaultValue: '100',
-            description: 'Azure stress test parameter for reboot number'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: "None\nkernel_pipeline_fvt.xml\nkernel_pipeline.bvt.xml\ntest_kernel_pipeline.xml",
-            name: 'LISA_TEST_XML',
-            description: 'Hyper-v functional validation type'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'all\nCore (fvt)\nStorage (fvt)\nNetwork_and_Stress (fvt)\nMemory (fvt)',
-            name: 'LISA_TEST_SUITE',
-            description: 'Functional test suite'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'None\nSR-IOV_TCP\nSR-IOV_UDP\nFIO_RAID',
-            name: 'LISA_PERF_TEST',
-            description: 'Hyper-v performance test'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'v4\nv6',
-            name: 'PERF_IPV',
-            description: 'IP version for network performance test'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
-            name: 'PERF_NET_THREADS',
-            description: 'TEST_THREADS for TCP. CONNECTION POOL for UDP'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'all\n1\n2\n4\n8\n16\n32\n64\n128\n256',
-            name: 'PERF_Q_DEPTH',
-            description: 'Q_DEPTH for FIO'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'all\n4\n1024',
-            name: 'PERF_IO_SIZE',
-            description: 'IO_SIZE for FIO'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'all\nread\nrandread\nwrite\nrandwrite',
-            name: 'PERF_IO_MODE',
-            description: 'IO_MODE for FIO'],
+            name: 'HYPERV_SECOND_PERF_NODE',
+            defaultValue: '',
+            description: 'The second HyperV nodes. Every performance test requires two HyperV nodes, one being the node where the job runs and one defined here.'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_AZURE_PERF_TESTS',
+            description: 'Whether to run Azure performance tests']
         ]
     ]
 ])
 
-def perfXml = ["SR-IOV_TCP": "TCP_SRIOV_v4.xml", "SR-IOV_UDP":"UDP_SRIOV_v4.xml", "FIO_RAID": "FIO_RAID0_Pipeline.xml"]
-def sendMail = false
-def slavePipelineName = "pipeline-developer-patch-runner"
+// ****************
+// PIPELINE HELPERS
+// ****************
 
-def getPerfOptions(perf_test) {
-    switch (perf_test) {
-        case "SR-IOV_TCP":
-            testOptions = PERF_IPV
-            if (PERF_NET_THREADS != "all"){
-                testOptions += ";TEST_THREADS=" + PERF_NET_THREADS
-            }
-            return testOptions
-        case "SR-IOV_UDP":
-            testOptions = PERF_IPV
-            if (PERF_NET_THREADS != "all"){
-                testOptions += ";IPERF3_TEST_CONNECTION_POOL=" + PERF_NET_THREADS
-            }
-            return testOptions
-        case "FIO_RAID":
-            testOptions = ""
-            if (PERF_Q_DEPTH != "all") {
-                testOptions += "Q_DEPTH=" + PERF_Q_DEPTH + ";"
-            }
-            if (PERF_IO_SIZE != "all") {
-                testOptions += "IO_SIZE=" + PERF_IO_SIZE + ";"
-            }
-            if (PERF_IO_MODE != "all") {
-                testOptions += "IO_MODE=" + PERF_IO_MODE + ";"
-            }
-            return testOptions
-    }
+def getCommonParams(patches, buildTag) {
+    return [
+        string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
+        string(name: 'KERNEL_GIT_BRANCH', value: params.KERNEL_GIT_BRANCH),
+        string(name: 'KERNEL_ARTIFACTS_SMB_PATH', value: env.KERNEL_ARTIFACTS_SMB_PATH),
+        string(name: 'KERNEL_PATCH', value: patches),
+        booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
+        string(name: 'LISAV2_AZURE_REGION', value: params.LISAV2_AZURE_REGION),
+        booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.RUN_AZURE_BOOT_TEST),
+        booleanParam(name: 'RUN_AZURE_BOOT_STRESS_TEST', value: params.RUN_AZURE_BOOT_STRESS_TEST),
+        string(name: 'AZURE_BOOT_STRESS_VM_SIZE', value: params.AZURE_BOOT_STRESS_VM_SIZE),
+        booleanParam(name: 'RUN_AZURE_BVT_TESTS', value: params.RUN_AZURE_BVT_TESTS),
+        booleanParam(name: 'RUN_HYPERV_BVT_TESTS', value: params.RUN_HYPERV_BVT_TESTS),
+        booleanParam(name: 'RUN_HYPERV_PERF_TESTS', value: params.RUN_HYPERV_PERF_TESTS),
+        string(name: 'HYPERV_SECOND_PERF_NODE', value: params.HYPERV_SECOND_PERF_NODE),
+        booleanParam(name: 'RUN_AZURE_PERF_TESTS', value: params.RUN_AZURE_PERF_TESTS),
+        string(name: 'CUSTOM_BUILD_TAG', value: "${buildTag}-${BUILD_NUMBER}")
+    ]
 }
 
-def createEnableStages(){
-    env.ENABLED_STAGES = "build_artifacts, publish_temp_artifacts, publish_artifacts, validation, validation_functional, validation_perf,"
-    if (AZURE_BOOT == "true") {
-        env.ENABLED_STAGES += " boot_test,"
-    }
-    if (AZURE_STRESS_PROVISION_NUMBER != "" && AZURE_STRESS_REBOOT_NUMBER != "") {
-        env.ENABLED_STAGES += " validation_stress_azure,"
-    }
-    if (env.LISA_TEST_XML != "None") {
-        env.ENABLED_STAGES +=  " validation_functional_hyperv,"
-    }
-    if (env.LISA_PERF_TEST != "None") {
-        env.ENABLED_STAGES += " validation_perf_hyperv"
-    }
-}
 
-createEnableStages()
+// *************
+// PIPELINE MAIN
+// *************
+
 
 node ("meta_slave") {
     def runs = [:]
     def patchedRun, unpachedRun;
-
-    if (LISA_TEST_SUITE == 'all') {
-        LISA_TEST_SUITE = ''
-    } else {
-        LISA_TEST_SUITE = LISA_TEST_SUITE.split(" ")[0].toLowerCase()
-    }
-    
-    PERF_OPTIONS = getPerfOptions(LISA_PERF_TEST)
+    def patchedParams = getCommonParams(env.KERNEL_PATCH, "patched")
 
     stage ("test_kernels") {
             runs["kernel_patched"] = {
-                patchedRun = build job: "${slavePipelineName}/${env.BRANCH_NAME}", parameters: [
-                    string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
-                    string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
-                    string(name: 'KERNEL_PATCH', value: "${KERNEL_PATCH}"),
-                    string(name: 'CUSTOM_BUILD_TAG', value: "patched-${BUILD_NUMBER}"),
-                    string(name: 'AZURE_VM_SIZE', value: AZURE_VM_SIZE),
-                    string(name: 'AZURE_REGION', value: AZURE_REGION),
-                    string(name: 'AZURE_STRESS_PROVISION_NUMBER', value: "${AZURE_STRESS_PROVISION_NUMBER}"),
-                    string(name: 'AZURE_STRESS_REBOOT_NUMBER', value: "${AZURE_STRESS_REBOOT_NUMBER}"),
-                    string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
-                    string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
-                    string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
-                    string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
-                    string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
+                patchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                             parameters: patchedParams, propagate: false;
             }
-            if (env.SKIP_UNPATCHED == "false") {
+            if (!params.SKIP_UNPATCHED) {
+                def unpatchedParams = getCommonParams("", "unpatched")
                 runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "${slavePipelineName}/${env.BRANCH_NAME}", parameters: [
-                        string(name: 'KERNEL_GIT_BRANCH', value: "${KERNEL_GIT_BRANCH}"),
-                        string(name: 'KERNEL_GIT_URL', value: "${KERNEL_GIT_URL}"),
-                        string(name: 'CUSTOM_BUILD_TAG', value: "unpatched-${BUILD_NUMBER}"),
-                        string(name: 'AZURE_VM_SIZE', value: AZURE_VM_SIZE),
-                        string(name: 'AZURE_REGION', value: AZURE_REGION),
-                        string(name: 'LISA_TEST_XML', value: "${LISA_TEST_XML}"),
-                        string(name: 'LISA_TEST_SUITE', value: "${LISA_TEST_SUITE}"),
-                        string(name: 'LISA_PERF_TEST_XML', value: "${perfXml[LISA_PERF_TEST]}"),
-                        string(name: 'LISA_PERF_OPTIONS', value: "${PERF_OPTIONS}"),
-                        string(name: 'ENABLED_STAGES', value: "${ENABLED_STAGES}")], propagate: false;
+                    unpatchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                                   parameters: unpatchedParams, propagate: false;
                 }
             }
             parallel runs
     }
 
-    stage ("aggregate_results") {
-        dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            copyArtifacts(projectName: "${slavePipelineName}/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
-            archiveArtifacts 'patched_run/**';
-            if (env.SKIP_UNPATCHED == "false") {
-                copyArtifacts(projectName: "${slavePipelineName}/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
-                archiveArtifacts 'unpatched_run/**';
-                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
-                    stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
-                    stash includes: 'unpatched_run/*-functional/TestResults/**/Report*.xml', name: 'unpatchedReport'
-                }
-                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
-                    stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
-                    stash includes: 'unpatched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'unpatchedPerf'
-                }
-                stash includes: 'unpatched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
-            } else {
-                if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
-                    stash includes: 'patched_run/*-functional/TestResults/**/Report*.xml', name: 'patchedReport'
-                }
-                if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
-                    stash includes: 'patched_run/*-perf/lis-test/WS2012R2/lisa/TestResults/', name: 'patchedPerf'
-                }
-                stash includes: 'patched_run/scripts/package_building/kernel_versions.ini', name: 'Metadata'
-            }
-        }
-    }
-
     stage ("compare_results") {
-        dir('comparison_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            checkout scm
-            unstash 'Metadata'
-            
-            if (env.ENABLED_STAGES.contains("validation_perf_hyperv")){
-                env.PERF_RUN = "true"
-                env.LISA_PARAMS = getPerfOptions(LISA_PERF_TEST)
-                sendMail = true
-            }
-            if (env.ENABLED_STAGES.contains("validation_functional_hyperv")){
-                env.FUNC_RUN = "true"
-                sendMail = true
-            }
-            sh '''#!/bin/bash
-                INI_PATH="./unpatched_run/scripts/package_building/kernel_versions.ini"
-                if [[ ! -e "$INI_PATH" ]];then
-                    INI_PATH="./patched_run/scripts/package_building/kernel_versions.ini"
-                fi
-                META_PATH="./metadata.ini"
-                KERNEL="$(crudini --get $INI_PATH KERNEL_BUILT folder)"
-                KERNEL="${KERNEL%-unpatched*}"
-                crudini --set $META_PATH 'METADATA' KERNEL_VERSION $KERNEL
-                BRANCH="$(crudini --get $INI_PATH KERNEL_BUILT branch)"
-                crudini --set $META_PATH 'METADATA' BRANCH $BRANCH
-                crudini --set $META_PATH 'METADATA' LISA_XML $LISA_TEST_XML
-                if [[ ${FUNC_RUN} == "true" ]];then
-                    crudini --set $META_PATH 'METADATA' LISA_TEST_SUITE $LISA_TEST_SUITE
-                fi
-                if [[ ${PERF_RUN} == "true" ]];then
-                    if [[ ${LISA_PERF_TEST} != "" ]];then
-                        crudini --set $META_PATH 'METADATA' LISA_PERF_TEST $LISA_PERF_TEST
+        dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            echo "Aggregate results"
+            copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
+            sh '''
+                #!/bin/bash
+                set -xe
+                output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report/"
+                echo "<testsuites>" >> "${output_file}"
+                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                    if [ -f "${filename}.xml" ]; then
+                        sed -i "s/LISAv2Test/LISAv2Patched-${filename}/g" "${filename}.xml"
+                        grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
                     fi
-                    if [[ ${LISA_PERF_TEST} == *"SR-IOV"* ]];then
-                        crudini --set $META_PATH 'METADATA' IP_VERSION $PERF_IPV
-                    fi
-                    crudini --set $META_PATH 'METADATA' LISA_PERF_PARAMS $LISA_PARAMS
-                fi
+                done
             '''
-
-            PARSE_PARAMS = ""
-            PERF_LOGS = ""
-            if (env.ENABLED_STAGES.contains("validation_functional_hyperv")) {
-                unstash 'patchedReport'
-                PARSE_PARAMS += " --func_path ./patched_run/*-functional/TestResults/**/Report*.xml"
-                if (env.SKIP_UNPATCHED == "false") {
-                    unstash 'unpatchedReport'
-                    PARSE_PARAMS += " --func_comp_path ./unpatched_run/*-functional/TestResults/**/Report*.xml"
-                }
+            if (!params.SKIP_UNPATCHED) {
+                copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
+                sh '''
+                    #!/bin/bash
+                    set -xe
+                    output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                    cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/"
+                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                        if [ -f "${filename}.xml" ]; then
+                            sed -i "s/LISAv2Test/LISAv2Unpatched-${filename}/g" "${filename}.xml"
+                            grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
+                        fi
+                    done
+                '''
             }
-            if (env.ENABLED_STAGES.contains("validation_perf_hyperv")) {
-                PERF_LOGS = perfXml[LISA_PERF_TEST].tokenize('.')[0]
-                unstash 'patchedPerf'
-                PARSE_PARAMS += " --perf_path ./patched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
-                if (env.SKIP_UNPATCHED == "false") {
-                    unstash 'unpatchedPerf'
-                    PARSE_PARAMS += " --perf_comp_path ./unpatched_run/*-perf/lis-test//WS2012R2/lisa/TestResults/${PERF_LOGS}*"
-                }
-            }
+            sh '''
+                #!/bin/bash
+                set -xe
+                output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                echo "</testsuites>" >> "${output_file}"
+            '''
+            junit "aggregate-junit.xml"
+            archiveArtifacts 'aggregate-junit.xml'
 
-            println (PARSE_PARAMS)
-            sh "bash ./scripts/comparison/create_report.sh ${PARSE_PARAMS} --metadata_path './metadata.ini' --perf_test_type ${LISA_PERF_TEST} --output ./results.html"
+            sh "junit2html aggregate-junit.xml results.html"
+            archiveArtifacts 'results.html'
 
-            if (sendMail) {
-                archiveArtifacts 'results.html'
-                stash includes: 'results.html', name: 'report_results'
-            }
-        }
-    }
-
-    stage ("email_report"){
-        node ("meta_slave") {
-            if (sendMail) {
-                dir ("mail-send-comp-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-                    unstash 'report_results'
-                    mailBody = "Hello,</br></br>\nDeveloper Patch Validation Pipeline #${env.BUILD_NUMBER} is completed.</br>\n"
-                    if (env.KERNEL_PATCH != '') {
-                        mailBody += "The following patches were applied:</br>\n"
-                        patches = env.KERNEL_PATCH.split(" ")
-                        patches.each(){
-                            mailBody += it + "</br>\n"
-                        }
+            if (env.SEND_EMAIL) {
+                mailBody = "Hello,</br></br>\n</br>\n"
+                mailBody = "<h2> Developer Patch Validation Pipeline #${env.BUILD_NUMBER} has completed. <a href='${env.BUILD_URL}'> Job url >>.</a></h2>"
+                if (env.KERNEL_PATCH && env.KERNEL_PATCH != '') {
+                    mailBody += "The following patches were applied:</br>\n"
+                    patches = env.KERNEL_PATCH.split(" ")
+                    patches.each(){
+                        mailBody += it + "</br>\n"
                     }
-                    mailBody += "</br>Testing results:</br></br>\n"
-                    mailBody += readFile("results.html")
-                    mailBody += "\n</br></br>Thank You,</br>Jenkins CI</br>\n"
-                    emailext (
-                        subject: "Developer patch validation report for run:${env.BUILD_NUMBER}.",
-                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                        mimeType : "text/html",
-                        body: mailBody
-                    )
-                    deleteDir()
                 }
+                mailBody += readFile("results.html")
+                emailext (
+                    subject: "Developer patch validation report for run: #${env.BUILD_NUMBER}.",
+                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                    mimeType : "text/html",
+                    body: mailBody
+                )
+                deleteDir()
             }
         }
     }

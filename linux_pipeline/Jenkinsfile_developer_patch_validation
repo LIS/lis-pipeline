@@ -311,6 +311,8 @@ if (params.RUN_AZURE_BOOT_TEST) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_TEST.xml"
+                    archive "Report\\AZURE_BOOT_TEST.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -336,6 +338,8 @@ if (params.RUN_AZURE_BOOT_STRESS_TEST) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_STRESS_TEST.xml"
+                    archive "Report\\AZURE_BOOT_STRESS_TEST.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -361,6 +365,8 @@ if (params.RUN_AZURE_BVT_TESTS) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BVT_TESTS.xml"
+                    archive "Report\\AZURE_BVT_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -388,6 +394,8 @@ if (params.RUN_HYPERV_BVT_TESTS) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\HYPERV_BVT_TESTS.xml"
+                    archive "Report\\HYPERV_BVT_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -415,6 +423,8 @@ if (params.RUN_AZURE_PERF_TESTS) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_PERF_TESTS.xml"
+                    archive "Report\\AZURE_PERF_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -442,6 +452,8 @@ if (params.RUN_HYPERV_PERF_TESTS && params.HYPERV_SECOND_PERF_NODE && !params.HY
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\HYPERV_PERF_TESTS.xml"
+                    archive "Report\\HYPERV_PERF_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
