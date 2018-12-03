@@ -201,21 +201,25 @@ def sendMailReport(reportStage) {
                         mailBody = "Hello,</br></br>\nLCOW validation pipeline #${env.BUILD_NUMBER} finished testing.</br>\n"
                         mailBody += "Jenkins URL: ${env.RUN_DISPLAY_URL}</br>\n</br>\n"
                         mailBody += "Testing Summary:</br>\n"
-
+                        mailBody += '<table cellspacing="0">\n'
                         STAGES_RESULTS.keySet().each {
                             def key = it
                             def result = ""
                             if (STAGES_RESULTS[key] != 0) {
                                 result = "FAIL"
+                                color = "#FF0000"
                             } else {
                                 result = "PASS"
+                                color = "#32B232"
                             }
 
-                            mailBody +="${key}: ${result}</br>\n"
+                            mailBody +='<tr bgcolor="'+ "${color}" + '"><td style="border: 1px solid black">&nbsp' + "${key}" + '&nbsp</td><td style="border: 1px solid black">&nbsp' + "${result}" + '&nbsp</td></tr>\n'
                         }
 
-                        mailBody += "</br>\nThank you,</br>\nJenkins CI"
+                        mailBody += "</table>"
                     }
+
+                    println(mailBody)
 
                     emailext (
                         subject: "LCOW validation pipeline: ${env.BUILD_NUMBER}.",
