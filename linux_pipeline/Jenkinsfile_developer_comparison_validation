@@ -120,6 +120,7 @@ node ("meta_slave") {
     }
 
     stage ("compare_results") {
+        checkout scm
         dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             echo "Aggregate results"
             copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
@@ -160,12 +161,12 @@ node ("meta_slave") {
             junit "aggregate-junit.xml"
             archiveArtifacts 'aggregate-junit.xml'
 
-            sh "junit2html aggregate-junit.xml results.html"
+            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --test_results ./aggregate-junit.xml --output ./results.html'
             archiveArtifacts 'results.html'
 
             if (env.SEND_EMAIL) {
                 mailBody = "Hello,</br></br>\n</br>\n"
-                mailBody = "<h2> Developer Patch Validation Pipeline #${env.BUILD_NUMBER} has completed. <a href='${env.BUILD_URL}'> Job url >>.</a></h2>"
+                mailBody = "<h3> Developer Patch Validation Pipeline #${env.BUILD_NUMBER} has completed. <a href='${env.BUILD_URL}'> >Job url<</a></h3>"
                 if (env.KERNEL_PATCH && env.KERNEL_PATCH != '') {
                     mailBody += "The following patches were applied:</br>\n"
                     patches = env.KERNEL_PATCH.split(" ")
