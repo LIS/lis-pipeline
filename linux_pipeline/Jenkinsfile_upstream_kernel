@@ -349,11 +349,14 @@ pipeline {
                 archiveArtifacts "TestResults\\**\\*"
               }
               success {
+                when {
+                  expression { params.KERNEL_GIT_URL.contains('linux-next') }
+                }
                 withCredentials(bindings: [
                   file(credentialsId: 'CBS_Azure_Secrets_File',
                        variable: 'Azure_Secrets_File')
                 ]) {
-                  RunPowershellCommand(".\\Utilities\\Get-VMInfoFromTestLog.ps1" +
+                  RunPowershellCommand(".\\Utilities\\VmOfToday\\Get-VMInfoFromTestLog.ps1" +
                     " -LogPath TestResults" +
                     " -UploadToDatabase" +
                     " -LockResourceGroup" +
