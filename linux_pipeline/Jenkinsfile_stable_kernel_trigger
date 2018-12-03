@@ -6,10 +6,10 @@ properties ([
 
 env.WORK_DIR = "/mnt/tmp/watcher-kernel-stable"
 env.KERNEL_TREE = "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git"
-env.DISTRO = "Ubuntu_16.04.5;CentOS_7.4"
+env.DISTRO = "Ubuntu_18.04.1;CentOS_7.5"
 env.AZURE_BOOT_LARGE_FLAVOR = "Standard_E64_v3"
-env.LISA_XML = "kernel_pipeline_fvt.xml"
-env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_sriov_hyperv"
+env.FUNCTIONAL_TESTS = "FVT"
+env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv"
 
 node ("meta_slave") {
     stage ("Trigger pipeline") {
@@ -40,9 +40,9 @@ node ("meta_slave") {
                                     string(name: 'KERNEL_GIT_URL', value: "${env.KERNEL_TREE}"),
                                     string(name: 'KERNEL_GIT_BRANCH', value: "${tag}"),
                                     string(name: 'DISTRO_VERSION', value: "${distro}"),
-                                    string(name: 'LISA_TEST_XML', value: "${env.LISA_XML}"),
+                                    string(name: 'FUNCTIONAL_TESTS', value: "${env.FUNCTIONAL_TESTS}"),
                                     string(name: 'KERNEL_DEBUG', value: "False"),
-                                    string(name: 'AZURE_BOOT_LARGE_FLAVOR', value: "${env.AZURE_BOOT_LARGE_FLAVOR}"),
+                                    string(name: 'LISAV2_AZURE_VM_SIZE_LARGE', value: "${env.AZURE_BOOT_LARGE_FLAVOR}"),
                                     string(name: 'ENABLED_STAGES', value: "${env.STAGES}")],
                                 wait: true, propagate: true)
                         }
