@@ -1,12 +1,12 @@
 #!/usr/bin/env groovy
 
-env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-env.LISAV2_BRANCH = "master"
+env.LISAV2_REMOTE = "https://github.com/ader1990/LISAv2.git"
+env.LISAV2_BRANCH = "perf_tc_common"
 env.LISAV2_RG_IDENTIFIER = "developerk"
 env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
-env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-LATENCY-MULTICONNECTION-SRIOV"
+env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-Synthetic"
 
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
 env.PACKAGE_TYPE = "deb"
@@ -423,8 +423,9 @@ if (params.RUN_AZURE_PERF_TESTS) {
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell 'ls -Recurse TestResults\\** | Where-Object {$_.Name -like "*_perf_results.json"} | ForEach-Object {Copy-Item $_ "Report\\AZURE_PERF_TESTSSUITE$($_.Name)"}'
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_PERF_TESTS.xml"
-                    archive "Report\\AZURE_PERF_TESTS.xml"
+                    archive "Report\\AZURE_PERF_TESTS*"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -452,8 +453,9 @@ if (params.RUN_HYPERV_PERF_TESTS && params.HYPERV_SECOND_PERF_NODE && !params.HY
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
+                    powershell 'ls -Recurse TestResults\\** | Where-Object {$_.Name -like "*_perf_results.json"} | ForEach-Object {Copy-Item $_ "Report\\HYPERV_PERF_TESTSSUITE$($_.Name)"}'
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\HYPERV_PERF_TESTS.xml"
-                    archive "Report\\HYPERV_PERF_TESTS.xml"
+                    archive "Report\\HYPERV_PERF_TESTS*"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }

@@ -2,7 +2,7 @@
 
 env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
 env.SEND_EMAIL = true
-env.BUILD_KERNEL_ARTIFACTS = true
+env.BUILD_KERNEL_ARTIFACTS = false
 env.KERNEL_ARTIFACTS_SMB_PATH = ""
 
 properties ([
@@ -130,7 +130,7 @@ node ("meta_slave") {
                 output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                 cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report/"
                 echo "<testsuites>" >> "${output_file}"
-                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
                     if [ -f "${filename}.xml" ]; then
                         sed -i "s/LISAv2Test/LISAv2Patched-${filename}/g" "${filename}.xml"
                         grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
@@ -144,7 +144,7 @@ node ("meta_slave") {
                     set -xe
                     output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                     cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/"
-                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
                         if [ -f "${filename}.xml" ]; then
                             sed -i "s/LISAv2Test/LISAv2Unpatched-${filename}/g" "${filename}.xml"
                             grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
@@ -158,10 +158,15 @@ node ("meta_slave") {
                 output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                 echo "</testsuites>" >> "${output_file}"
             '''
-            junit "aggregate-junit.xml"
+            try {
+                junit "aggregate-junit.xml"
+            } catch (Exception e) {
+                echo e.toString()
+                echo "Failed to find any junit test results"
+            }
             archiveArtifacts 'aggregate-junit.xml'
 
-            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --test_results ./aggregate-junit.xml --output ./results.html'
+            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --patched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report" --unpatched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/" --junit_test_results ./aggregate-junit.xml --output ./results.html'
             archiveArtifacts 'results.html'
 
             if (env.SEND_EMAIL) {

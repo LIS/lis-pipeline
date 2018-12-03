@@ -185,9 +185,9 @@ class ComparisonTable(HtmlTable):
         for key in self.table_keys:
             if self.table_sub_keys[key]:
                 for sub_key in self.table_sub_keys[key]:
-                    self.add_cell_to_row(data_row, data_set[sub_key][key],
+                    self.add_cell_to_row(data_row, str(data_set[sub_key][key]),
                                          style="border: 1px solid")
             else:
                 base_key = list(data_set.keys())[0]
-                self.add_cell_to_row(data_row, data_set[base_key][key],
+                self.add_cell_to_row(data_row, str(data_set[base_key][key]),
                                      style="border: 1px solid")
