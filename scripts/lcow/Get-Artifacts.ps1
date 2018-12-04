@@ -18,7 +18,9 @@ Import-Module $helpersPath
 
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
+$PACKAGES_NAME = "rpm.tgz"
 $BUILD_ID = "reporting_metadata"
+$PACKAGES_REL_PATH=".\tmp\deploy\rpm\lcow\kernel*"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $VSTS_PATH = "C:\Program Files (x86)\Microsoft SDKs\VSTS\CLI\wbin\"
 $env:Path = "${BIN_PATH};${VSTS_PATH};" + $env:Path
@@ -89,7 +91,7 @@ function Download-VstsArtifacts {
     Write-Host "vsts package universal download --instance $Instance --feed $Feed --name $PackageName --version $Version --path ."
     vsts package universal download --instance $Instance --feed $Feed --name $PackageName --version $Version --path "."
 
-    Get-ChildItem -Path "." -Recurse -Include $KERNEL_NAME,$INITRD_NAME,$BUILD_ID | `
+    Get-ChildItem -Path "." -Recurse -Include $KERNEL_NAME,$INITRD_NAME,$BUILD_ID,$PACKAGES_NAME | `
         ForEach-Object {Write-Host "Found file: $_";Copy-Item $_ .}
 
     if (Test-Path ".\${KERNEL_NAME}") {
@@ -110,6 +112,18 @@ function Download-VstsArtifacts {
     } else {
         Write-Host "Using package version"
         Set-Content -Value $Version -Path $BuildIdDestination
+    }
+    if (Test-Path ".\${PACKAGES_NAME}") {
+        tar -xzf ".\${PACKAGES_NAME}"
+        if (Test-Path $PACKAGES_REL_PATH) {
+            $packageDest = Join-Path $Destination "packages"
+            New-Item -Type Directory -Path $packageDest
+            Copy-Item ".\${PACKAGES_REL_PATH}" $packageDest
+        } else {
+            throw "Cannot find kernel packages in archive"
+        }
+    } else {
+        throw "Cannot find packages archive"
     }
 
     Pop-Location
