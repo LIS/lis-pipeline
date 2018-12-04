@@ -340,7 +340,7 @@ pipeline {
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                         " -TestLocation '${LISAV2_AZURE_REGION}'" +
-                        " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" + "${LISAV2_RG_IDENTIFIER_POSTFIX}" +
+                        " -RGIdentifier '${LISAV2_RG_IDENTIFIER}" + "${LISAV2_RG_IDENTIFIER_POSTFIX}'" +
                         " -TestPlatform 'Azure'" +
                         " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                         " -OverrideVMSize '${LISAV2_AZURE_VM_SIZE_SMALL}'" +
