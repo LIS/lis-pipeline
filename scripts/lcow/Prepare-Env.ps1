@@ -18,6 +18,19 @@ $scriptPath = Get-Location
 $helpersPath = Join-Path $scriptPath "scripts\utils\powershell\helpers.psm1"
 Import-Module $helpersPath
 
+function Check-Environment {
+
+    $hvFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V
+    if ($hvFeature.State -ne "Enabled") {
+        throw "Error: Hyper-V feature is not enabled on this system"
+    }
+    
+    $lcowFeature = Get-WindowsOptionalFeature -Featurename 'Containers' -online
+    if ($hvFeature.State -ne "Enabled") {
+        throw "Error: Containers feature is not enabled on this system"
+    }
+}
+
 function Get-Kernel {
     param(
         [String] $ArtifactsPath,
@@ -78,6 +91,8 @@ function Get-TestDependencies {
 }
 
 function Main {
+    Check-Environment
+
     if (Test-Path $WorkDir) {
         & 'C:\Program Files\git\usr\bin\rm.exe' -rf "${WorkDir}\*"
     } else {

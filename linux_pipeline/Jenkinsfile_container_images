@@ -92,12 +92,14 @@ env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
 HYPERV_TEST_JOB = "lcow-hyperv-testing"
 
+STAGES_RESULTS = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
 testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,WSL_Docker,LTP_Docker",
            "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP_Docker"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP_Docker"
 skipBuild = false
+BUILD_NAME = ""
 
 def runTests(versionsMap, hostName){
     testMap.keySet().each {
@@ -176,7 +178,7 @@ def createStageReport(stageName, testType, logPath, exitCode) {
             -LogPath '${logPath}'
             -ExitCode '${exitCode}'
             -ReportDestination '.\\${stageName}-Dir'
-            -BuildNumber '${env.BUILD_NUMBER}'
+            -BuildNumber '${BUILD_NAME}'
     """)
     if (eCode != 0) {
         error("Test script returned exit code: ${eCode}")
@@ -185,10 +187,58 @@ def createStageReport(stageName, testType, logPath, exitCode) {
     stash includes: "${stageName}-Dir\\*", name: "${stageName}_report"
 }
 
+def sendMailReport(reportStage) {
+    stage ("send_report") {
+        node ("jenkins-meta-slave") {
+            withCredentials(bindings: [string(credentialsId: 'LCOW_MAIL_LIST', variable: 'MAIL_LIST')]) {
+                dir ("lcow-mail-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                    def mailBody = ""
+                    if (reportStage == "START") {
+                        mailBody = "Hello,</br></br>\nLCOW validation pipeline #${env.BUILD_NUMBER} started.</br>\n"
+                        mailBody += "Jenkins URL: ${env.RUN_DISPLAY_URL}</br>\n</br>\n"
+                        mailBody += "Thank you,</br>\nJenkins CI"
+                    } else if (reportStage == "FINISH") {
+                        mailBody = "Hello,</br></br>\nLCOW validation pipeline #${env.BUILD_NUMBER} finished testing.</br>\n"
+                        mailBody += "Jenkins URL: ${env.RUN_DISPLAY_URL}</br>\n</br>\n"
+                        mailBody += "Testing Summary:</br>\n"
+                        mailBody += '<table cellspacing="0">\n'
+                        STAGES_RESULTS.keySet().each {
+                            def key = it
+                            def result = ""
+                            if (STAGES_RESULTS[key] != 0) {
+                                result = "FAIL"
+                                color = "#FF0000"
+                            } else {
+                                result = "PASS"
+                                color = "#32B232"
+                            }
+
+                            mailBody +='<tr bgcolor="'+ "${color}" + '"><td style="border: 1px solid black">&nbsp' + "${key}" + '&nbsp</td><td style="border: 1px solid black">&nbsp' + "${result}" + '&nbsp</td></tr>\n'
+                        }
+
+                        mailBody += "</table>"
+                    }
+
+                    println(mailBody)
+
+                    emailext (
+                        subject: "LCOW validation pipeline: ${env.BUILD_NUMBER}.",
+                        to: "${MAIL_LIST}",
+                        mimeType : "text/html",
+                        body: mailBody
+                    )
+
+                    deleteDir()
+                }
+            }
+        }
+    }
+}
+
 def runHypervTest() {
     dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
         echo 'Starting Hyper-V test job'
-        fileName = "rpm-" + buildName.split("-")[1] + ".tgz"
+        fileName = "rpm-" + BUILD_NAME.split("-")[1] + ".tgz"
         testRun = build job: HYPERV_TEST_JOB, parameters: [
             string(name: 'ARCHIVE_NAME', value: "${fileName}"),
             string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
@@ -207,6 +257,7 @@ def runBinariesCheck () {
                 -WorkDir "C:\\lcow-testing\\workdir-bin-check-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\bin-check-logs"
             ''')
+        STAGES_RESULTS["binaries_check"] = exitCode
         archiveArtifacts artifacts: "bin-check-logs\\*", allowEmptyArchive: true
         createStageReport("binaries_check", "STRESS", "", exitCode)
         if (exitCode != 0) {
@@ -227,6 +278,7 @@ def runDockerTest() {
                  -WorkDir "C:\\lcow-testing\\workdir-hypervtest-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                  -LogDestination ".\\hypervtest-logs"
              ''')
+        STAGES_RESULTS["docker_test"] = exitCode
         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
         createStageReport("docker_test", "DOCKER_HYPERV", ".\\hypervtest-logs", exitCode)
         if (exitCode != 0) {
@@ -246,6 +298,7 @@ def runLtpDocker() {
                 -WorkDir "C:\\lcow-testing\\workdir-linuxkit-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\ltp-logs"
             ''')
+        STAGES_RESULTS["LTP_docker"] = exitCode
         archiveArtifacts artifacts: "ltp-logs\\*", allowEmptyArchive: true
         createStageReport("LTP_Docker", "LTP", ".\\ltp-logs", exitCode)
         if (exitCode != 0) {
@@ -268,6 +321,7 @@ def runLinuxKitTesting() {
                 -LogDestination ".\\linuxkit-logs"
                 -BaseNumber "${env:LINUXKIT_BASE_NUMBER}"
             ''')
+        STAGES_RESULTS["linuxkit"] = exitCode
         archiveArtifacts artifacts: "linuxkit-logs\\*", allowEmptyArchive: true
         createStageReport("linuxkit", "LINUXKIT", ".\\linuxkit-logs", exitCode)
         if (exitCode != 0) {
@@ -289,6 +343,7 @@ def runDockerWsl() {
                     -WorkDir "C:\\lcow-testing\\workdir-docker-wsl-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                     -LogDestination ".\\docker-wsl-logs"
                 ''')
+            STAGES_RESULTS["WSL_docker"] = exitCode
             archiveArtifacts artifacts: "docker-wsl-logs\\*", allowEmptyArchive: true
             createStageReport("WSL_Docker", "WSL", ".\\docker-wsl-logs", exitCode)
             if (exitCode != 0) {
@@ -311,6 +366,7 @@ def buildOpenGCS() {
                 -WorkDir "C:\\lcow-testing\\workdir-gcs-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\opengcs-logs"
             ''')
+        STAGES_RESULTS["opengcs_build"] = exitCode
         archiveArtifacts artifacts: "opengcs-logs\\*", allowEmptyArchive: true
         createStageReport("opengcs_build", "STRESS", "", exitCode)
         if (exitCode != 0) {
@@ -332,6 +388,7 @@ def runStressTest() {
                 -WorkDir "C:\\lcow-testing\\workdir-stress-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\stress-logs"
             ''')
+        STAGES_RESULTS["docker_stress"] = exitCode
         archiveArtifacts artifacts: "stress-logs\\*", allowEmptyArchive: true
         createStageReport("docker_stress", "STRESS", "", exitCode)
         if (exitCode != 0) {
@@ -353,6 +410,7 @@ def runKernelBuildTest() {
                      -WorkDir "C:\\lcow-testing\\workdir-Kbuild-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                      -LogDestination ".\\Kbuild-logs"
                  ''')
+            STAGES_RESULTS["kernel_builder"] = exitCode
             archiveArtifacts artifacts: "Kbuild-logs\\*", allowEmptyArchive: true
             createStageReport("kernel_builder", "STRESS", "", exitCode)
             if (exitCode != 0) {
@@ -372,6 +430,7 @@ def runDockerLkp() {
                 -WorkDir "C:\\lcow-testing\\workdir-lkp-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                 -LogDestination ".\\lkp-logs"
             ''')
+        STAGES_RESULTS["LKP_docker"] = exitCode
         archiveArtifacts artifacts: "lkp-logs\\**\\*", allowEmptyArchive: true
         if (exitCode != 0) {
             error("Test script returned exit code: ${exitCode}")
@@ -401,13 +460,14 @@ stage ("check_kernel") {
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
                         -ArtifactsDestination ".\\lcow-artifacts"
+                        -BuildIDDestination ".\\build_name"
                 ''')
                 if (exitCode != 0) {
                     error("Test script returned exit code: ${exitCode}")
                 }
-                buildName = readFile "./build_name"
-                if (buildName != "" ) {
-                    currentBuild.displayName = buildName + "-${env.BUILD_NUMBER}"
+                BUILD_NAME = readFile "./build_name"
+                if (BUILD_NAME != "" ) {
+                    currentBuild.displayName = BUILD_NAME.trim() + "-${env.BUILD_NUMBER}"
                     stash includes: 'lcow-artifacts\\*', name: 'lcow_artifacts'
                 } else {
                     echo "No new artifacts found"
@@ -441,7 +501,11 @@ if (!skipBuild) {
         }
     }
 
+    sendMailReport ("START")
+
     runTests(versionsMap, hostName)
+
+    sendMailReport ("FINISH")
 
     stage ("report_results") {
         node ("jenkins-meta-slave") {

@@ -3,6 +3,7 @@
 PACKAGES="lsb-release sudo build-essential git wget"
 RUN_TESTS=("analyze_suspend.yaml" "autotest.yaml" "dbench.yaml" "ebizzy.yaml" "pm-qa.yaml" "trinity.yaml")
 
+export DEBIAN_FRONTEND=noninteractive
 set -x
 
 function install_dependencies {
