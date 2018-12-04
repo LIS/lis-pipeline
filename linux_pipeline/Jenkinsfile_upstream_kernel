@@ -61,6 +61,7 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
 def prepareForVmNotToDelete(kernelGitUrl) {
     script {
       env.LISAV2_RG_IDENTIFIER_NEW = env.LISAV2_RG_IDENTIFIER
+      env.LISAV2_DO_NOT_DELETE_PARAM = ""
       if (kernelGitUrl.contains('linux-next')) {
         env.LISAV2_RG_IDENTIFIER_NEW = 'linuxnext'
         env.LISAV2_DO_NOT_DELETE_PARAM = " -DoNotDeleteVMs"
