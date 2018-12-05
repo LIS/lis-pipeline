@@ -406,7 +406,7 @@ if (params.RUN_AZURE_BOOT_TEST) {
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, 'BVT-CORE-VERIFY-LIS-MODULES', '')
+                        runLisa('Azure', env.Azure_Secrets_File, 'BVT-CORE-VERIFY-LIS-MODULES', '', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
@@ -433,7 +433,7 @@ if (params.RUN_AZURE_BOOT_STRESS_TEST) {
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_AZURE_STRESS_TEST, '')
+                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_AZURE_STRESS_TEST, '', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
@@ -460,7 +460,7 @@ if (params.RUN_AZURE_BVT_TESTS) {
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, '', 'BVT')
+                        runLisa('Azure', env.Azure_Secrets_File, '', 'BVT', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
@@ -489,7 +489,7 @@ if (params.RUN_HYPERV_BVT_TESTS) {
                       string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
                              variable: 'LISAV2_IMAGES_SHARE_URL')
                     ]) {
-                        runLisa('HyperV', env.Azure_Secrets_File, '', 'BVT')
+                        runLisa('HyperV', env.Azure_Secrets_File, '', 'BVT', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
