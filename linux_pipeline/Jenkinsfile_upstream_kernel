@@ -62,9 +62,11 @@ def prepareForVmNotToDelete(kernelGitUrl, distroVersion) {
     script {
       env.LISAV2_RG_IDENTIFIER_NEW = env.LISAV2_RG_IDENTIFIER
       env.LISAV2_DO_NOT_DELETE_PARAM = ""
+      env.CLEAN_ENV_NEW = env.CLEAN_ENV
       if (kernelGitUrl.contains("linux-next") && distroVersion.toLowerCase().contains("ubuntu")) {
         env.LISAV2_RG_IDENTIFIER_NEW = 'linuxnext'
         env.LISAV2_DO_NOT_DELETE_PARAM = " -DoNotDeleteVMs"
+        env.CLEAN_ENV_NEW = 'False'
       }
       
     }
@@ -135,8 +137,9 @@ pipeline {
                 }
               }
               steps {
-              stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-              sh '''#!/bin/bash
+                prepareForVmNotToDelete(KERNEL_GIT_URL, DISTRO_VERSION)
+                stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+                sh '''#!/bin/bash
                 set -xe
                 echo "Building artifacts..."
                 pushd "$WORKSPACE/scripts/package_building"
@@ -149,7 +152,7 @@ pipeline {
                     --debian_os_version "${UBUNTU_VERSION}" \\
                     --build_path "${BUILD_PATH}" \\
                     --kernel_config "${KERNEL_CONFIG}" \\
-                    --clean_env "${CLEAN_ENV}" \\
+                    --clean_env "${CLEAN_ENV_NEW}" \\
                     --use_ccache "${USE_CCACHE}" \\
                     --use_kernel_folder_prefix "${USE_KERNEL_FOLDER_PREFIX}" \\
                     --create_changelog "${CREATE_CHANGELOG}" \\
