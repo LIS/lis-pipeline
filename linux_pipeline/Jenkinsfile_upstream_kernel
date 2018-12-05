@@ -58,11 +58,11 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
     }
 }
 
-def prepareForVmNotToDelete(kernelGitUrl) {
+def prepareForVmNotToDelete(kernelGitUrl, distroVersion) {
     script {
       env.LISAV2_RG_IDENTIFIER_NEW = env.LISAV2_RG_IDENTIFIER
       env.LISAV2_DO_NOT_DELETE_PARAM = ""
-      if (kernelGitUrl.contains('linux-next')) {
+      if (kernelGitUrl.contains("linux-next") && distroVersion.toLowerCase().contains("ubuntu")) {
         env.LISAV2_RG_IDENTIFIER_NEW = 'linuxnext'
         env.LISAV2_DO_NOT_DELETE_PARAM = " -DoNotDeleteVMs"
       }
@@ -339,7 +339,7 @@ pipeline {
                        variable: 'Azure_Secrets_File')
                 ]) {
                     prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
-                    prepareForVmNotToDelete(KERNEL_GIT_URL)
+                    prepareForVmNotToDelete(KERNEL_GIT_URL, DISTRO_VERSION)
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                         " -TestLocation '${LISAV2_AZURE_REGION}'" +
