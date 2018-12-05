@@ -4,11 +4,16 @@ env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
 env.SEND_EMAIL = true
 env.BUILD_KERNEL_ARTIFACTS = true
 env.KERNEL_ARTIFACTS_SMB_PATH = ""
+env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
 
 properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "KERNEL BUILD CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
             name: 'KERNEL_GIT_URL',
             choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel""",
@@ -25,6 +30,10 @@ properties ([
             defaultValue: false,
             name: 'SKIP_UNPATCHED',
             description: 'Whether to skip unpatched run. No result comparison will be possible.'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
             choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
                         canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
@@ -33,18 +42,30 @@ properties ([
                         westeurope\nwestindia\nwestus\nsepremium""",
             name: 'LISAV2_AZURE_REGION',
             description: 'Azure Region'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE BOOT TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             name: 'RUN_AZURE_BOOT_TEST',
             description: 'Whether to run Azure Boot test'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE BOOT STRESS TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             name: 'RUN_AZURE_BOOT_STRESS_TEST',
-            description: 'Whether to run Azure Boot Stress test'],
+            description: 'Whether to run Azure Boot Stress test (100 iterations)'],
         [$class: 'ChoiceParameterDefinition',
             name: 'AZURE_BOOT_STRESS_VM_SIZE',
             choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
-            description: 'Kernel tree repo'],
+            description: 'Azure Boot Stress vm size'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             name: 'RUN_AZURE_BVT_TESTS',
@@ -53,21 +74,69 @@ properties ([
             defaultValue: false,
             name: 'RUN_HYPERV_BVT_TESTS',
             description: 'Whether to run HYPERV basic validation tests'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: false,
-            name: 'RUN_HYPERV_PERF_TESTS',
-            description: 'Whether to run HYPERV performance tests'],
-        [$class: 'StringParameterDefinition',
-            name: 'HYPERV_SECOND_PERF_NODE',
-            defaultValue: '',
-            description: 'The second HyperV nodes. Every performance test requires two HyperV nodes, one being the node where the job runs and one defined here.'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: false,
-            name: 'RUN_AZURE_PERF_TESTS',
-            description: 'Whether to run Azure performance tests']
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """NONE
+                    STORAGE
+                    NETWORK""",
+            name: 'AZURE_PERF_TESTS',
+            description: 'What Azure Performance tests to run. You can customize the test cases from the options below. STORAGE TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """4k
+                    1024k""",
+            name: 'AZURE_PERF_STORAGE_IO_SIZE',
+            description: 'Azure Performance STORAGE IO SIZE. TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    randread
+                    randwrite
+                    read
+                    write""",
+            name: 'AZURE_PERF_STORAGE_IO_MODE',
+            description: 'Azure Performance STORAGE IO MODE.  TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """IPERF3_1CONNECTION
+                    NTTTCP_TCP
+                    NTTTCP_UDP""",
+            name: 'AZURE_PERF_NETWORK_TEST_TYPE',
+            description: 'Azure Performance Network testing type. NTTTCP_TCP and NTTTCP_UDP TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NET_IPERF3_TYPE',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION: SYNTHETIC or SRIOV type. SRIOV TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    32\n64\n128\n256\n512\n1024\n2048\n4096\n8192\n16384\n32768\n65536""",
+            name: 'NET_IPERF3_BUFFER_LENGTH',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION BUFFER LENGTH.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_TCP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type. TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
+            name: 'NTTTCP_TCP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP TCP number of connections. TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_UDP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type. TBD.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
+            name: 'NTTTCP_UDP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP UDP number of connections. TBD.']
         ]
     ]
 ])
+
 
 // ****************
 // PIPELINE HELPERS
@@ -86,9 +155,16 @@ def getCommonParams(patches, buildTag) {
         string(name: 'AZURE_BOOT_STRESS_VM_SIZE', value: params.AZURE_BOOT_STRESS_VM_SIZE),
         booleanParam(name: 'RUN_AZURE_BVT_TESTS', value: params.RUN_AZURE_BVT_TESTS),
         booleanParam(name: 'RUN_HYPERV_BVT_TESTS', value: params.RUN_HYPERV_BVT_TESTS),
-        booleanParam(name: 'RUN_HYPERV_PERF_TESTS', value: params.RUN_HYPERV_PERF_TESTS),
-        string(name: 'HYPERV_SECOND_PERF_NODE', value: params.HYPERV_SECOND_PERF_NODE),
-        booleanParam(name: 'RUN_AZURE_PERF_TESTS', value: params.RUN_AZURE_PERF_TESTS),
+        string(name: 'AZURE_PERF_TESTS', value: params.AZURE_PERF_TESTS.trim()),
+        string(name: 'AZURE_PERF_STORAGE_IO_SIZE', value: params.AZURE_PERF_STORAGE_IO_SIZE.trim()),
+        string(name: 'AZURE_PERF_STORAGE_IO_MODE', value: params.AZURE_PERF_STORAGE_IO_MODE.trim()),
+        string(name: 'AZURE_PERF_NETWORK_TEST_TYPE', value: params.AZURE_PERF_NETWORK_TEST_TYPE.trim()),
+        string(name: 'NET_IPERF3_TYPE', value: params.NET_IPERF3_TYPE.trim()),
+        string(name: 'NET_IPERF3_BUFFER_LENGTH', value: params.NET_IPERF3_BUFFER_LENGTH.trim()),
+        string(name: 'NTTTCP_TCP_TYPE', value: params.NTTTCP_TCP_TYPE.trim()),
+        string(name: 'NTTTCP_TCP_CONNECTIONS', value: params.NTTTCP_TCP_CONNECTIONS.trim()),
+        string(name: 'NTTTCP_UDP_TYPE', value: params.NTTTCP_UDP_TYPE.trim()),
+        string(name: 'NTTTCP_UDP_CONNECTIONS', value: params.NTTTCP_UDP_CONNECTIONS.trim()),
         string(name: 'CUSTOM_BUILD_TAG', value: "${buildTag}-${BUILD_NUMBER}")
     ]
 }
@@ -130,7 +206,7 @@ node ("meta_slave") {
                 output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                 cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report/"
                 echo "<testsuites>" >> "${output_file}"
-                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
                     if [ -f "${filename}.xml" ]; then
                         sed -i "s/LISAv2Test/LISAv2Patched-${filename}/g" "${filename}.xml"
                         grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
@@ -144,7 +220,7 @@ node ("meta_slave") {
                     set -xe
                     output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                     cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/"
-                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_PERF_TESTS HYPERV_BVT_TESTS AZURE_PERF_TESTS; do
+                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
                         if [ -f "${filename}.xml" ]; then
                             sed -i "s/LISAv2Test/LISAv2Unpatched-${filename}/g" "${filename}.xml"
                             grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
@@ -158,10 +234,15 @@ node ("meta_slave") {
                 output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
                 echo "</testsuites>" >> "${output_file}"
             '''
-            junit "aggregate-junit.xml"
+            try {
+                junit "aggregate-junit.xml"
+            } catch (Exception e) {
+                echo e.toString()
+                echo "Failed to find any junit test results"
+            }
             archiveArtifacts 'aggregate-junit.xml'
 
-            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --test_results ./aggregate-junit.xml --output ./results.html'
+            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --patched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report" --unpatched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/" --junit_test_results ./aggregate-junit.xml --output ./results.html'
             archiveArtifacts 'results.html'
 
             if (env.SEND_EMAIL) {
