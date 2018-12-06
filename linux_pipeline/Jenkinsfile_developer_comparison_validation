@@ -177,93 +177,133 @@ def getCommonParams(patches, buildTag) {
 
 node ("meta_slave") {
     def runs = [:]
-    def patchedRun, unpachedRun;
+    def patchedRun, unpatchedRun;
     def patchedParams = getCommonParams(env.KERNEL_PATCH, "patched")
 
     stage ("test_kernels") {
-            runs["kernel_patched"] = {
-                patchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
-                             parameters: patchedParams, propagate: false;
-            }
-            if (!params.SKIP_UNPATCHED) {
-                def unpatchedParams = getCommonParams("", "unpatched")
-                runs["kernel_unpatched"] = {
-                    unpatchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
-                                   parameters: unpatchedParams, propagate: false;
-                }
-            }
-            parallel runs
-    }
-
-    stage ("compare_results") {
-        checkout scm
-        dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
-            echo "Aggregate results"
-            copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}", selector: specific("${patchedRun.number}"), target: "patched_run");
-            sh '''
-                #!/bin/bash
-                set -xe
-                output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
-                cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report/"
-                echo "<testsuites>" >> "${output_file}"
-                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
-                    if [ -f "${filename}.xml" ]; then
-                        sed -i "s/LISAv2Test/LISAv2Patched-${filename}/g" "${filename}.xml"
-                        grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
-                    fi
-                done
-            '''
-            if (!params.SKIP_UNPATCHED) {
-                copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}", selector: specific("${unpatchedRun.number}"), target: "unpatched_run");
-                sh '''
-                    #!/bin/bash
-                    set -xe
-                    output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
-                    cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/"
-                    for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
-                        if [ -f "${filename}.xml" ]; then
-                            sed -i "s/LISAv2Test/LISAv2Unpatched-${filename}/g" "${filename}.xml"
-                            grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
-                        fi
-                    done
-                '''
-            }
-            sh '''
-                #!/bin/bash
-                set -xe
-                output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
-                echo "</testsuites>" >> "${output_file}"
-            '''
-            try {
-                junit "aggregate-junit.xml"
-            } catch (Exception e) {
-                echo e.toString()
-                echo "Failed to find any junit test results"
-            }
-            archiveArtifacts 'aggregate-junit.xml'
-
-            sh 'python3 "${WORKSPACE}/scripts/comparison/html_parser.py" --patched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report" --unpatched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/" --junit_test_results ./aggregate-junit.xml --output ./results.html'
-            archiveArtifacts 'results.html'
-
-            if (env.SEND_EMAIL) {
-                mailBody = "Hello,</br></br>\n</br>\n"
-                mailBody = "<h3> Developer Patch Validation Pipeline #${env.BUILD_NUMBER} has completed. <a href='${env.BUILD_URL}'> >Job url<</a></h3>"
-                if (env.KERNEL_PATCH && env.KERNEL_PATCH != '') {
-                    mailBody += "The following patches were applied:</br>\n"
-                    patches = env.KERNEL_PATCH.split(" ")
-                    patches.each(){
-                        mailBody += it + "</br>\n"
-                    }
-                }
-                mailBody += readFile("results.html")
-                emailext (
-                    subject: "Developer patch validation report for run: #${env.BUILD_NUMBER}.",
-                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                    mimeType : "text/html",
-                    body: mailBody
-                )
-                deleteDir()
+        runs["kernel_patched"] = {
+            patchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                         parameters: patchedParams, propagate: false;
+            env.patchedRunNumber = patchedRun.number
+        }
+        if (!params.SKIP_UNPATCHED) {
+            def unpatchedParams = getCommonParams("", "unpatched")
+            runs["kernel_unpatched"] = {
+                unpatchedRun = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                               parameters: unpatchedParams, propagate: false;
+                env.unpatchedRunNumber = unpatchedRun.number
             }
         }
+        parallel runs
+    }
+}
+
+def compareResultsRetries = 0
+def compareResultsMaxRetries = 3
+def compareResultsSuccess = false
+while (!compareResultsSuccess && compareResultsRetries < compareResultsMaxRetries) {
+    try {
+        node ("meta_slave") {
+            stage ("compare_results") {
+                checkout scm
+                def mailErrorMessages = ""
+                dir ('aggregate_results' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+                    echo "Aggregate results"
+                    sh '''#!/bin/bash
+                        set -xe
+                        output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                        echo "<testsuites>" > "${output_file}"
+                    '''
+                    try {
+                        copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                                      selector: specific("${env.patchedRunNumber}"),
+                                      target: "patched_run");
+                        sh '''
+                            #!/bin/bash
+                            set -xe
+                            output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                            cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report/"
+                            for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
+                                if [ -f "${filename}.xml" ]; then
+                                    sed -i "s/LISAv2Test/LISAv2Patched-${filename}/g" "${filename}.xml"
+                                    grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
+                                fi
+                            done
+                        '''
+                    } catch (Exception e) {
+                        echo e.toString()
+                        mailErrorMessages += "Failed to copy artifacts from patched downstream build ${env.patchedRunNumber}. </br>\n"
+                    }
+                    try {
+                        if (!params.SKIP_UNPATCHED) {
+                            copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+                                          selector: specific("${env.unpatchedRunNumber}"),
+                                          target: "unpatched_run");
+                            sh '''#!/bin/bash
+                                set -xe
+                                output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                                cd "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/"
+                                for filename in AZURE_BOOT_TEST AZURE_BOOT_STRESS_TEST AZURE_BVT_TESTS HYPERV_BVT_TESTS; do
+                                    if [ -f "${filename}.xml" ]; then
+                                        sed -i "s/LISAv2Test/LISAv2Unpatched-${filename}/g" "${filename}.xml"
+                                        grep -v '<testsuites>\\|</testsuites>' "${filename}.xml" >> "${output_file}"
+                                    fi
+                                done
+                            '''
+                        }
+                    } catch (Exception e) {
+                        echo e.toString()
+                        mailErrorMessages +=  "Failed to copy artifacts from unpatched downstream build ${env.unpatchedRunNumber}. </br>\n"
+                    }
+                    sh '''#!/bin/bash
+                        set -xe
+                        output_file="${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/aggregate-junit.xml"
+                        echo "</testsuites>" >> "${output_file}"
+                    '''
+                    try {
+                        junit "aggregate-junit.xml"
+                    } catch (Exception e) {
+                        echo e.toString()
+                        mailErrorMessages += "Failed to find any jUnit test results. </br> \n"
+                    }
+                    archiveArtifacts 'aggregate-junit.xml'
+                    sh '''#!/bin/bash
+                        python3 "${WORKSPACE}/scripts/comparison/html_parser.py" \\
+                            --patched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/patched_run/Report" \\
+                            --unpatched_perf_dir "${WORKSPACE}/aggregate_results${BUILD_NUMBER}${BRANCH_NAME}/unpatched_run/Report/" \\
+                            --junit_test_results ./aggregate-junit.xml --output ./results.html
+                    '''
+                    archiveArtifacts 'results.html'
+
+                    if (env.SEND_EMAIL) {
+                        mailBody = "Hello,</br></br>\n</br>\n"
+                        mailBody = "<h5> Developer Patch Validation Pipeline <a href='${env.BUILD_URL}'>#${env.BUILD_NUMBER}</a> has completed.</h5></br>\n"
+                        if (env.KERNEL_PATCH && env.KERNEL_PATCH != '') {
+                            mailBody += "The following kernel patches were applied:</br>\n"
+                            patches = env.KERNEL_PATCH.split(" ")
+                            patches.each(){
+                                mailBody += it + "</br>\n"
+                            }
+                        } else {
+                            mailBody += "No kernel patches were applied." + "</br>\n"
+                        }
+                        mailBody += mailErrorMessages
+                        mailBody += readFile("results.html")
+                        emailext (
+                            subject: "Developer patch validation report for run: #${env.BUILD_NUMBER}.",
+                            recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                            mimeType : "text/html",
+                            body: mailBody
+                        )
+                        deleteDir()
+                    }
+                }
+            }
+            compareResultsSuccess = true
+        }
+    } catch (Exception e) {
+        compareResultsRetries++
+        echo e.toString()
+        echo "Retrying compare results stage."
     }
 }
