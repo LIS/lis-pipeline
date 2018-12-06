@@ -102,7 +102,7 @@ properties ([
                     NTTTCP_TCP
                     NTTTCP_UDP""",
             name: 'AZURE_PERF_NETWORK_TEST_TYPE',
-            description: 'Azure Performance Network testing type. NTTTCP_TCP and NTTTCP_UDP TBD.'],
+            description: 'Azure Performance Network testing type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """SYNTHETIC
                     SRIOV""",
@@ -117,22 +117,22 @@ properties ([
             choices: """SYNTHETIC
                     SRIOV""",
             name: 'NTTTCP_TCP_TYPE',
-            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """ALL
                     1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
             name: 'NTTTCP_TCP_CONNECTIONS',
-            description: 'Azure Performance NETWORK NTTTCP TCP number of connections. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP TCP number of connections.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """SYNTHETIC
                     SRIOV""",
             name: 'NTTTCP_UDP_TYPE',
-            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """ALL
                     2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
             name: 'NTTTCP_UDP_CONNECTIONS',
-            description: 'Azure Performance NETWORK NTTTCP UDP number of connections. TBD.']
+            description: 'Azure Performance NETWORK NTTTCP UDP number of connections.']
         ]
     ]
 ])

@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
-env.LISAV2_REMOTE = "https://github.com/ader1990/LISAv2.git"
-env.LISAV2_BRANCH = "fix_transient_azure_api"
+env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
+env.LISAV2_BRANCH = "master"
 env.LISAV2_RG_IDENTIFIER = "developerk"
 env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
@@ -113,7 +113,7 @@ properties ([
                     NTTTCP_TCP
                     NTTTCP_UDP""",
             name: 'AZURE_PERF_NETWORK_TEST_TYPE',
-            description: 'Azure Performance Network testing type. NTTTCP_TCP and NTTTCP_UDP TBD.'],
+            description: 'Azure Performance Network testing type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """SYNTHETIC
                     SRIOV""",
@@ -128,22 +128,22 @@ properties ([
             choices: """SYNTHETIC
                     SRIOV""",
             name: 'NTTTCP_TCP_TYPE',
-            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """ALL
                     1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
             name: 'NTTTCP_TCP_CONNECTIONS',
-            description: 'Azure Performance NETWORK NTTTCP TCP number of connections. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP TCP number of connections.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """SYNTHETIC
                     SRIOV""",
             name: 'NTTTCP_UDP_TYPE',
-            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """ALL
                     2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
             name: 'NTTTCP_UDP_CONNECTIONS',
-            description: 'Azure Performance NETWORK NTTTCP UDP number of connections. TBD.'],
+            description: 'Azure Performance NETWORK NTTTCP UDP number of connections.'],
         [$class: 'StringParameterDefinition',
             name: 'CUSTOM_BUILD_TAG',
             defaultValue: "",
@@ -356,7 +356,7 @@ def stashArtifacts() {
     cleanWs()
 }
 
-def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storIoSize, storIoMode) {
+def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storIoSize, storIoMode, netNtttcpTcpType, netNtttcpTcpConnections, netNtttcpUdpType, netNtttcpUdpConnections) {
     def perfTestInfo = [ "test_case_name": 'NONE', "test_case_params": '']
     perfType = perfType.trim()
     netType = netType.trim()
@@ -364,6 +364,10 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
     netIperfBufferLength = netIperfBufferLength.trim()
     storIoSize = storIoSize.trim()
     storIoMode = storIoMode.trim()
+    netNtttcpTcpType = netNtttcpTcpType.trim()
+    netNtttcpTcpConnections = netNtttcpTcpConnections.trim()
+    netNtttcpUdpType = netNtttcpUdpType.trim()
+    netNtttcpUdpConnections = netNtttcpUdpConnections.trim()
 
     // LISAV2 TEST CASE INFORMATION
     def netIperfUSriovTestCase = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV"
@@ -375,6 +379,15 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
     def storIo1024KTestCase = "PERF-STORAGE-1024K-IO"
     def storIo4kParam = "PERF-STORAGE-4K-IO-MODES"
     def storIo1024kParam = "PERF-STORAGE-1024K-IO-MODES"
+
+    def netNtttcpTcpSyntTestCase = "PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic"
+    def netNtttcpTcpSriovTestCase = "PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
+    def netNtttcpTcpConnectionsParam = "NTTTCP_TCP_CONNECTIONS"
+
+    def netNtttcpUdpSyntTestCase = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic"
+    def netNtttcpUdpSriovTestCase = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
+    def netNtttcpUdpConnectionsParam = "NTTTCP_UDP_CONNECTIONS"
+
 
     switch (perfType) {
         case "STORAGE":
@@ -408,6 +421,28 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
                     }
                     if (netIperfBufferLength && !netIperfBufferLength.equals("ALL")) {
                        perfTestInfo["test_case_params"] = netIperfBufferLengthParam + "=(" + netIperfBufferLength + ")"
+                    }
+                    break;
+                case "NTTTCP_TCP":
+                    if (netNtttcpTcpType.equals("SYNTHETIC")) {
+                        perfTestInfo["test_case_name"] = netNtttcpTcpSyntTestCase
+                    }
+                    if (netNtttcpTcpType.equals("SRIOV")) {
+                        perfTestInfo["test_case_name"] = netNtttcpTcpSriovTestCase
+                    }
+                    if (netNtttcpTcpConnections && !netNtttcpTcpConnections.equals("ALL")) {
+                       perfTestInfo["test_case_params"] = netNtttcpTcpConnectionsParam + "=(" + netNtttcpTcpConnections + ")"
+                    }
+                    break;
+                case "NTTTCP_UDP":
+                    if (netNtttcpUdpType.equals("SYNTHETIC")) {
+                        perfTestInfo["test_case_name"] = netNtttcpUdpSyntTestCase
+                    }
+                    if (netNtttcpUdpType.equals("SRIOV")) {
+                        perfTestInfo["test_case_name"] = netNtttcpUdpSriovTestCase
+                    }
+                    if (netNtttcpUdpConnections && !netNtttcpUdpConnections.equals("ALL")) {
+                       perfTestInfo["test_case_params"] = netNtttcpUdpConnectionsParam + "=(" + netNtttcpUdpConnections + ")"
                     }
                     break;
                 default:
@@ -537,7 +572,7 @@ if (params.RUN_HYPERV_BVT_TESTS) {
 }
 
 if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
-    def perfTestInfo = getPerfTestInfo(params.AZURE_PERF_TESTS, params.AZURE_PERF_NETWORK_TEST_TYPE, params.NET_IPERF3_TYPE, params.NET_IPERF3_BUFFER_LENGTH, params.AZURE_PERF_STORAGE_IO_SIZE, params.AZURE_PERF_STORAGE_IO_MODE)
+    def perfTestInfo = getPerfTestInfo(params.AZURE_PERF_TESTS, params.AZURE_PERF_NETWORK_TEST_TYPE, params.NET_IPERF3_TYPE, params.NET_IPERF3_BUFFER_LENGTH, params.AZURE_PERF_STORAGE_IO_SIZE, params.AZURE_PERF_STORAGE_IO_MODE, params.NTTTCP_TCP_TYPE, params.NTTTCP_TCP_CONNECTIONS, params.NTTTCP_UDP_TYPE, params.NTTTCP_UDP_CONNECTIONS)
     if (!perfTestInfo["test_case_name"].equals("NONE")) {
             runs['azure_perf'] = {
             node ("azure") {
