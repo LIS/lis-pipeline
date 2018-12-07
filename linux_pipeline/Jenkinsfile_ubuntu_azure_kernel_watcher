@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 properties ([
-    pipelineTriggers([cron('H */6 * * *')])
+    pipelineTriggers([cron('H */4 * * *')])
 ])
 
 env.VERSION_TO_TEST = "/home/lisa/version_to_test.sh"
@@ -38,7 +38,7 @@ node ("meta_slave") {
                 if (will_test == "yes") {
                     SEND_MAIL = "yes"
                     println "TRIGGERING the testing for ${distro} distro, ${kernel} kernel - ${latest_kernel_version}"
-                    MESSAGE_LIST = MESSAGE_LIST + "${distro} ${latest_kernel_version} ${kernel} kernel, "
+                    MESSAGE_LIST = MESSAGE_LIST + "<br>${distro} ${latest_kernel_version} ${kernel} kernel, "
                     build (job: "${env.PIPELINE_NAME}/master",
                         parameters: [
                             string(name: 'Distro', value: "${distro}"),
@@ -48,8 +48,6 @@ node ("meta_slave") {
                             string(name: 'sendMail', value: "yes"),
                         ],
                         wait: false, propagate: false)
-                } else {
-                    println "Not triggering testing for ${distro} distro, ${kernel} kernel"
                 }
             }
             deleteDir()
