@@ -151,6 +151,8 @@ class ComparisonTable(HtmlTable):
             self.comp_op = "=="
         if "<=" in comp_met:
             self.comp_op = "<="
+        if ">=" in comp_met:
+            self.comp_op = ">="
         elif "<" in comp_met:
             self.comp_op = "<"
         elif ">" in comp_met:
@@ -174,6 +176,8 @@ class ComparisonTable(HtmlTable):
             result &= float(args[0]) < float(args[1])
         elif self.comp_op == "<=":
             result &= float(args[0]) <= float(args[1])
+        elif self.comp_op == ">=":
+            result &= float(args[0]) >= float(args[1])
         elif self.comp_op == ">":
             result &= float(args[0]) > float(args[1])
         return result

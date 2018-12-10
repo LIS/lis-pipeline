@@ -11,7 +11,7 @@ from html_utils import HtmlTable
 from html_utils import HtmlTag
 
 FUNCTIONAL_COMPARISON = 'Patched == "Pass"'
-PERFORMANCE_COMPARISON = 'Patched <= Unpatched'
+PERFORMANCE_COMPARISON = 'Patched >= Unpatched'
 
 LISAV2_PATCHED_SUITE = "LISAv2Patched-"
 LISAV2_UNPATCHED_SUITE = "LISAv2Unpatched-"
