@@ -19,7 +19,7 @@ Import-Module $helpersPath
 $KERNEL_NAME = "bzimage"
 $INITRD_NAME = "core-image-minimal-lcow.cpio.gz"
 $PACKAGES_NAME = "rpm.tgz"
-$BUILD_ID = "reporting_metadata"
+$BUILD_ID = "metadata.txt"
 $PACKAGES_REL_PATH=".\tmp\deploy\rpm\lcow\kernel*"
 $BIN_PATH = "C:\Program Files\Git\usr\bin\"
 $VSTS_PATH = "C:\Program Files (x86)\Microsoft SDKs\VSTS\CLI\wbin\"
@@ -108,7 +108,15 @@ function Download-VstsArtifacts {
     }
     if (Test-Path ".\${BUILD_ID}") {
         Write-Host "Using unique build id"
-        Copy-Item ".\${BUILD_ID}" $BuildIdDestination  
+        $buildID = Get-Content ".\${BUILD_ID}"
+        $identifier = @{}
+        $buildID.split(";") | foreach-object {
+                                                if ($_ -ne "") {
+                                                    $identifier[$_.Split("=")[0]] = $_.Split("=")[1]
+                                                }
+                                             }
+        $id = "$($identifier['CDP_BUILD_TYPE'])_$($identifier['BUILD_SOURCEBRANCHNAME'])_$($identifier['CDP_BUILD_NUMBER'])"
+        Set-Content -Value $id -Path $BuildIdDestination
     } else {
         Write-Host "Using package version"
         Set-Content -Value $Version -Path $BuildIdDestination
