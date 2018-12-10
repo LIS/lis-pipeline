@@ -149,6 +149,10 @@ class ComparisonTable(HtmlTable):
         comp_met = params["method"]
         if "==" in comp_met:
             self.comp_op = "=="
+        if "<=" in comp_met:
+            self.comp_op = "<="
+        if ">=" in comp_met:
+            self.comp_op = ">="
         elif "<" in comp_met:
             self.comp_op = "<"
         elif ">" in comp_met:
@@ -170,6 +174,10 @@ class ComparisonTable(HtmlTable):
             result &= args[0] == args[1]
         elif self.comp_op == "<":
             result &= float(args[0]) < float(args[1])
+        elif self.comp_op == "<=":
+            result &= float(args[0]) <= float(args[1])
+        elif self.comp_op == ">=":
+            result &= float(args[0]) >= float(args[1])
         elif self.comp_op == ">":
             result &= float(args[0]) > float(args[1])
         return result

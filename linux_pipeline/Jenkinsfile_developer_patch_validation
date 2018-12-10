@@ -480,7 +480,7 @@ if (params.RUN_AZURE_BOOT_TEST) {
                 } finally {
                     junit "Report\\*-junit.xml"
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_TEST.xml"
-                    archive "Report\\AZURE_BOOT_TEST.xml"
+                    archiveArtifacts "Report\\AZURE_BOOT_TEST.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -507,7 +507,7 @@ if (params.RUN_AZURE_BOOT_STRESS_TEST) {
                 } finally {
                     junit "Report\\*-junit.xml"
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_STRESS_TEST.xml"
-                    archive "Report\\AZURE_BOOT_STRESS_TEST.xml"
+                    archiveArtifacts "Report\\AZURE_BOOT_STRESS_TEST.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -534,7 +534,7 @@ if (params.RUN_AZURE_BVT_TESTS) {
                 } finally {
                     junit "Report\\*-junit.xml"
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BVT_TESTS.xml"
-                    archive "Report\\AZURE_BVT_TESTS.xml"
+                    archiveArtifacts "Report\\AZURE_BVT_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -563,7 +563,7 @@ if (params.RUN_HYPERV_BVT_TESTS) {
                 } finally {
                     junit "Report\\*-junit.xml"
                     powershell "Move-Item -Force Report\\*-junit.xml Report\\HYPERV_BVT_TESTS.xml"
-                    archive "Report\\HYPERV_BVT_TESTS.xml"
+                    archiveArtifacts "Report\\HYPERV_BVT_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -581,9 +581,7 @@ if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
                         echo "Running Azure performance tests"
                         withCredentials(bindings: [
                           file(credentialsId: 'Azure_Secrets_File',
-                               variable: 'Azure_Secrets_File'),
-                          string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-                                 variable: 'LISAV2_IMAGES_SHARE_URL')
+                               variable: 'Azure_Secrets_File')
                         ]) {
                             runLisa('Azure', env.Azure_Secrets_File, perfTestInfo["test_case_name"], '', perfTestInfo['test_case_params'])
                         }
@@ -595,7 +593,7 @@ if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
                         junit "Report\\*-junit.xml"
                         powershell 'ls -Recurse TestResults\\** | Where-Object {$_.Name -like "*_perf_results.json"} | ForEach-Object {Copy-Item $_ "Report\\AZURE_PERF_TESTSSUITE$($_.Name)"}'
                         powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_PERF_TESTS.xml"
-                        archive "Report\\AZURE_PERF_TESTS*"
+                        archiveArtifacts "Report\\AZURE_PERF_TESTS*"
                         archiveArtifacts "TestResults\\**\\*"
                     }
                 }
@@ -636,10 +634,22 @@ stage("validation_stage") {
 }
 
 if (params.BUILD_KERNEL_ARTIFACTS) {
-    node ("meta_slave") {
-        stage ("publish_artifacts") {
-            checkout scm
-            publishArtifacts()
+    def publishArtifactsRetries = 0
+    def publishArtifactsMaxRetries = 3
+    def publishArtifactsSuccess = false
+    while (!publishArtifactsSuccess && publishArtifactsRetries < publishArtifactsMaxRetries) {
+        try {
+            node ("meta_slave") {
+                stage ("publish_artifacts" + publishArtifactsRetries) {
+                    checkout scm
+                    publishArtifacts()
+                }
+            }
+            publishArtifactsSuccess = true
+        } catch (Exception e) {
+            publishArtifactsRetries++
+            echo e.toString()
+            echo "Retrying publish artifacts stage."
         }
     }
 }

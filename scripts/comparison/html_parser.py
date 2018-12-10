@@ -11,7 +11,7 @@ from html_utils import HtmlTable
 from html_utils import HtmlTag
 
 FUNCTIONAL_COMPARISON = 'Patched == "Pass"'
-PERFORMANCE_COMPARISON = 'Patched < Unpatched'
+PERFORMANCE_COMPARISON = 'Patched >= Unpatched'
 
 LISAV2_PATCHED_SUITE = "LISAv2Patched-"
 LISAV2_UNPATCHED_SUITE = "LISAv2Unpatched-"
@@ -38,9 +38,10 @@ def get_params():
 
 
 def parse_junit_results(results_path):
+    all_results = {}
+
     tree = ET.parse(results_path)
     root = tree.getroot()
-    all_results = {}
 
     for test_suite in root.iter('testsuite'):
         results = []
@@ -64,7 +65,7 @@ def parse_junit_results(results_path):
             test_case_name = test_case.attrib.get("name")
             test_case_time = test_case.attrib.get("time")
             test_case_status = "Pass"
-            if test_case.findall("failure"):
+            if test_case.findall("failure") or test_case.findall("error"):
                 test_case_status = "Fail"
             results.append({
                 "TestResult": test_case_status,
@@ -76,14 +77,14 @@ def parse_junit_results(results_path):
 
 
 def parse_perf_results(dir_path):
+    all_results = {}
+
     if not dir_path:
-        return
+        return all_results
 
     if not os.path.isdir(dir_path):
         print("Skip parsing perf results")
-        return
-
-    all_results = {}
+        return all_results
 
     for file in os.listdir(dir_path):
         if file.endswith(".json"):
@@ -100,8 +101,10 @@ def parse_perf_results(dir_path):
                 if type(test_results) is dict:
                     test_results = [test_results]
                 for test_result in test_results:
-                    test_result["TestName"] = test_case_name + "_" + test_result["Id"]
-                    del test_result["Id"]
+                    test_result["TestName"] = test_case_name
+                    for meta_key in test_result["meta_data"].keys():
+                        test_result["TestName"] += ";" + meta_key + "=" + test_result["meta_data"][meta_key]
+                    del test_result["meta_data"]
                     all_results[test_suite_name].append(test_result)
     return all_results
 
@@ -113,22 +116,24 @@ if __name__ == "__main__":
 
     new_file = HtmlFile()
     meta_table = HtmlTable(cellspacing="0")
-    metadata = [
-        {
-            "name": "Test suites",
-            "value": ", ".join(test_results.keys())
-        },
-        {
-            "name": "Perf Test suites",
-            "value": ", ".join(all_patched_perf_results.keys())
-    }]
-    for key in metadata:
-        cell_style = "border: 1px solid"
-        new_row = meta_table.add_row()
-        meta_table.add_cell_to_row(new_row, key["name"], style=cell_style)
-        meta_table.add_cell_to_row(new_row, key["value"],
-                                   style=cell_style)
-    new_file.add_section(title=None, section=meta_table.get_table())
+
+    if test_results.keys() or all_patched_perf_results.keys():
+        metadata = [
+            {
+                "name": "Test suites",
+                "value": ", ".join(test_results.keys())
+            },
+            {
+                "name": "Perf Test suites",
+                "value": ", ".join(all_patched_perf_results.keys())
+        }]
+        for key in metadata:
+            cell_style = "border: 1px solid"
+            new_row = meta_table.add_row()
+            meta_table.add_cell_to_row(new_row, key["name"], style=cell_style)
+            meta_table.add_cell_to_row(new_row, key["value"],
+                                       style=cell_style)
+        new_file.add_section(title=None, section=meta_table.get_table())
 
     ### FUNCTIONAL TESTS COMPARISON
     for key in test_results.keys():
@@ -188,12 +193,12 @@ if __name__ == "__main__":
                                   sections_order=[])
         structure.comp_keys = list(patched_perf_results[0].keys())
         structure.comp_keys.remove("TestName")
-        structure.comp_keys.sort()
+        structure.comp_keys.sort(reverse=True)
         structure.comp_sub_keys = ["Patched", "Unpatched"]
         structure.sections[key] = dict()
         structure.sections[key]["table2"] = list(patched_perf_results[0].keys())
         structure.sections[key]["table2"].remove("TestName")
-        structure.sections[key]["table2"].sort()
+        structure.sections[key]["table2"].sort(reverse=True)
         structure.sections[key]["table2"] = ["TestName"] + structure.sections[key]["table2"]
         structure.sections_order.append(key)
 
