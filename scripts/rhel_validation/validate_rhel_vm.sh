@@ -34,7 +34,7 @@ run_remote_az_commands() {
             printf "$output"
             break
         else
-            output="$(echo $output | jq '.output[].message')"
+            output="$(echo $output | jq '.value[].message')"
             trimmed_output="$(echo $output | tr -d '"')"
             full_output="[stdout]${trimmed_output#*stdout]}"
             std_output="${trimmed_output#*stdout]\\n}"
