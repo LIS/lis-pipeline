@@ -601,7 +601,7 @@ function build_debian (){
             params="--overlay-dir $additions_folder $params"
         fi
         params="$params kernel_image kernel_headers"
-        if [[ "light_build" == "False" ]];then
+        if [[ "${light_build}" == "False" ]];then
             params="$params kernel_source kernel_debug"
         fi
         make-kpkg $params
