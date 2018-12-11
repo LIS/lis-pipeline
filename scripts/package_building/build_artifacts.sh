@@ -1,10 +1,11 @@
 #!/bin/bash
 
 set -xe -o pipefail
+BASEDIR=$(dirname $0)
+BASEDIR=$(readlink -f ./$BASEDIR)
+. "${BASEDIR}/utils.sh"
 
-. utils.sh
-
-KERNEL_VERSION_FILE='./kernel_versions.ini'
+KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
 
 function install_deps_rhel {
     #
@@ -102,8 +103,8 @@ function build_kernel_metapackages_deb () {
 
     kernel_version="$kernel_version"
     kernel_version="$kernel_version-$kernel_git_commit"
-    changelog_loc=$(readlink -f $(find ./kernel_metapackages -name changelog))
-    debian_rules_loc=$(readlink -f $(find ./kernel_metapackages -name linux-latest))
+    changelog_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name changelog))
+    debian_rules_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
     build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc"
 }
@@ -203,7 +204,7 @@ function prepare_kernel_debian (){
     pushd "$source"
     kernel_version="$(make kernelversion)"
     if [[ "$KERNEL_CONFIG" != ".config" ]];then
-        if [[ -e "./$KERNEL_CONFIG" ]];then
+        if [[ -e "${BASEDIR}/$KERNEL_CONFIG" ]];then
             cp "$KERNEL_CONFIG" .config
         elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
             cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config
@@ -235,7 +236,7 @@ function prepare_kernel_rhel (){
         mv "tools/hv/lis-daemon.spec" "tools/hv/lis-daemon.oldspec"
     fi
     if [[ "$KERNEL_CONFIG" != ".config" ]];then
-        if [[ -e "./$KERNEL_CONFIG" ]];then
+        if [[ -e "${BASEDIR}/$KERNEL_CONFIG" ]];then
             cp "$KERNEL_CONFIG" .config
         elif [[ -e "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" ]];then
             cp "${dep_path%/*}/kernel_config/$KERNEL_CONFIG" .config 
@@ -582,6 +583,7 @@ function build_debian (){
     kernel_git_commit="$8"
     additions_folder="$9"
     create_changelog="${10}"
+    light_build="${11}"
 
     artifacts_dir="${base_dir}/${build_state}/"
     if [[ -d "$artifacts_dir" ]];then
@@ -598,9 +600,15 @@ function build_debian (){
         if [[ -e "$additions_folder/changelog" ]] && [[ "$create_changelog" == "True" ]];then
             params="--overlay-dir $additions_folder $params"
         fi
-        make-kpkg $params kernel_image kernel_headers kernel_source kernel_debug
+        params="$params kernel_image kernel_headers"
+        if [[ "light_build" == "False" ]];then
+            params="$params kernel_source kernel_debug"
+        fi
+        make-kpkg $params
         popd
-        build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
+        if [[ "light_build" == "False" ]];then
+            build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
+        fi
     elif [[ "$build_state" == "daemons" ]];then
         build_dir="hyperv-daemons"
         if [[ "$PACKAGE_PREFIX" != "" ]];then
@@ -704,6 +712,7 @@ function build_kernel (){
     enable_debug="${15}"
     debug_path="${16}"
     custom_build_tag="${17}"
+    light_build="${18}"
 
     prepare_env_"${os_family}" "$base_dir" "$build_state"
     source=$(get_sources_${download_method} "$base_dir" "$source_path" "$git_branch" "$clone_depth" "$patches")
@@ -726,7 +735,7 @@ function build_kernel (){
     fi
     prepare_kernel_"${os_family}" "$source" "${package_prefix}" "$GIT_TAG12" "$dep_path" "$enable_debug" "$debug_path"
     build_"${os_family}" "$base_dir" "$source" "$build_state" "$thread_number" "$DESTINATION_PATH" \
-	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$additions_folder" "$create_changelog"
+	  "$build_date" "$KERNEL_VERSION" "$GIT_TAG12" "$additions_folder" "$create_changelog" "$light_build"
     DESTINATION_FOLDER_TMP=$(dirname "${DESTINATION_PATH}")
     DESTINATION_FOLDER=$(basename "${DESTINATION_FOLDER_TMP}")
     echo "Updating the kernel build information for later usage."
@@ -842,9 +851,9 @@ function main {
     done
 
     BASE_DIR="$(pwd)/temp_build"
-    DEP_PATH="$(pwd)/deps-lis/${os_PACKAGE}"
-    INI_FILE="$(pwd)/kernel_versions.ini"
-    DEBUG_CONFIG_PATH="$(pwd)/deps-lis/kernel_config/debug_flags.ini"
+    DEP_PATH="${BASEDIR}/deps-lis/${os_PACKAGE}"
+    INI_FILE="${BASEDIR}/kernel_versions.ini"
+    DEBUG_CONFIG_PATH="${BASEDIR}/deps-lis/kernel_config/debug_flags.ini"
 
     # Mandatory:
     SOURCE_PATH=""
@@ -871,8 +880,10 @@ function main {
     USE_KERNEL_PREFIX='False'
     CREATE_CHANGELOG='True'
     ENABLE_DEBUG='False'
+    # Note(v-advlad): Build only kernel and headers
+    LIGHT_BUILD='False'
 
-    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k:m: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,custom_build_tag:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug: -n 'build_artifacts.sh' -- "$@")
+    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k:m:r: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,custom_build_tag:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug:,light_build: -n 'build_artifacts.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -993,6 +1004,11 @@ function main {
                     "") shift 2 ;;
                     *) ENABLE_DEBUG="$2" ; shift 2 ;;
                 esac ;;
+            --light_build)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) LIGHT_BUILD="$2" ; shift 2 ;;
+                esac ;;
             --) shift ; break ;;
             *) echo "Wrong parameters!" ; exit 1 ;;
         esac
@@ -1051,12 +1067,15 @@ function main {
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH" \
-        "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH" "$CUSTOM_BUILD_TAG"
-    build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
-        "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
-    build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
-    build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
-
+        "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH" "$CUSTOM_BUILD_TAG" "$LIGHT_BUILD"
+    if [[ "LIGHT_BUILD" == "False" || "$os_FAMILY" == "debian" ]];then
+        build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
+            "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+    fi
+    if [[ "LIGHT_BUILD" == "False" ]];then
+        build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+        build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+    fi
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
         link_path="./latest"
