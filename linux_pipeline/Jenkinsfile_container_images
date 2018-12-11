@@ -19,11 +19,15 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
-        // Binaries Check
+        // Smoke tests
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run binaries version test', 
             name: 'binaries_check'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Test kernel boot speed in VM', 
+            name: 'Boot_Test'],
         // Functional
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
@@ -94,7 +98,7 @@ HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 
 STAGES_RESULTS = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
+testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
            "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
@@ -159,6 +163,8 @@ def runTestStage(testName) {
         case "LTP":
             runLtp()
             break
+        case "Boot_Test":
+            runBootSpeedTest()
         default:
             println ("Test: ${testName} not defined. Skipping.")
     }
@@ -237,13 +243,29 @@ def sendMailReport(reportStage) {
     }
 }
 
-def runHypervTest() {
-    dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-        echo 'Starting Hyper-V test job'
-        fileName = "rpm-" + BUILD_NAME.split("-")[1] + ".tgz"
-        testRun = build job: HYPERV_TEST_JOB, parameters: [
-            string(name: 'ARCHIVE_NAME', value: "${fileName}"),
-            string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
+def runBootSpeedTest() {
+    dir ("lcow-boot-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        withCredentials(bindings: [string(credentialsId: 'LCOW_IMAGE_PATH', variable: 'IMAGE_PATH')]) {
+            checkout scm
+            unstash "LISA"
+            echo 'Starting boot test'
+            dir (".\\WS2012R2\\lisa") {
+                unstash "lcow_kernel_packages"
+                def exitCode = PowerShellWrapper('''
+                    & ".\\lisa.ps1 -cmdVerb run -cmdNoun .\\xml\\boot_test.xml"
+                        -dbgLevel "9"
+                        -CLImageStorDir "${env:IMAGE_PATH}"
+                        -testParams ('BASE_TIME=300ms;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
+                        ''')
+                STAGES_RESULTS["Boot_Test"] = exitCode
+                archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
+            }
+
+            createStageReport("Boot_Test", "STRESS", "", STAGES_RESULTS["Boot_Test"])
+            if (STAGES_RESULTS["Boot_Test"] != 0) {
+                error("Test script returned exit code: ${STAGES_RESULTS['Boot_Test']}")
+            }
+        }
         deleteDir()
     }
 }
