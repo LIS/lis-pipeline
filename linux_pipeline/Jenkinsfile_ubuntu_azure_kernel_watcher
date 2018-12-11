@@ -58,18 +58,21 @@ node ("meta_slave") {
 if (SEND_MAIL == "yes"){
     node ("meta_slave") {
         stage('Send-email') {
-            withCredentials([string(credentialsId: 'TEST_EMAIL_LIST', variable: 'MAIL_LIST')]) {
-                echo "Sending email with the new kernels found"
-                emailext (
-                    subject: "Ubuntu-Azure-Pipeline: New proposed kernels detected: ${MESSAGE_LIST}",
-                    to: "${env.MAIL_LIST}",
-                    mimeType : "text/html",
-                    body: """
-                        Hello,<br/><br/>
-                        New kernels have been detected and testing has been triggered for: ${MESSAGE_LIST}<br/><br/>
-                        Thank you,<br/>Jenkins CI
-                    """
-                )
+            withCredentials([
+                string(credentialsId: 'TEST_EMAIL_LIST', variable: 'MAIL_LIST'),
+                string(credentialsId: 'VALIDATION_JOB_LINK', variable: 'VALIDATION_JOB_LINK')]) {
+                    echo "Sending email with the new kernels found"
+                    emailext (
+                        subject: "Ubuntu-Azure-Pipeline: New proposed kernels detected: ${MESSAGE_LIST}",
+                        to: "${env.MAIL_LIST}",
+                        mimeType : "text/html",
+                        body: """
+                            Hello,<br/><br/>
+                            New kernels have been detected and testing has been triggered for: ${MESSAGE_LIST}<br/>
+                            <br>You can check the progress of the running validation jobs here: ${env.VALIDATION_JOB_LINK}<br/><br/>
+                            Thank you,<br/>Jenkins CI
+                        """
+                    )
             }
         }
     }
