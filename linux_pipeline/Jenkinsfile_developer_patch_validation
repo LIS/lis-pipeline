@@ -227,6 +227,7 @@ def buildKernel() {
                   --clone_depth "1" \\
                   --patch_file "developer_patches" \\
                   --create_changelog "False" \\
+                  --light_build "True" \\
                   --custom_build_tag="${CUSTOM_BUILD_TAG}"
               popd
               '''
