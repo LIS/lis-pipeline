@@ -7,6 +7,18 @@ BASEDIR=$(readlink -f ./$BASEDIR)
 
 KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
 
+function config_ccache_rhel {
+    if [[ "$1" == "True" ]];then
+        PATH="/usr/lib64/ccache:"$PATH
+    fi
+}
+
+function config_ccache_debian {
+    if [[ "$1" == "True" ]];then
+        PATH="/usr/lib/ccache:"$PATH
+    fi
+}
+
 function install_deps_rhel {
     #
     # Installing packages required for the build process.
@@ -20,10 +32,6 @@ function install_deps_rhel {
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
-    
-    if [[ "$USE_CCACHE" == "True" ]];then
-        PATH="/usr/lib64/ccache:"$PATH
-    fi
 }
 
 function install_deps_debian {
@@ -36,10 +44,6 @@ function install_deps_debian {
     libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
     libbabeltrace-ctf-dev libbabeltrace-dev)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
-    
-    if [[ "$USE_CCACHE" == "True" ]];then
-        PATH="/usr/lib/ccache:"$PATH
-    fi
 }
 
 function prepare_env_debian (){
@@ -1064,6 +1068,8 @@ function main {
     if [[ ! -e "$BASE_DIR" ]];then
         mkdir -p "$BASE_DIR"
     fi
+
+    config_ccache_"${os_FAMILY}" "${USE_CCACHE}"
 
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH" \
