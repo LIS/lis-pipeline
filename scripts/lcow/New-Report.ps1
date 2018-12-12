@@ -92,7 +92,7 @@ function Parse-LTPResults {
     )
     
     $results = @()
-    $summaryPath = $(Get-ChildItem ${LogPath}\LTP_RUN*.log)
+    $summaryPath = $(Get-ChildItem ${LogPath}\ltp-results.log)
     if (Test-Path $summaryPath) {
         $summaryContent = Get-Content $summaryPath
     } else {

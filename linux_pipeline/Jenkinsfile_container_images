@@ -19,11 +19,15 @@ properties ([
             name: 'INITRD_URL',
             defaultValue: "",
             description: 'Url to the initrd to be tested'],
-        // Binaries Check
+        // Smoke tests
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
             description: 'Run binaries version test', 
             name: 'binaries_check'],
+        [$class: 'BooleanParameterDefinition', 
+            defaultValue: true, 
+            description: 'Test kernel boot speed in VM', 
+            name: 'Boot_Test'],
         // Functional
         [$class: 'BooleanParameterDefinition', 
             defaultValue: true, 
@@ -90,11 +94,11 @@ env.DOCKER_STRESS_BRANCH = "master"
 env.DOCKER_KERNEL_BUILDER_REPO = "https://github.com/moul/docker-kernel-builder.git"
 env.DOCKER_KERNEL_BUILDER_BRANCH = "master"
 env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/lcow/hypervlcowtest.zip"
-HYPERV_TEST_JOB = "lcow-hyperv-testing"
+HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 
 STAGES_RESULTS = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["binaries_check":"binaries_check","test_functional":"linuxkit,docker_test,kernel_hyperv_test,WSL_Docker,LTP",
+testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
            "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
@@ -159,6 +163,8 @@ def runTestStage(testName) {
         case "LTP":
             runLtp()
             break
+        case "Boot_Test":
+            runBootSpeedTest()
         default:
             println ("Test: ${testName} not defined. Skipping.")
     }
@@ -195,10 +201,12 @@ def sendMailReport(reportStage) {
                     def mailBody = ""
                     if (reportStage == "START") {
                         mailBody = "Hello,</br></br>\nLCOW validation pipeline #${env.BUILD_NUMBER} started.</br>\n"
+                        mailBody += "Build ID: ${BUILD_NAME}</br>\n"
                         mailBody += "Jenkins URL: ${env.RUN_DISPLAY_URL}</br>\n</br>\n"
                         mailBody += "Thank you,</br>\nJenkins CI"
                     } else if (reportStage == "FINISH") {
                         mailBody = "Hello,</br></br>\nLCOW validation pipeline #${env.BUILD_NUMBER} finished testing.</br>\n"
+                        mailBody += "Build ID: ${BUILD_NAME}</br>\n"
                         mailBody += "Jenkins URL: ${env.RUN_DISPLAY_URL}</br>\n</br>\n"
                         mailBody += "Testing Summary:</br>\n"
                         mailBody += '<table cellspacing="0">\n'
@@ -235,13 +243,29 @@ def sendMailReport(reportStage) {
     }
 }
 
-def runHypervTest() {
-    dir ("lcow-bin-test-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-        echo 'Starting Hyper-V test job'
-        fileName = "rpm-" + BUILD_NAME.split("-")[1] + ".tgz"
-        testRun = build job: HYPERV_TEST_JOB, parameters: [
-            string(name: 'ARCHIVE_NAME', value: "${fileName}"),
-            string(name: 'TEST_XML', value: "lcow_fvt.xml")], wait: false;
+def runBootSpeedTest() {
+    dir ("lcow-boot-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+        withCredentials(bindings: [string(credentialsId: 'LCOW_IMAGE_PATH', variable: 'IMAGE_PATH')]) {
+            checkout scm
+            unstash "LISA"
+            echo 'Starting boot test'
+            dir (".\\WS2012R2\\lisa") {
+                unstash "lcow_kernel_packages"
+                def exitCode = PowerShellWrapper('''
+                    & ".\\lisa.ps1 -cmdVerb run -cmdNoun .\\xml\\boot_test.xml"
+                        -dbgLevel "9"
+                        -CLImageStorDir "${env:IMAGE_PATH}"
+                        -testParams ('BASE_TIME=300ms;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
+                        ''')
+                STAGES_RESULTS["Boot_Test"] = exitCode
+                archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
+            }
+
+            createStageReport("Boot_Test", "STRESS", "", STAGES_RESULTS["Boot_Test"])
+            if (STAGES_RESULTS["Boot_Test"] != 0) {
+                error("Test script returned exit code: ${STAGES_RESULTS['Boot_Test']}")
+            }
+        }
         deleteDir()
     }
 }
@@ -442,7 +466,6 @@ def runLkp() {
                 STAGES_RESULTS["LKP"] = exitCode
                 archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
             }
-            createStageReport("LKP", "STRESS", "", STAGES_RESULTS["LKP"])
             if (STAGES_RESULTS["LKP"] != 0) {
                 error("Test script returned exit code: ${STAGES_RESULTS['LKP']}")
             }
@@ -467,7 +490,7 @@ stage ("check_kernel") {
                         -VstsUrl "${env:VSTS_REST_URL}"
                         -VstsFeed "${env:LCOW_VSTS_FEED}"
                         -VstsInstance "${env:LCOW_VSTS_INSTANCE}"
-                        -PackageName "lsg-linux-build-lcow"
+                        -PackageName "lsg-linux-test-lcow"
                         -VersionsFile "${env:LAST_VERSION_FILE}"
                         -KernelUrl "${env:KERNEL_URL}"
                         -InitrdUrl "${env:INITRD_URL}"
