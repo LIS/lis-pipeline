@@ -604,9 +604,9 @@ function build_debian (){
         if [[ -e "$additions_folder/changelog" ]] && [[ "$create_changelog" == "True" ]];then
             params="--overlay-dir $additions_folder $params"
         fi
-        params="$params kernel_image kernel_headers"
+        params="$params kernel_image"
         if [[ "${light_build}" == "False" ]];then
-            params="$params kernel_source kernel_debug"
+            params="$params kernel_headers kernel_source kernel_debug"
         fi
         make-kpkg $params
         popd
