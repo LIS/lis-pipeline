@@ -9,13 +9,13 @@ KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
 
 function config_ccache_rhel {
     if [[ "$1" == "True" ]];then
-        PATH="/usr/lib64/ccache:"$PATH
+        export PATH="/usr/lib64/ccache:"$PATH
     fi
 }
 
 function config_ccache_debian {
     if [[ "$1" == "True" ]];then
-        PATH="/usr/lib/ccache:"$PATH
+        export PATH="/usr/lib/ccache:"$PATH
     fi
 }
 
