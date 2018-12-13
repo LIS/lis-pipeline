@@ -1,435 +1,669 @@
 #!/usr/bin/env groovy
 
-def PowerShellWrapper(psCmd) {
-    psCmd = psCmd.replaceAll("\r", "").replaceAll("\n", "")
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
-}
+env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
+env.LISAV2_BRANCH = "master"
+env.LISAV2_RG_IDENTIFIER = "bisectk"
+env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
+env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
+env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
+env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
+env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
+env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
+env.KERNEL_BUILD_DIR = "/mnt/tmp/bisect-commit"
+env.PACKAGE_TYPE = "deb"
+env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
+
+def runs = [:]
 
 properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "KERNEL BUILD CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel',
             name: 'KERNEL_GIT_URL',
-            description: 'Linux kernel repository'],
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel""",
+            description: 'Kernel tree repo'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
             defaultValue: 'master',
-            description: 'Kernel repo branch name'],
+            description: 'Branch to be built'],
         [$class: 'StringParameterDefinition',
-            name: 'KERNEL_GIT_COMMIT_ID',
-            defaultValue: 'HEAD',
-            description: 'Kernel repo commit id'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'Ubuntu_16.04.5\nCentOS_7.4',
-            name: 'DISTRO_VERSION',
-            description: 'Distro version'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'Boot\nFunctional\nPerformance',
-            name: 'BISECT_TYPE',
-            description: 'Type of bisect that will be performed.'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'Standard_A2\nStandard_E64_v3',
-            name: 'BOOT_FLAVOR_SIZE',
-            description: 'The Azure flavor size used for boot validation'],
-        [$class: 'ChoiceParameterDefinition',
-            choices: 'KVP\nCore\nFCOPY\nNET\nNET6\nProd_Checkpoint\nSTOR_VHDX\nVHDX_RESIZE\nLIVE_MIGR16\nLIVE_MIGR12R2',
-            name: 'FUNC_TEST_SUITE',
-            description: '[FUNC] The test suite which you want to run.'],
+            name: 'KERNEL_PATCH',
+            defaultValue: "",
+            description: 'Valid examples: \n scp://my-scp-hostname:/home/my-username/patch.p1 \n scp://my-username@my-scp-hostname:/home/my-username/patch.p1 \n http://my-website.com/patch.p1 \n Use the space separator for multiple patches.'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            name: 'BUILD_KERNEL_ARTIFACTS',
+            description: 'Whether to build kernel artifacts. If this options is not selected, the builtin kernel will be tested.'],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            name: 'PUBLISH_KERNEL_ARTIFACTS',
+            description: 'Whether to publish built kernel artifacts. If this options is not selected, the built kernel packages will be published.'],
         [$class: 'StringParameterDefinition',
-            name: 'FUNC_XML_PATH',
-            defaultValue: '',
-            description: '[FUNC] An absolute path to LISA custom xml test. This path must a valid SMB share path, accessible by any test node.'],
+            name: 'KERNEL_ARTIFACTS_SMB_PATH',
+            defaultValue: "",
+            description: 'The pre built kernel artifacts path from the share. Ex: linux-next/linux-next-4.20.0-e6c7317-28112018-unpatched-19. BUILD_KERNEL_ARTIFACTS step has to be unchecked for this option to become valid. If left empty, the builtin kernel will be tested.'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n5\n10\n15\n20',
-            name: 'PERF_VARIATION',
-            description: '[PERF] If above this performance variation, the commit is bad'],
+            choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
+                        canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
+                        japaneast\njapanwest\nkoreacentral\nkoreasouth\nnorthcentralus\nnortheurope
+                        southcentralus\nsoutheastasia\nsouthindia\nuksouth\nukwest\nwestcentralus
+                        westeurope\nwestindia\nwestus\nsepremium""",
+            name: 'LISAV2_AZURE_REGION',
+            description: 'Azure Region'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE BOOT TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: true,
+            name: 'RUN_AZURE_BOOT_TEST',
+            description: 'Whether to run Azure Boot test'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE BOOT STRESS TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'BooleanParameterDefinition',
+            defaultValue: false,
+            name: 'RUN_AZURE_BOOT_STRESS_TEST',
+            description: 'Whether to run Azure Boot Stress test'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_BOOT_STRESS_PROVISIONING_NUMBER',
+            defaultValue: "3",
+            description: 'Azure VM provisioning number (how many times to recreate the VM).'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_BOOT_STRESS_REBOOT_NUMBER',
+            defaultValue: "10",
+            description: 'Azure VM reboot number for each provisioning iteration. The total reboot number will be: AZURE_BOOT_STRESS_PROVISIONING_NUMBER * AZURE_BOOT_STRESS_REBOOT_NUMBER.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'TCP\nUDP\nFIO',
-            name: 'PERF_TEST',
-            description: '[PERF] Which perf test to run'],
+            name: 'AZURE_BOOT_STRESS_VM_SIZE',
+            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
+            description: 'Azure Boot Stress vm size'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'v4\nv6',
-            name: 'PERF_IPV',
-            description: '[PERF] [TCP] [UDP] IP version to use.'],
+            choices: """NONE
+                    Azure
+                    HyperV""",
+            name: 'FUNCTIONAL_TESTS_PLATFORM',
+            description: 'On which platform to run LISAv2 functional tests.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_CATEGORY',
+            defaultValue: "BVT",
+            description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_AREA',
+            defaultValue: "",
+            description: 'LISAv2 test case area. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test areas will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_TAG',
+            defaultValue: "",
+            description: 'LISAv2 test case tag. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test tags will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_NAME',
+            defaultValue: "",
+            description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1k\n8k',
-            name: 'PERF_K',
-            description: '[PERF] [UDP] Buffer size to be used.'],
+            choices: """NONE
+                    STORAGE
+                    NETWORK""",
+            name: 'AZURE_PERF_TESTS',
+            description: 'What Azure Performance tests to run. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240',
-            name: 'PERF_TEST_THREADS_TCP',
-            description: '[PERF] [TCP] TEST_THREADS.'],
+            choices: """4k
+                    1024k""",
+            name: 'AZURE_PERF_STORAGE_IO_SIZE',
+            description: 'Azure Performance STORAGE IO SIZE.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024',
-            name: 'PERF_TEST_THREADS_UDP',
-            description: '[PERF] [UDP] TEST_THREADS.'],
+            choices: """ALL
+                    randread
+                    randwrite
+                    read
+                    write""",
+            name: 'AZURE_PERF_STORAGE_IO_MODE',
+            description: 'Azure Performance STORAGE IO MODE.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '4\n1024',
-            name: 'PERF_IO_SIZE',
-            description: '[PERF] [FIO] IO_SIZE.'],
+            choices: """IPERF3_1CONNECTION
+                    NTTTCP_TCP
+                    NTTTCP_UDP""",
+            name: 'AZURE_PERF_NETWORK_TEST_TYPE',
+            description: 'Azure Performance Network testing type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: '1\n2\n4\n8\n16\n32\n64\n128\n256',
-            name: 'PERF_Q_DEPTH',
-            description: '[PERF] [FIO] Queue depth.'],
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NET_IPERF3_TYPE',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'read\nrandread\nwrite\nrandwrite',
-            name: 'PERF_IO_MODE',
-            description: '[PERF] [FIO] IO_MODE']
+            choices: """ALL
+                    32\n64\n128\n256\n512\n1024\n2048\n4096\n8192\n16384\n32768\n65536""",
+            name: 'NET_IPERF3_BUFFER_LENGTH',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION BUFFER LENGTH.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_TCP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
+            name: 'NTTTCP_TCP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP TCP number of connections.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_UDP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """ALL
+                    2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
+            name: 'NTTTCP_UDP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP UDP number of connections.'],
+        [$class: 'StringParameterDefinition',
+            name: 'CUSTOM_BUILD_TAG',
+            defaultValue: "",
+            description: 'Custom build tag for artifacts. If left undefined, BUILD_NUMBER will be used']
         ]
     ]
 ])
 
-perfXml = ["TCP": "TCP_SRIOV_v4.xml", "UDP":"UDP_SRIOV_v4.xml", "FIO": "FIO_RAID0_Pipeline.xml"]
+// ****************
+// PIPELINE HELPERS
+// ****************
 
-env.BUILD_PATH = '/mnt/tmp/bisect-kernel-build-folder'
-env.KERNEL_ARTIFACTS_PATH = 'bisect-kernel-artifacts'
-env.KERNEL_CONFIG = 'Microsoft/config-azure'
-env.BUILD_NAME = 'b'
-env.INSTALL_DEPS = 'True'
-env.USE_KERNEL_FOLDER_PREFIX = 'True'
-env.THREAD_NUMBER = 'x3'
-env.AZURE_MAX_RETRIES = '10'
-
-isPerf = BISECT_TYPE.equals('Performance')
-isBootTest = BISECT_TYPE.equals('Boot')
-isFunc = BISECT_TYPE.equals('Functional')
-
-perfServer = GetPerfServer(PERF_TEST)
-perfTestType = GetPerfTestType(PERF_TEST)
-
-env.osDistro = DISTRO_VERSION.split('_')[0]
-env.osVersion = DISTRO_VERSION.split('_')[1]
-
-
-// this is the main logic
-build_kernel(osDistro)
-
-if (isBootTest) {
-    node ('meta_slave') {
-        boot_test()
-    }
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
-if (isPerf) {
-    node (perfServer) {
-        perf()
-    }
-    node ('meta_slave') {
-        parse_perf_data()
-    }
+def getVhdLocation(basePath, distroVersion) {
+    def distroFamily = distroVersion.split('_')[0]
+    return "${basePath}\\" + distroFamily + "\\" + distroVersion + "\\" + distroVersion + ".vhdx"
 }
 
-if (isFunc) {
-    func()
+def prepareEnv(branch, remote) {
+    cleanWs()
+    git branch: branch, url: remote
 }
 
-def GetPerfServer(xmlName) {
-    switch(xmlName) {
-        case "TCP":
-            return "net_perf"
-        case "UDP":
-            return "net_perf"
-        case "FIO":
-            return "stor_perf"
-        default:
-            currentBuild.result = 'FAILURE'
+def unstashKernel(kernelStash) {
+    unstash kernelStash
+    powershell """
+        \$rmPath = "\${env:ProgramFiles}\\Git\\usr\\bin\\rm.exe"
+        \$basePath = "./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.PACKAGE_TYPE}"
+
+        & \$rmPath -rf "\${basePath}/*dbg*"
+        & \$rmPath -rf "\${basePath}/*devel*"
+        & \$rmPath -rf "\${basePath}/*debug*"
+    """
+}
+// buildKernel method is using params:
+//     params.KERNEL_GIT_URL
+//     params.KERNEL_GIT_BRANCH
+//     params.KERNEL_PATCH
+//     params.CUSTOM_BUILD_TAG
+def buildKernel() {
+    if (!params.CUSTOM_BUILD_TAG) {
+        env.CUSTOM_BUILD_TAG = env.BUILD_NUMBER
     }
-}
-
-def GetPerfTestType(xmlName) {
-    switch(xmlName) {
-        case "TCP":
-            return "sr-iov_tcp"
-        case "UDP":
-            return "sr-iov_udp"
-        case "FIO":
-            return "fio_raid"
-        default:
-            currentBuild.result = 'FAILURE'
+    withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
+                               string(credentialsId: 'SCP_USERNAME_DEFAULT', variable: 'SCP_USERNAME_DEFAULT')]) {
+        sh '''#!/bin/bash
+              set -xe -o pipefail
+              if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                  KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
+              fi
+              echo "Building artifacts..."
+              pushd "$WORKSPACE/scripts/package_building"
+              echo ${KERNEL_PATCH} | tr ' ' '\n' > developer_patches
+              i='0'
+              IFS=$'\t\n'
+              for url in $(cat developer_patches); do
+                  i=$(( i + 1 ))
+                  protocol=${url%%://*}
+                  url=${url#*//}
+                  test_user=${url%%*@*}
+                  if [[ $protocol == "scp" ]] && [[ $test_user != "" ]]; then
+                      sed -i "${i}s/.*/scp:\\/\\/$SCP_USERNAME_DEFAULT@${url//\\//\\\\/}/" developer_patches
+                  fi
+              done
+              IFS=$' '
+              bash build_artifacts.sh \\
+                  --git_url "${KERNEL_GIT_URL}" \\
+                  --git_branch "${KERNEL_GIT_BRANCH}" \\
+                  --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
+                  --install_deps "True" \\
+                  --thread_number "x3" \\
+                  --debian_os_version "16" \\
+                  --build_path "${KERNEL_BUILD_DIR}" \\
+                  --kernel_config "Microsoft/config-azure" \\
+                  --clean_env "False" \\
+                  --use_ccache "True" \\
+                  --use_kernel_folder_prefix "True" \\
+                  --patch_file "developer_patches" \\
+                  --create_changelog "False" \\
+                  --light_build "True" \\
+                  --custom_build_tag="${CUSTOM_BUILD_TAG}"
+              popd
+              '''
     }
-}
-
-def getPerfOptions(perf_test) {
-    switch (perf_test) {
-        case "TCP":
-            return PERF_IPV + ";TEST_THREADS=" + PERF_TEST_THREADS_TCP
-        case "UDP":
-            return PERF_IPV + ";" + PERF_K + ";IPERF3_TEST_CONNECTION_POOL=" + PERF_TEST_THREADS_UDP
-        case "FIO":
-            return "Q_DEPTH=" + PERF_Q_DEPTH + ";IO_SIZE=" + PERF_IO_SIZE + ";IO_MODE=" + PERF_IO_MODE
+    sh '''#!/bin/bash
+      echo ${BUILD_NUMBER}-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
+    '''
+    script {
+      currentBuild.displayName = readFile "./build_name"
     }
-}
-
-def getDistro(String distro) {
-    switch (distro) {
-        case "Ubuntu":
-            return ["ubuntu_kernel_builder", "deb"]
-        case "CentOS":
-            return ["centos_kernel_builder", "rpm"]
-
+    stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
+    dir ("scripts/package_building") {
+        stash includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**", name: env.KERNEL_ARTIFACTS_PATH
     }
+    sh '''
+        set -xe
+        rm -rf "scripts/package_building/${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+        '''
+    archiveArtifacts 'scripts/package_building/kernel_versions.ini'
 }
 
-def build_kernel(String distro) {
-    (slave, pkg) = getDistro(distro)
-    println "NODE IS " + slave
-    println "PKG IS " + slave
-    node (slave) {
-        checkout scm
-        stage('build_artifacts_' + distro.toLowerCase()) {
-            withCredentials(bindings: [string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL')]) {
-                sh '''#!/bin/bash
-                    set -xe
-                    if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
-                            KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
-                    fi
-                    echo "Building artifacts..."
-                    pushd "$WORKSPACE/scripts/package_building_bisect"
-                    bash build_artifacts_bisect.sh \\
-                        --git_url "$KERNEL_GIT_URL" \\
-                        --git_branch "$KERNEL_GIT_BRANCH" \\
-                        --git_commit_id "$KERNEL_GIT_COMMIT_ID" \\
-                        --destination_path "$BUILD_NUMBER-$BRANCH_NAME" \\
-                        --build_path "$BUILD_PATH"
-                    popd
-                    '''
-                    sh '''#!/bin/bash
-                        echo $BUILD_NUMBER-$(crudini --get scripts/package_building/kernel_versions.ini KERNEL_BUILT folder) > ./build_name
-                       '''
-            currentBuild.displayName = readFile "./build_name"
-            if (distro == "Ubuntu") {
-                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*image*"),
-                            name: "kernel_artifacts"
-                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*daemons*"),
-                            name: "daemons"
-            } else if (distro == "CentOS") {
-                stash includes: ("scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg/*kernel*"),
-                            name: "kernel_artifacts"
-            }
-            stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
-            sh """
-                    set -xe
-                    rm -rf "scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME"
-            """
-            }
+
+def runLisa(platform, secrets, testName, testCategory, testArea, testTag, customTestParams, testIterations) {
+    def customKernel = ""
+    def osVHD = ""
+    def region = params.LISAV2_AZURE_REGION
+    def vmSize = ""
+    def customTestIterations = ""
+
+    prepareEnv(env.LISAV2_BRANCH, env.LISAV2_REMOTE)
+    try {
+        unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+        customKernel = "-CustomKernel 'localfile:./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/deb/*.deb'"
+    } catch (Exception e) {
+        echo "No stash ${env.KERNEL_ARTIFACTS_PATH} found"
+    }
+
+    if (testName.equals(env.LISAV2_AZURE_STRESS_TEST)) {
+        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_STRESS_VM_SIZE}'"
+    }
+    if (platform.equals('HyperV')) {
+        region = "localhost"
+        if (testName.equals(env.LISAV2_PERFORMANCE_TEST)) {
+            region = "localhost," + env.HYPERV_SECOND_PERF_NODE
         }
+        osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC) + "'"
     }
+
+    if (testIterations) {
+        customTestIterations = " -DeployVMPerEachTest -TestIterations " + testIterations
+    }
+
+    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+        " -TestLocation '${region}'" +
+        " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
+        " -TestPlatform '${platform}'" +
+        " ${vmSize}" +
+        " -ARMImageName '${env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC}'" +
+        " ${osVHD}" +
+        " ${customKernel}" +
+        "${customTestIterations}" +
+        " -TestNames '${testName}'" +
+        " -TestCategory '${testCategory}'" +
+        " -TestArea '${testArea}'" +
+        " -TestTag '${testTag}'" +
+        " -CustomParameters '${customTestParams}'" +
+        " -StorageAccount 'ExistingStorage_Standard'" +
+        " -XMLSecretFile '${secrets}'"
+    )
 }
 
-def boot_test() {
-    node ('meta_slave') {
-        stage('boot_test') {
-            checkout scm
-            dir(BUILD_NUMBER + BRANCH_NAME) {
-                unstash "kernel_artifacts"
-            }
-            dir('kernel_version' + BUILD_NUMBER + BRANCH_NAME) {
-                unstash 'kernel_version_ini'
-                sh 'cat scripts/package_building/kernel_versions.ini'
-            }
 
-            sh(script: '''#!/bin/bash
+def publishArtifacts() {
+    dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+        unstash "${env.KERNEL_ARTIFACTS_PATH}"
+        withCredentials([string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
+                         string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                                usernamePassword(credentialsId: 'smb_share_user_pass',
+                                passwordVariable: 'PASSWORD', usernameVariable: 'USERNAME')
+                        ]) {
+            sh '''#!/bin/bash
                 set -xe
-                distro_version=$DISTRO_VERSION
-                OS_TYPE=${distro_version%_*}
-                OS_TYPE=${OS_TYPE,,}
-                if [[ $OS_TYPE == "ubuntu" ]]; then
-                    PACKAGE_NAME="deb"
-                elif [[ $OS_TYPE == "centos" ]]; then
-                    PACKAGE_NAME="rpm"
+                if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                    KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
                 fi
-                pushd $BUILD_NUMBER$BRANCH_NAME
-                mkdir -p "$PACKAGE_NAME"
-                art=$(find . -name "*.$PACKAGE_NAME")
-                mv $art "$PACKAGE_NAME"
-                popd
-            '''
-            )
-
-            println "Validating Azure boot..."
-            exitStatus = sh(script: '''#!/bin/bash
-                distro_version=$DISTRO_VERSION
-                OS_TYPE=${distro_version%_*}
-                OS_TYPE=${OS_TYPE,,}
-                local_path=$(readlink -f ${BUILD_NUMBER}${BRANCH_NAME})
-                AZURE_MAX_RETRIES=$AZURE_MAX_RETRIES bash scripts/azure_kernel_validation/validate_azure_vm_boot.sh \
-                       --build_name $BUILD_NAME --build_number "${BUILD_NUMBER}${BRANCH_NAME}" \
-                       --os_type $OS_TYPE --vm_user_name $OS_TYPE \
-                       --local_path $local_path --flavor "${BOOT_FLAVOR_SIZE}"
-               ''',
-               returnStatus:true
-            )
-
-            println "Cleaning Azure resources up..."
-            sh(script: '''#!/bin/bash
-                pushd ./scripts/azure_kernel_validation
-                bash remove_azure_vm_resources.sh "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}"
-                popd
-            '''
-            )
-
-            archiveArtifacts(artifacts: "$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME-boot-diagnostics/*.log", allowEmptyArchive: true)
-            if (exitStatus == 0) {
-                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests.xml', failIfNoResults: false)
-            } else {
-                nunit(testResultsPattern: 'scripts/azure_kernel_validation/tests-fail.xml', failIfNoResults: false)
-                sh(script: "exit 1")
-            }
+                folder_prefix="${KERNEL_GIT_URL##*/}"
+                folder_prefix="${folder_prefix%.*}"
+                mkdir -p "scripts/package_building"
+                mv "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" "scripts/package_building/"
+                bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                    --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                    --smb_url "${SMB_SHARE_URL}/${folder_prefix}" --smb_username "${USERNAME}" \\
+                    --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                    --artifacts_folder_prefix "${folder_prefix}"
+                '''
         }
     }
 }
 
-def perf() {
-    PERF_OPTIONS = getPerfOptions(PERF_TEST)
-    (node, pkg) = getDistro(osDistro)
-    XML = perfXml[PERF_TEST]
-    stage('validation_perf_hyperv') {
-        checkout scm
-        withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL',
-                                          variable: 'LISA_IMAGES_SHARE_URL'),
-                                   string(credentialsId: 'LISA_TEST_DEPENDENCIES',
-                                          variable: 'LISA_TEST_DEPENDENCIES')]) {
-            println 'Running LISA...'
-            unstash 'kernel_artifacts'
-            if (osDistro == "Ubuntu") {
-                unstash 'daemons'
-            }
-            println "$LISA_TEST_DEPENDENCIES"
-            try {
-                PowerShellWrapper("""
-                    & .\\scripts\\lis_hyperv_platform\\main_perf.ps1
-                        -JobId $BUILD_NAME$BUILD_NUMBER$BRANCH_NAME
-                        -InstanceName $BUILD_NAME$BUILD_NUMBER$BRANCH_NAME
-                        -VHDType $osDistro -WorkingDirectory C:\\workspace
-                        -OSVersion $osVersion
-                        -LISAImagesShareUrl $LISA_IMAGES_SHARE_URL
-                        -XmlTest $XML
-                        -LisaTestDependencies $LISA_TEST_DEPENDENCIES
-                        -LocalKernelFolder "scripts/package_building_bisect/$BUILD_NUMBER-$BRANCH_NAME/**/$pkg"
-                        -LisaPerfOptions '${PERF_OPTIONS}'
-                    """)
-                println 'Finished running LISA.'
-            } catch (Exception e){
-                println "LISA failed"
-                currentBuild.result = 'FAILURE'
-            } finally {
-                testResultPath = "$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME\\lis-test\\WS2012R2\\lisa\\TestResults\\**\\*"
-                archiveArtifacts testResultPath
-                stash includes: testResultPath, name: 'perf_result'
-                junit testResultPath + ".xml"
-            }
+def publishTempArtifacts() {
+    dir("${env.KERNEL_ARTIFACTS_PATH}${env.BUILD_NUMBER}${env.BRANCH_NAME}") {
+        unstash "${env.KERNEL_ARTIFACTS_PATH}"
+        withCredentials([string(credentialsId: 'MSFT_KERNEL_GIT_URL', variable: 'MSFT_KERNEL_GIT_URL'),
+                         string(credentialsId: 'SMB_SHARE_URL', variable: 'SMB_SHARE_URL'),
+                            usernamePassword(credentialsId: 'smb_share_user_pass',
+                                        passwordVariable: 'PASSWORD',
+                                        usernameVariable: 'USERNAME')]) {
+            sh '''#!/bin/bash
+                set -xe
+                if [[ "$KERNEL_GIT_URL" == "azure_kernel" ]]; then
+                    KERNEL_GIT_URL=${MSFT_KERNEL_GIT_URL}
+                fi
+                folder_prefix="${KERNEL_GIT_URL##*/}"
+                folder_prefix="${folder_prefix%.*}"
+                mkdir -p "scripts/package_building"
+                mv "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" "scripts/package_building/"
+                bash "${WORKSPACE}/scripts/utils/publish_artifacts_to_smb.sh" \\
+                    --build_number "${BUILD_NUMBER}-${BRANCH_NAME}" \\
+                    --smb_url "${SMB_SHARE_URL}/temp-kernel-artifacts" --smb_username "${USERNAME}" \\
+                    --smb_password "${PASSWORD}" --artifacts_path "${KERNEL_ARTIFACTS_PATH}" \\
+                    --artifacts_folder_prefix "${folder_prefix}"
+                '''
         }
     }
 }
 
-def func() {
-    (node, pkg) = getDistro(osDistro)
-    env.pkg = pkg
-    if (FUNC_XML_PATH) {
-        env.lisaXml = FUNC_XML_PATH
-    } else {
-        env.lisaXml = getLisaXml(FUNC_TEST_SUITE)
+def stashArtifacts() {
+    sh '''#!/bin/bash
+        set -xe -o pipefail
+        kernel_dir="${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}"
+        mkdir -p "${kernel_dir}"
+        cp -r "/mnt/kernels/${KERNEL_ARTIFACTS_SMB_PATH}" "${kernel_dir}"
+    '''
+    stash excludes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.PACKAGE_TYPE}/*dbg*", includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.PACKAGE_TYPE}/**", name: env.KERNEL_ARTIFACTS_PATH
+    cleanWs()
+}
+
+def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storIoSize, storIoMode, netNtttcpTcpType, netNtttcpTcpConnections, netNtttcpUdpType, netNtttcpUdpConnections) {
+    def perfTestInfo = [ "test_case_name": 'NONE', "test_case_params": '']
+    perfType = perfType.trim()
+    netType = netType.trim()
+    netIperfType = netIperfType.trim()
+    netIperfBufferLength = netIperfBufferLength.trim()
+    storIoSize = storIoSize.trim()
+    storIoMode = storIoMode.trim()
+    netNtttcpTcpType = netNtttcpTcpType.trim()
+    netNtttcpTcpConnections = netNtttcpTcpConnections.trim()
+    netNtttcpUdpType = netNtttcpUdpType.trim()
+    netNtttcpUdpConnections = netNtttcpUdpConnections.trim()
+
+    // LISAV2 TEST CASE INFORMATION
+    def netIperfUSriovTestCase = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV"
+    def netIperfSyntTestCase = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
+    def netIperfSriovBufferLengthParam = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV-BUFFER-LENGTHS"
+    def netIperfSyntBufferLengthParam = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC-BUFFER-LENGTHS"
+
+    def storIo4KTestCase = "PERF-STORAGE-4K-IO"
+    def storIo1024KTestCase = "PERF-STORAGE-1024K-IO"
+    def storIo4kParam = "PERF-STORAGE-4K-IO-MODES"
+    def storIo1024kParam = "PERF-STORAGE-1024K-IO-MODES"
+
+    def netNtttcpTcpSyntTestCase = "PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic"
+    def netNtttcpTcpSriovTestCase = "PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
+    def netNtttcpTcpConnectionsParam = "NTTTCP_TCP_CONNECTIONS"
+
+    def netNtttcpUdpSyntTestCase = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic"
+    def netNtttcpUdpSriovTestCase = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
+    def netNtttcpUdpConnectionsParam = "NTTTCP_UDP_CONNECTIONS"
+
+
+    switch (perfType) {
+        case "STORAGE":
+            switch (storIoSize) {
+                case "4k":
+                    perfTestInfo["test_case_name"] = storIo4KTestCase
+                    storIoParam = storIo4kParam
+                    break;
+                case "1024k":
+                    perfTestInfo["test_case_name"] = storIo1024KTestCase
+                    storIoParam = storIo1024kParam
+                    break;
+                default:
+                    echo "STORAGE perf tests are not implemented."
+                    break;
+            }
+            if (storIoMode && !storIoMode.equals("ALL")) {
+                perfTestInfo["test_case_params"] = storIoParam + "=" + storIoMode
+            }
+            break
+        case "NETWORK":
+            switch (netType) {
+                case "IPERF3_1CONNECTION":
+                    if (netIperfType.equals("SYNTHETIC")) {
+                        perfTestInfo["test_case_name"] = netIperfSyntTestCase
+                        netIperfBufferLengthParam = netIperfSyntBufferLengthParam
+                    }
+                    if (netIperfType.equals("SRIOV")) {
+                        perfTestInfo["test_case_name"] = netIperfUSriovTestCase
+                        netIperfBufferLengthParam = netIperfSriovBufferLengthParam
+                    }
+                    if (netIperfBufferLength && !netIperfBufferLength.equals("ALL")) {
+                       perfTestInfo["test_case_params"] = netIperfBufferLengthParam + "=(" + netIperfBufferLength + ")"
+                    }
+                    break;
+                case "NTTTCP_TCP":
+                    if (netNtttcpTcpType.equals("SYNTHETIC")) {
+                        perfTestInfo["test_case_name"] = netNtttcpTcpSyntTestCase
+                    }
+                    if (netNtttcpTcpType.equals("SRIOV")) {
+                        perfTestInfo["test_case_name"] = netNtttcpTcpSriovTestCase
+                    }
+                    if (netNtttcpTcpConnections && !netNtttcpTcpConnections.equals("ALL")) {
+                       perfTestInfo["test_case_params"] = netNtttcpTcpConnectionsParam + "=(" + netNtttcpTcpConnections + ")"
+                    }
+                    break;
+                case "NTTTCP_UDP":
+                    if (netNtttcpUdpType.equals("SYNTHETIC")) {
+                        perfTestInfo["test_case_name"] = netNtttcpUdpSyntTestCase
+                    }
+                    if (netNtttcpUdpType.equals("SRIOV")) {
+                        perfTestInfo["test_case_name"] = netNtttcpUdpSriovTestCase
+                    }
+                    if (netNtttcpUdpConnections && !netNtttcpUdpConnections.equals("ALL")) {
+                       perfTestInfo["test_case_params"] = netNtttcpUdpConnectionsParam + "=(" + netNtttcpUdpConnections + ")"
+                    }
+                    break;
+                default:
+                    echo "NETWORK ${netType} perf tests are not implemented."
+                    break
+            }
+            break
+        default:
+            echo "${perfType} perf tests are not implemented."
+            break
     }
-    slave = getSlave(FUNC_TEST_SUITE, FUNC_XML_PATH)
-    node(slave) {
-        stage('validation_functional_hyperv') {
-            checkout scm
-            withCredentials(bindings: [string(credentialsId: 'LISA_IMAGES_SHARE_URL', variable: 'LISA_IMAGES_SHARE_URL'),
-                                       string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                                       string(credentialsId: 'DEVELOPER_AZURE_STORAGE_URL', variable: 'DEVELOPER_AZURE_STORAGE_URL'),
-                                       string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES')]) {
-                echo 'Running LISA...'
-                println "LISA test deps are:" + LISA_TEST_DEPENDENCIES
-                unstash 'kernel_artifacts'
-                if (osDistro == "Ubuntu") {
-                    unstash 'daemons'
-                }
-                result = 'SUCCESS'
+    return perfTestInfo
+}
+
+// **************
+// PIPELINE LOGIC
+// **************
+
+if (params.RUN_AZURE_BOOT_TEST) {
+    runs['azure_boot'] = {
+        node ("azure") {
+            stage ("azure_boot") {
                 try {
-                    PowerShellWrapper('''
-                        & ".\\scripts\\lis_hyperv_platform\\run_bisect_functional_tests.ps1"
-                             -JobId "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-functional"
-                             -InstanceName "${env:BUILD_NAME}${env:BUILD_NUMBER}${env:BRANCH_NAME}-f"
-                             -VHDType "${env:osDistro}" -WorkingDirectory "C:\\workspace"
-                             -OSVersion "${env:osVersion}"
-                             -LISAImagesShareUrl "${env:LISA_IMAGES_SHARE_URL}" -XmlTest "${env:lisaXml}"
-                             -LisaTestDependencies "${env:LISA_TEST_DEPENDENCIES}"
-                             -LocalKernelFolder "scripts/package_building_bisect/${env:BUILD_NUMBER}-${env:BRANCH_NAME}/**/${env:pkg}"
-                        ''')
-                    echo 'Finished running LISA.'
-                } catch (exc) {
-                    println "LISA failed, will now archive logs and exit."
-                    result = 'FAILURE'
+                    echo "Running Azure Boot test"
+                    withCredentials(bindings: [
+                      file(credentialsId: 'Azure_Secrets_File',
+                           variable: 'Azure_Secrets_File')
+                    ]) {
+                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_FUNCTIONAL_BOOT_TEST, '', '', '', '', '')
+                    }
+                } catch (Exception e) {
+                    echo e.toString()
+                    echo "Failed to run Azure Boot test"
+                    currentBuild.result = 'FAILURE'
                 } finally {
-                    archiveArtifacts "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*"
-                    junit "${BUILD_NAME}${BUILD_NUMBER}${BRANCH_NAME}-functional\\TestResults\\**\\*.xml"
-                    currentBuild.result = result
+                    junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_TEST.xml"
+                    archiveArtifacts "Report\\AZURE_BOOT_TEST.xml"
+                    archiveArtifacts "TestResults\\**\\*"
                 }
             }
         }
     }
 }
 
-def getSlave (testName, customPath) {
-    if (customPath) {
-        testName = customPath
-    }
-    switch (testName) {
-        case "LIVE_MIGR16":
-            return "lis-f2324"
-        case "LIVE_MIGR12R2":
-            return "lis-f1927"
-        case testName.contains("Intel"):
-            return "lis-f2322"
-        case testName.contains("Mellanox"):
-            return "lis-f2324"
-        default:
-            return "hyper-v"
-    }
-}
-
-def getLisaXml (testName) {
-    switch (testName) {
-        case "KVP":
-            return "KvpTests.xml"
-        case "Core":
-            return "CoreTests.xml"
-        case "FCOPY":
-            return "FCOPY_Tests.xml"
-        case "NET":
-            return "NET_Tests.xml"
-        case "NET6":
-            return "NET_Tests_IPv6.xml"
-        case "Prod_Checkpoint":
-            return "Production_Checkpoint.xml"
-        case "STOR_VHDX":
-            return "STOR_VHDX.xml"
-        case "VHDX_RESIZE":
-            return "STOR_VHDXResize.xml"
-        case "LIVE_MIGR16":
-            return "NET_LIVEMIG.xml"
-        case "LIVE_MIGR12R2":
-            return "NET_LIVEMIG.xml"
-        default:
-            currentBuild.result = 'FAILURE'
-    }
-}
-
-def parse_perf_data() {
-    stage('parse_perf_data') {
-        checkout scm
-        dir("results") {
-            unstash 'perf_result'
+if (params.RUN_AZURE_BOOT_STRESS_TEST) {
+    def customBootStressParams = "STRESS_REBOOT_NUMBER=" + params.AZURE_BOOT_STRESS_REBOOT_NUMBER
+    runs['azure_boot_stress'] = {
+        node ("azure") {
+            stage ("azure_boot_stress") {
+                try {
+                    echo "Running Azure Boot Stress tests"
+                    withCredentials(bindings: [
+                      file(credentialsId: 'Azure_Secrets_File',
+                           variable: 'Azure_Secrets_File')
+                    ]) {
+                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_AZURE_STRESS_TEST, '', '', '', customBootStressParams, params.AZURE_BOOT_STRESS_PROVISIONING_NUMBER)
+                    }
+                } catch (Exception e) {
+                    echo e.toString()
+                    echo "Failed to run Azure Boot Stress test"
+                    currentBuild.result = 'FAILURE'
+                } finally {
+                    junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BOOT_STRESS_TEST.xml"
+                    archiveArtifacts "Report\\AZURE_BOOT_STRESS_TEST.xml"
+                    archiveArtifacts "TestResults\\**\\*"
+                }
+            }
         }
-        sh """
-            #!/bin/bash
-            bash scripts/bisect/get_perf_results.sh \
-                --perf_path "results/$BUILD_NAME$BUILD_NUMBER$BRANCH_NAME/lis-test/WS2012R2/lisa/TestResults/$PERF_TEST"* \
-                --perf_test_type $perfTestType --io_mode $PERF_IO_MODE \
-                --output "$WORKSPACE/perf_result"
-          """
-        archiveArtifacts "perf_result"
+    }
+}
+
+if (params.FUNCTIONAL_TESTS_PLATFORM && !params.FUNCTIONAL_TESTS_PLATFORM.equals('NONE')) {
+    def functionPlatform = params.FUNCTIONAL_TESTS_PLATFORM.trim()
+    def functionalStage = functionPlatform.toLowerCase() + '_fvt'
+    runs[functionalStage] = {
+        node (functionPlatform.toLowerCase()) {
+            stage (functionalStage) {
+                try {
+                    echo "Running functional tests"
+                    withCredentials(bindings: [
+                      file(credentialsId: 'Azure_Secrets_File',
+                           variable: 'Azure_Secrets_File'),
+                      string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                             variable: 'LISAV2_IMAGES_SHARE_URL')
+                    ]) {
+                        runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '')
+                    }
+                } catch (Exception e) {
+                    echo e.toString()
+                    echo "Failed to run functional tests"
+                    currentBuild.result = 'FAILURE'
+                } finally {
+                    junit "Report\\*-junit.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\LISAV2_FUNCTIONAL_TESTS.xml"
+                    archiveArtifacts "Report\\LISAV2_FUNCTIONAL_TESTS.xml"
+                    archiveArtifacts "TestResults\\**\\*"
+                }
+            }
+        }
+    }
+}
+
+if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
+    def perfTestInfo = getPerfTestInfo(params.AZURE_PERF_TESTS, params.AZURE_PERF_NETWORK_TEST_TYPE, params.NET_IPERF3_TYPE, params.NET_IPERF3_BUFFER_LENGTH, params.AZURE_PERF_STORAGE_IO_SIZE, params.AZURE_PERF_STORAGE_IO_MODE, params.NTTTCP_TCP_TYPE, params.NTTTCP_TCP_CONNECTIONS, params.NTTTCP_UDP_TYPE, params.NTTTCP_UDP_CONNECTIONS)
+    if (!perfTestInfo["test_case_name"].equals("NONE")) {
+            runs['azure_perf'] = {
+            node ("azure") {
+                stage ("azure_perf") {
+                    try {
+                        echo "Running Azure performance tests"
+                        withCredentials(bindings: [
+                          file(credentialsId: 'Azure_Secrets_File',
+                               variable: 'Azure_Secrets_File')
+                        ]) {
+                            runLisa('Azure', env.Azure_Secrets_File, perfTestInfo["test_case_name"], '', '', '', perfTestInfo['test_case_params'], '')
+                        }
+                    } catch (Exception e) {
+                        echo e.toString()
+                        echo "Failed to run Azure performance tests"
+                        currentBuild.result = 'FAILURE'
+                    } finally {
+                        junit "Report\\*-junit.xml"
+                        powershell 'ls -Recurse TestResults\\** | Where-Object {$_.Name -like "*_perf_results.json"} | ForEach-Object {Copy-Item $_ "Report\\AZURE_PERF_TESTSSUITE$($_.Name)"}'
+                        powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_PERF_TESTS.xml"
+                        archiveArtifacts "Report\\AZURE_PERF_TESTS*"
+                        archiveArtifacts "TestResults\\**\\*"
+                    }
+                }
+            }
+        }
+    }
+}
+
+// *************
+// PIPELINE MAIN
+// *************
+
+if (params.BUILD_KERNEL_ARTIFACTS) {
+    node ("ubuntu_kernel_builder") {
+        stage ("build_artifacts") {
+            checkout scm
+            buildKernel()
+        }
+    }
+    if (params.PUBLISH_KERNEL_ARTIFACTS && !currentBuild.result.equals('FAILURE')) {
+        node ("meta_slave") {
+            stage ("publish_temp_artifacts") {
+                checkout scm
+                publishTempArtifacts()
+            }
+        }
+    }
+} else {
+    if (params.KERNEL_ARTIFACTS_SMB_PATH) {
+        node ("meta_slave") {
+            stage ("stash_artifacts") {
+                stashArtifacts()
+            }
+        }
+    }
+}
+
+stage("validation_stage") {
+    parallel runs
+}
+
+if (params.PUBLISH_KERNEL_ARTIFACTS && params.BUILD_KERNEL_ARTIFACTS && !currentBuild.result.equals('FAILURE')) {
+    def publishArtifactsRetries = 0
+    def publishArtifactsMaxRetries = 3
+    def publishArtifactsSuccess = false
+    while (!publishArtifactsSuccess && publishArtifactsRetries < publishArtifactsMaxRetries) {
+        try {
+            node ("meta_slave") {
+                stage ("publish_artifacts" + publishArtifactsRetries) {
+                    checkout scm
+                    publishArtifacts()
+                }
+            }
+            publishArtifactsSuccess = true
+        } catch (Exception e) {
+            publishArtifactsRetries++
+            echo e.toString()
+            echo "Retrying publish artifacts stage."
+        }
     }
 }
