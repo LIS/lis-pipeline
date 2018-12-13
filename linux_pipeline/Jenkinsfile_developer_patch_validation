@@ -5,6 +5,7 @@ env.LISAV2_BRANCH = "master"
 env.LISAV2_RG_IDENTIFIER = "developerk"
 env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
+env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
 env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
@@ -68,7 +69,15 @@ properties ([
         [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             name: 'RUN_AZURE_BOOT_STRESS_TEST',
-            description: 'Whether to run Azure Boot Stress test (100 iterations)'],
+            description: 'Whether to run Azure Boot Stress test'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_BOOT_STRESS_PROVISIONING_NUMBER',
+            defaultValue: "3",
+            description: 'Azure VM provisioning number (how many times to recreate the VM).'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_BOOT_STRESS_REBOOT_NUMBER',
+            defaultValue: "10",
+            description: 'Azure VM reboot number for each provisioning iteration. The total reboot number will be: AZURE_BOOT_STRESS_PROVISIONING_NUMBER * AZURE_BOOT_STRESS_REBOOT_NUMBER.'],
         [$class: 'ChoiceParameterDefinition',
             name: 'AZURE_BOOT_STRESS_VM_SIZE',
             choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
@@ -77,14 +86,28 @@ properties ([
             separatorStyle: "",
             sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: false,
-            name: 'RUN_AZURE_BVT_TESTS',
-            description: 'Whether to run Azure basic validation tests'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: false,
-            name: 'RUN_HYPERV_BVT_TESTS',
-            description: 'Whether to run HYPERV basic validation tests'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """NONE
+                    Azure
+                    HyperV""",
+            name: 'FUNCTIONAL_TESTS_PLATFORM',
+            description: 'On which platform to run LISAv2 functional tests.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_CATEGORY',
+            defaultValue: "BVT",
+            description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_AREA',
+            defaultValue: "",
+            description: 'LISAv2 test case area. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test areas will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_TAG',
+            defaultValue: "",
+            description: 'LISAv2 test case tag. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test tags will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_NAME',
+            defaultValue: "",
+            description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
@@ -250,11 +273,12 @@ def buildKernel() {
 }
 
 
-def runLisa(platform, secrets, testName, testCategory, customTestParams) {
+def runLisa(platform, secrets, testName, testCategory, testArea, testTag, customTestParams, testIterations) {
     def customKernel = ""
     def osVHD = ""
     def region = params.LISAV2_AZURE_REGION
     def vmSize = ""
+    def customTestIterations = ""
 
     prepareEnv(env.LISAV2_BRANCH, env.LISAV2_REMOTE)
     try {
@@ -275,6 +299,10 @@ def runLisa(platform, secrets, testName, testCategory, customTestParams) {
         osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC) + "'"
     }
 
+    if (testIterations) {
+        customTestIterations = " -DeployVMPerEachTest -TestIterations " + testIterations
+    }
+
     RunPowershellCommand(".\\Run-LisaV2.ps1" +
         " -TestLocation '${region}'" +
         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
@@ -283,8 +311,11 @@ def runLisa(platform, secrets, testName, testCategory, customTestParams) {
         " -ARMImageName '${env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC}'" +
         " ${osVHD}" +
         " ${customKernel}" +
+        "${customTestIterations}" +
         " -TestNames '${testName}'" +
         " -TestCategory '${testCategory}'" +
+        " -TestArea '${testArea}'" +
+        " -TestTag '${testTag}'" +
         " -CustomParameters '${customTestParams}'" +
         " -StorageAccount 'ExistingStorage_Standard'" +
         " -XMLSecretFile '${secrets}'"
@@ -472,7 +503,7 @@ if (params.RUN_AZURE_BOOT_TEST) {
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, 'BVT-CORE-VERIFY-LIS-MODULES', '', '')
+                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_FUNCTIONAL_BOOT_TEST, '', '', '', '', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
@@ -490,6 +521,7 @@ if (params.RUN_AZURE_BOOT_TEST) {
 }
 
 if (params.RUN_AZURE_BOOT_STRESS_TEST) {
+    def customBootStressParams = "STRESS_REBOOT_NUMBER=" + params.AZURE_BOOT_STRESS_REBOOT_NUMBER
     runs['azure_boot_stress'] = {
         node ("azure") {
             stage ("azure_boot_stress") {
@@ -499,7 +531,7 @@ if (params.RUN_AZURE_BOOT_STRESS_TEST) {
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_AZURE_STRESS_TEST, '', '')
+                        runLisa('Azure', env.Azure_Secrets_File, env.LISAV2_AZURE_STRESS_TEST, '', '', '', customBootStressParams, params.AZURE_BOOT_STRESS_PROVISIONING_NUMBER)
                     }
                 } catch (Exception e) {
                     echo e.toString()
@@ -516,55 +548,28 @@ if (params.RUN_AZURE_BOOT_STRESS_TEST) {
     }
 }
 
-if (params.RUN_AZURE_BVT_TESTS) {
-    runs['azure_bvt'] = {
-        node ("azure") {
-            stage ("azure_bvt") {
+if (params.FUNCTIONAL_TESTS_PLATFORM && !params.FUNCTIONAL_TESTS_PLATFORM.equals('NONE')) {
+    def functionPlatform = params.FUNCTIONAL_TESTS_PLATFORM.trim()
+    def functionalStage = functionPlatform.toLowerCase() + '_fvt'
+    runs[functionalStage] = {
+        node (functionPlatform.toLowerCase()) {
+            stage (functionalStage) {
                 try {
-                    echo "Running Azure BVT tests"
+                    echo "Running functional tests"
                     withCredentials(bindings: [
                       file(credentialsId: 'Azure_Secrets_File',
                            variable: 'Azure_Secrets_File')
                     ]) {
-                        runLisa('Azure', env.Azure_Secrets_File, '', 'BVT', '')
+                        runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '')
                     }
                 } catch (Exception e) {
                     echo e.toString()
-                    echo "Failed to run Azure BVT tests"
+                    echo "Failed to run functional tests"
                     currentBuild.result = 'FAILURE'
                 } finally {
                     junit "Report\\*-junit.xml"
-                    powershell "Move-Item -Force Report\\*-junit.xml Report\\AZURE_BVT_TESTS.xml"
-                    archiveArtifacts "Report\\AZURE_BVT_TESTS.xml"
-                    archiveArtifacts "TestResults\\**\\*"
-                }
-            }
-        }
-    }
-}
-
-if (params.RUN_HYPERV_BVT_TESTS) {
-    runs['hyperv_bvt'] = {
-        node ("hyper-v") {
-            stage ("hyperv_bvt") {
-                try {
-                    echo "Running HyperV BVT tests"
-                    withCredentials(bindings: [
-                      file(credentialsId: 'Azure_Secrets_File',
-                           variable: 'Azure_Secrets_File'),
-                      string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-                             variable: 'LISAV2_IMAGES_SHARE_URL')
-                    ]) {
-                        runLisa('HyperV', env.Azure_Secrets_File, '', 'BVT', '')
-                    }
-                } catch (Exception e) {
-                    echo e.toString()
-                    echo "Failed to run HyperV BVT tests"
-                    currentBuild.result = 'FAILURE'
-                } finally {
-                    junit "Report\\*-junit.xml"
-                    powershell "Move-Item -Force Report\\*-junit.xml Report\\HYPERV_BVT_TESTS.xml"
-                    archiveArtifacts "Report\\HYPERV_BVT_TESTS.xml"
+                    powershell "Move-Item -Force Report\\*-junit.xml Report\\LISAV2_FUNCTIONAL_TESTS.xml"
+                    archiveArtifacts "Report\\LISAV2_FUNCTIONAL_TESTS.xml"
                     archiveArtifacts "TestResults\\**\\*"
                 }
             }
@@ -584,7 +589,7 @@ if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
                           file(credentialsId: 'Azure_Secrets_File',
                                variable: 'Azure_Secrets_File')
                         ]) {
-                            runLisa('Azure', env.Azure_Secrets_File, perfTestInfo["test_case_name"], '', perfTestInfo['test_case_params'])
+                            runLisa('Azure', env.Azure_Secrets_File, perfTestInfo["test_case_name"], '', '', '', perfTestInfo['test_case_params'], '')
                         }
                     } catch (Exception e) {
                         echo e.toString()
@@ -614,10 +619,12 @@ if (params.BUILD_KERNEL_ARTIFACTS) {
             buildKernel()
         }
     }
-    node ("meta_slave") {
-        stage ("publish_temp_artifacts") {
-            checkout scm
-            publishTempArtifacts()
+    if (!currentBuild.result.equals('FAILURE')) {
+        node ("meta_slave") {
+            stage ("publish_temp_artifacts") {
+                checkout scm
+                publishTempArtifacts()
+            }
         }
     }
 } else {
@@ -634,7 +641,7 @@ stage("validation_stage") {
     parallel runs
 }
 
-if (params.BUILD_KERNEL_ARTIFACTS) {
+if (params.BUILD_KERNEL_ARTIFACTS && !currentBuild.result.equals('FAILURE')) {
     def publishArtifactsRetries = 0
     def publishArtifactsMaxRetries = 3
     def publishArtifactsSuccess = false
