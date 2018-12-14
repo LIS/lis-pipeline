@@ -653,6 +653,7 @@ function build_rhel {
     build_date="$6"
     kernel_version_local="$7"
     kernel_git_commit="$8"
+    light_build="${11}"
 
     if [[ "$build_state" == "kernel" ]];then
         artifacts_dir="${base_dir}/${build_state}/rpmbuild/RPMS/x86_64/"
@@ -674,7 +675,12 @@ function build_rhel {
             rm -f $source_package_dir/*
         fi
         pushd "$source"
-        make rpm-pkg -j"$thread_number"
+
+        if [[ "${light_build}" == "False" ]];then
+            make rpm-pkg -j"$thread_number"
+        else
+            make binrpm-pkg -j"$thread_number"
+        fi
         sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"
         popd
         copy_artifacts "$source_package_dir" "$destination_path"

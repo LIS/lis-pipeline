@@ -35,7 +35,7 @@ properties ([
             description: 'Bad commit (can be HEAD).'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'Ubuntu_18.04.1\nCentOS_7.5',
-            name: 'DISTRO',
+            name: 'DISTRO_VERSION',
             description: 'Distro version to be tested.'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'Boot\nFunctional\nPerformance',
@@ -152,6 +152,7 @@ def getCommonParams(buildTag, commit) {
     return [
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: commit),
+        string(name: 'DISTRO_VERSION', value: value: params.DISTRO_VERSION),
         booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
         booleanParam(name: 'PUBLISH_KERNEL_ARTIFACTS', value: false),
         booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.BISECT_TYPE.equals("Boot")),
