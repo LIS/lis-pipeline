@@ -26,6 +26,7 @@ When launching the pipeline, one can choose from the following options:
   - Choice of Azure flavor size from the following options:
       - Standard_A2 (default option)
       - Standard_E64_v3
+      - Standard_F72s_v2
  - Input field for the test case name. If bisect type is Functional or Performance, this input field is mandatory. If the bisect type is Boot, this input field is not applied.
  - Input field for performance variation (the percentage of minimum performance drop in comparison to the good commit). This value must be specified as an integer. If bisect type is Performance,  this input field is mandatory.
 

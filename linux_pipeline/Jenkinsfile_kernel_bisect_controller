@@ -42,8 +42,8 @@ properties ([
             name: 'BISECT_TYPE',
             description: 'Type of bisect that will be performed.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Standard_A2\nStandard_E64_v3',
-            name: 'BOOT_FLAVOR_SIZE',
+            choices: 'Standard_A2\nStandard_E64_v3\nStandard_F72s_v2',
+            name: 'AZURE_BOOT_VM_SIZE',
             description: 'The Azure flavor size used for boot validation']
         ]
     ]
@@ -153,6 +153,7 @@ def getCommonParams(buildTag, commit) {
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: commit),
         string(name: 'DISTRO_VERSION', value: params.DISTRO_VERSION),
+        string(name: 'AZURE_BOOT_VM_SIZE', value: params.AZURE_BOOT_VM_SIZE),
         booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
         booleanParam(name: 'PUBLISH_KERNEL_ARTIFACTS', value: false),
         booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.BISECT_TYPE.equals("Boot")),
