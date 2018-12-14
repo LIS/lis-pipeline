@@ -3,14 +3,18 @@
 env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 env.LISAV2_BRANCH = "master"
 env.LISAV2_RG_IDENTIFIER = "bisectk"
-env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
-env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
+
+env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
+env.DISTRO_AZURE_CENTOS_IMAGE_75 = "OpenLogic CentOS 7.5 latest"
+env.DISTRO_TYPE = "ubuntu"
+env.DISTRO_PACKAGE_TYPE = "deb"
+env.DISTRO_AZURE_IMAGE = env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC
+
 env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
 env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
 env.KERNEL_BUILD_DIR = "/mnt/tmp/bisect-commit"
-env.PACKAGE_TYPE = "deb"
 env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
 
 def runs = [:]
@@ -51,6 +55,10 @@ properties ([
             separatorStyle: "",
             sectionHeader: "TEST CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'Ubuntu_18.04.1\nCentOS_7.5',
+            name: 'DISTRO_VERSION',
+            description: 'Distro version to be tested.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
                         canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
@@ -202,7 +210,7 @@ def unstashKernel(kernelStash) {
     unstash kernelStash
     powershell """
         \$rmPath = "\${env:ProgramFiles}\\Git\\usr\\bin\\rm.exe"
-        \$basePath = "./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.PACKAGE_TYPE}"
+        \$basePath = "./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.DISTRO_PACKAGE_TYPE}"
 
         & \$rmPath -rf "\${basePath}/*dbg*"
         & \$rmPath -rf "\${basePath}/*devel*"
@@ -267,7 +275,7 @@ def buildKernel() {
     }
     stash includes: 'scripts/package_building/kernel_versions.ini', name: 'kernel_version_ini'
     dir ("scripts/package_building") {
-        stash includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/deb/**", name: env.KERNEL_ARTIFACTS_PATH
+        stash includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.DISTRO_PACKAGE_TYPE}/**", name: env.KERNEL_ARTIFACTS_PATH
     }
     sh '''
         set -xe
@@ -287,7 +295,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
     prepareEnv(env.LISAV2_BRANCH, env.LISAV2_REMOTE)
     try {
         unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-        customKernel = "-CustomKernel 'localfile:./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/deb/*.deb'"
+        customKernel = "-CustomKernel 'localfile:./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.DISTRO_PACKAGE_TYPE}/*.${env.DISTRO_PACKAGE_TYPE}'"
     } catch (Exception e) {
         echo "No stash ${env.KERNEL_ARTIFACTS_PATH} found"
     }
@@ -300,7 +308,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         if (testName.equals(env.LISAV2_PERFORMANCE_TEST)) {
             region = "localhost," + env.HYPERV_SECOND_PERF_NODE
         }
-        osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC) + "'"
+        osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.DISTRO_AZURE_IMAGE) + "'"
     }
 
     if (testIterations) {
@@ -312,7 +320,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
         " -TestPlatform '${platform}'" +
         " ${vmSize}" +
-        " -ARMImageName '${env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC}'" +
+        " -ARMImageName '${env.DISTRO_AZURE_IMAGE}'" +
         " ${osVHD}" +
         " ${customKernel}" +
         "${customTestIterations}" +
@@ -388,7 +396,7 @@ def stashArtifacts() {
         mkdir -p "${kernel_dir}"
         cp -r "/mnt/kernels/${KERNEL_ARTIFACTS_SMB_PATH}" "${kernel_dir}"
     '''
-    stash excludes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.PACKAGE_TYPE}/*dbg*", includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.PACKAGE_TYPE}/**", name: env.KERNEL_ARTIFACTS_PATH
+    stash excludes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.DISTRO_PACKAGE_TYPE}/*dbg*", includes: "${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/**/${env.DISTRO_PACKAGE_TYPE}/**", name: env.KERNEL_ARTIFACTS_PATH
     cleanWs()
 }
 
@@ -618,9 +626,16 @@ if (params.AZURE_PERF_TESTS && !params.AZURE_PERF_TESTS.equals('NONE')) {
 // PIPELINE MAIN
 // *************
 
+
+if (params.DISTRO_VERSION.toLowerCase().contains("centos")) {
+    env.DISTRO_TYPE = "rhel"
+    env.DISTRO_PACKAGE_TYPE = "rpm"
+    env.DISTRO_AZURE_IMAGE = env.DISTRO_AZURE_CENTOS_IMAGE_75
+}
+
 if (params.BUILD_KERNEL_ARTIFACTS) {
-    node ("ubuntu_kernel_builder") {
-        stage ("build_artifacts") {
+    node (env.DISTRO_TYPE + "_kernel_builder") {
+        stage (env.DISTRO_TYPE + "_kernel_build") {
             checkout scm
             buildKernel()
         }
