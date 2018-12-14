@@ -186,7 +186,6 @@ pipeline {
                         --destination_path "${BUILD_NUMBER}-${BRANCH_NAME}-${KERNEL_ARTIFACTS_PATH}" \\
                         --install_deps "True" \\
                         --thread_number "x3" \\
-                        --debian_os_version "${UBUNTU_VERSION}" \\
                         --build_path "${BUILD_PATH}" \\
                         --kernel_config "${KERNEL_CONFIG}" \\
                         --clean_env "${CLEAN_ENV}" \\
