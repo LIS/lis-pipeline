@@ -48,7 +48,8 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
           env.LISAV2_PARAMS = "-TestCategory 'BVT'"
       }
       if (functionalTests.contains('FVT')) {
-          env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
+          env.LISAV2_PARAMS_AZURE = "-TestCategory 'Functional' -TestArea 'KVP,SRIOV,NETWORK,STORAGE,WALA,CORE,KDUMP'"
+          env.LISAV2_PARAMS_HYPERV = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,KDUMP,BACKUP'"
       }
     }
 }
@@ -436,7 +437,7 @@ pipeline {
                     " -TestLocation 'localhost'" +
                     " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'HyperV'" +
-                    " ${env.LISAV2_PARAMS}" +
+                    " ${env.LISAV2_PARAMS_HYPERV}" +
                     " -OsVHD '${env.HYPERV_VHD_PATH}'" +
                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                     " -XMLSecretFile '${env.HyperV_Secrets_File}'"
@@ -479,7 +480,7 @@ pipeline {
                     " -TestLocation 'localhost'" +
                     " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'HyperV'" +
-                    " ${env.LISAV2_PARAMS}" +
+                    " ${env.LISAV2_PARAMS_HYPERV}" +
                     " -OsVHD '${env.HYPERV_VHD_PATH}'" +
                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                     " -XMLSecretFile '${env.HyperV_Secrets_File}'"
@@ -520,7 +521,7 @@ pipeline {
                     " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'Azure'" +
                     " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
-                    " ${env.LISAV2_PARAMS} " +
+                    " ${env.LISAV2_PARAMS_AZURE} " +
                     " -OsVHD '${env.CapturedVHD}'" +
                     " -XMLSecretFile '${env.Azure_Secrets_File}'"
                 )
