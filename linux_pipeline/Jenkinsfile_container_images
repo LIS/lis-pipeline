@@ -97,6 +97,7 @@ env.DOCKER_HYPERV_TEST_REPO = "https://linuxpipelineshare.blob.core.windows.net/
 HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 
 STAGES_RESULTS = [:]
+STAGES_SUMMARY = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
 testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
            "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP"]
@@ -185,7 +186,15 @@ def createStageReport(stageName, testType, logPath, exitCode) {
             -ExitCode '${exitCode}'
             -ReportDestination '.\\${stageName}-Dir'
             -BuildNumber '${BUILD_NAME}'
+            -StageSummary '.\\summary.log'
     """)
+    
+    def summaryExists = fileExists 'summary.log'
+    if (summaryExists) {
+        def summary = readFile 'summary.log'
+        STAGES_SUMMARY[stageName] = summary.trim()
+    }
+    
     if (eCode != 0) {
         error("Test script returned exit code: ${eCode}")
     }
@@ -221,7 +230,11 @@ def sendMailReport(reportStage) {
                                 color = "#32B232"
                             }
 
-                            mailBody +='<tr bgcolor="'+ "${color}" + '"><td style="border: 1px solid black">&nbsp' + "${key}" + '&nbsp</td><td style="border: 1px solid black">&nbsp' + "${result}" + '&nbsp</td></tr>\n'
+                            mailBody +='<tr bgcolor="'+ "${color}" + '"><td style="border: 1px solid black">&nbsp' + "${key}" + '&nbsp</td><td style="border: 1px solid black">&nbsp' + "${result}" + '&nbsp</td>'
+                            if (STAGES_SUMMARY[key]) {
+                                mailBody += '<td style="border: 1px solid black">&nbsp' + STAGES_SUMMARY[key] + '&nbsp</td>'
+                            }
+                            mailBody += '</tr>\n'
                         }
 
                         mailBody += "</table>"
@@ -261,7 +274,7 @@ def runBootSpeedTest() {
                 archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
             }
 
-            createStageReport("Boot_Test", "STRESS", "", STAGES_RESULTS["Boot_Test"])
+            createStageReport("Boot_Test", "BOOT_TEST", ".\\WS2012R2\\lisa\\TestResults\\**\\", STAGES_RESULTS["Boot_Test"])
             if (STAGES_RESULTS["Boot_Test"] != 0) {
                 error("Test script returned exit code: ${STAGES_RESULTS['Boot_Test']}")
             }
