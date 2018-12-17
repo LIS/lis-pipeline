@@ -42,9 +42,17 @@ properties ([
             name: 'BISECT_TYPE',
             description: 'Type of bisect that will be performed.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Standard_A2\nStandard_E64_v3',
-            name: 'BOOT_FLAVOR_SIZE',
-            description: 'The Azure flavor size used for boot validation']
+            choices: 'Standard_A2\nStandard_E64_v3\nStandard_F72s_v2',
+            name: 'AZURE_BOOT_VM_SIZE',
+            description: 'The Azure flavor size used for boot validation'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_CASE_NAME',
+            defaultValue: '',
+            description: 'Functional or Performance test case name. Mandatory if the bisect type is Functional or Performance'],
+        [$class: 'StringParameterDefinition',
+            name: 'PERFORMANCE_VARIATION',
+            defaultValue: '',
+            description: 'Performance variation. Mandatory if the bisect type is Performance.']
         ]
     ]
 ])
@@ -153,12 +161,23 @@ def getCommonParams(buildTag, commit) {
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: commit),
         string(name: 'DISTRO_VERSION', value: params.DISTRO_VERSION),
+        string(name: 'AZURE_BOOT_VM_SIZE', value: params.AZURE_BOOT_VM_SIZE),
+        string(name: 'FUNCTIONAL_TESTS_PLATFORM', value: getFunctionalTestsPlatform()),
+        string(name: 'FUNCTIONAL_TESTS_NAME', value: params.TEST_CASE_NAME),
         booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
         booleanParam(name: 'PUBLISH_KERNEL_ARTIFACTS', value: false),
         booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.BISECT_TYPE.equals("Boot")),
         string(name: 'CUSTOM_BUILD_TAG', value: "${buildTag}-${BUILD_NUMBER}")
     ]
 }
+
+def getFunctionalTestsPlatform() {
+    if (params.BISECT_TYPE.equals("Functional")) {
+        return "Azure"
+    }
+    return "NONE"
+}
+
 
 // *************
 // PIPELINE MAIN
@@ -176,6 +195,21 @@ node ("bisect_kernel_builder") {
     }
     if (params.BAD_COMMIT.equals(params.GOOD_COMMIT)) {
         throw new Exception("BAD_COMMIT cannot be GOOD_COMMIT.")
+    }
+
+    if (params.BISECT_TYPE.equals('Functional')) {
+        if (!params.TEST_CASE_NAME) {
+            throw new Exception("You need to specify a test case name for Functional bisect.")
+        }
+    }
+
+    if (params.BISECT_TYPE.equals('Performance')) {
+        if (!params.TEST_CASE_NAME) {
+            throw new Exception("You need to specify a test case name for Performance bisect.")
+        }
+        if (!params.PERFORMANCE_VARIATION) {
+            throw new Exception("You need to specify a performance variation for Performance bisect.")
+        }
     }
 
     if (env.BISECT_CLONE_KERNEL_REPO.equals("true")) {

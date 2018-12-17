@@ -75,6 +75,10 @@ properties ([
             defaultValue: true,
             name: 'RUN_AZURE_BOOT_TEST',
             description: 'Whether to run Azure Boot test'],
+        [$class: 'ChoiceParameterDefinition',
+            name: 'AZURE_BOOT_VM_SIZE',
+            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
+            description: 'Azure Boot vm size'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE BOOT STRESS TEST CONFIGURATION",
@@ -302,6 +306,9 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
 
     if (testName.equals(env.LISAV2_AZURE_STRESS_TEST)) {
         vmSize = "-OverrideVMSize '${params.AZURE_BOOT_STRESS_VM_SIZE}'"
+    }
+    if (testName.equals(env.LISAV2_FUNCTIONAL_BOOT_TEST)) {
+        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_VM_SIZE}'"
     }
     if (platform.equals('HyperV')) {
         region = "localhost"
