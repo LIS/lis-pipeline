@@ -3,7 +3,8 @@ param (
     [String] $BinariesPath,
     [String] $TestRepo,
     [String] $WorkDir,
-    [String] $LogDestination
+    [String] $LogDestination,
+    [String] $BaseNumber
 )
 
 $TEST_CONTAINER_NAME = "docker_test"
@@ -22,11 +23,8 @@ function Execute-Test {
     } catch {
         throw $_
     }
-	try {
-		.\Run-DockerLinuxPullAutomation.ps1 -RootDir $TestPath -ConfigFile $TestPath\LinuxAppPullImageList.xml -ImageName linux -NetworkName nat -UseNat $true -Xenon $true -UseDataVolume $true -VolumeName $TestPath\volume -DataVolumeType Local -Verbose:$false
-	} catch {
-		throw $_
-	}
+    
+    .\Run-DockerLinuxPullAutomation.ps1 -RootDir $TestPath -ConfigFile $TestPath\LinuxAppPullImageList.xml -ImageName linux -NetworkName nat -UseNat $true -Xenon $true -UseDataVolume $true -VolumeName $TestPath\volume -DataVolumeType Local -Verbose:$false
 }
 
 function Main {
@@ -61,6 +59,32 @@ function Main {
     Copy-Item $WorkDir\log*\* -Destination $LogDestination -Recurse
 
     Pop-Location
+
+    $summaryPath = Join-Path $LogDestination "AppSummary.csv"
+    if (Test-Path $summaryPath) {
+        $summaryContent = Get-Content $summaryPath -Raw
+    } else {
+        throw "Cannot find summary file: AppSummary.csv"
+    }
+
+    $failureNumber = 0
+
+    $testResults = $($summaryContent -split "`r`n`r`n")
+    foreach ($result in $testResults) {
+        if ($result -eq "" ) {
+            continue
+        }
+        $result =  $result.Split("`n")
+        if ($result[12].Split(":")[1].Trim() -ne "0") {
+            $failureNumber ++
+        }
+    }
+    if ($failureNumber -ge $BaseNumber) {
+        Write-Host "Tests fail more that expected $BaseNumber number of failures, total number of failures for this run was $failureNumber"
+        exit 1
+    } else {
+        exit 0
+    }
 }
 
 Main

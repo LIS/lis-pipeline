@@ -82,6 +82,11 @@ properties ([
 // Kernel Version: 4.14.29-linuxkit
 env.LINUXKIT_BASE_NUMBER = "58"
 
+// This value represents the number of expected failures in the hyperv test stage
+// The stage will fail if the number of failures is greater than HYPERV_BASE_NUMBER
+// default to 5 failures
+env.HYPERV_BASE_NUMBER = "5"  
+
 env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
 env.BINARIES_DESTINATION = "C:\\lcow-bin"
@@ -314,6 +319,7 @@ def runDockerTest() {
 				 -TestRepo "${env:DOCKER_HYPERV_TEST_REPO}"
                  -WorkDir "C:\\lcow-testing\\workdir-hypervtest-${env:BUILD_NUMBER}-${env:BRANCH_NAME}"
                  -LogDestination ".\\hypervtest-logs"
+                 -BaseNumber "${env:HYPERV_BASE_NUMBER}"
              ''')
         STAGES_RESULTS["docker_test"] = exitCode
         archiveArtifacts artifacts: "hypervtest-logs\\*", allowEmptyArchive: true
