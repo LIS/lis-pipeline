@@ -4,9 +4,11 @@ param (
     [String] $LogPath,
     [int] $ExitCode,
     [String] $ReportDestination,
-    [String] $BuildNumber
+    [String] $BuildNumber,
+    [String] $StageSummary
 )
 
+$BOOT_SUMMARY = "boot_speed.log"
 $LINUXKIT_SUMMARY = "SUMMARY.json"
 $HYPERV_DOCKER_SUMMARY = "AppSummary.csv"
 $WSL_SUMMARY = "summary.log"
@@ -174,6 +176,9 @@ function Main {
     if (Test-Path $ReportDestination) {
         Remove-Item -Recurse -Force $ReportDestination
     }
+    if (Test-Path $StageSummary) {
+        Remove-Item $StageSummary
+    }
     New-Item -Type Directory -Path $ReportDestination
     $ReportDestination = Resolve-Path $ReportDestination
     if ($LogPath) {
@@ -181,6 +186,7 @@ function Main {
     }
 
     $results = $null
+    $summary = $null
     Switch ($TestType) {
         "STRESS" {
             $results = @{"TestStage" = $StageName; "TestName" = $StageName; `
@@ -191,6 +197,24 @@ function Main {
             } else {
                 $results["TestResult"] = "PASS"
             }
+            break
+        }
+        "BOOT_TEST" {
+            $results = @{"TestStage" = $StageName; "TestName" = $StageName; `
+                         "TestDate" = $(Get-Date -UFormat "%Y-%m-%d"); `
+                         "BuildNumber" = $BuildNumber}
+            if ($ExitCode -ne 0) {
+                $results["TestResult"] = "FAIL"
+            } else {
+                $results["TestResult"] = "PASS"
+            }
+            $summaryPath = $(Get-ChildItem ${LogPath}\${BOOT_SUMMARY})
+            if (Test-Path $summaryPath) {
+                $summaryContent = Get-Content $summaryPath
+            } else {
+                throw "Cannot find summary file: ${BOOT_SUMMARY}"
+            }
+            $summary = "Boot Time: $summaryContent"
             break
         }
         "LINUXKIT" {
@@ -216,6 +240,10 @@ function Main {
         default {
             throw "Test type not supported"
         }
+    }
+    
+    if ($summary -and $StageSummary) {
+        Set-Content -Path $StageSummary -Value $summary
     }
     
     New-JsonReport -ReportDestination $ReportDestination -Results $results `
