@@ -157,10 +157,10 @@ function get_sources_git (){
     fi
     pushd "$source"
     git reset --hard HEAD~1 > /dev/null
-    git fetch > /dev/null
     # Note(avladu): the checkout to master is needed to
     # get from a detached HEAD state
     git checkout -f master > /dev/null
+    git fetch --all --tags > /dev/null
     git checkout -f "$git_branch" > /dev/null
     if [[ $? -ne 0 ]];then
         exit 1

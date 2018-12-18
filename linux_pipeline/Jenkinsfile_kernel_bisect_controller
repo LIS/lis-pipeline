@@ -1,5 +1,8 @@
 #!/usr/bin/env groovy
 
+import groovy.json.JsonSlurper
+import groovy.json.JsonBuilder
+
 env.SLAVE_PIPELINE_NAME = "pipeline-kernel-bisect-runner"
 env.BUILD_KERNEL_ARTIFACTS = "true"
 env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
@@ -12,6 +15,7 @@ env.BISECT_BUILD_DIR = "/mnt/tmp/bisect"
 env.BISECT_CLONE_DIR = "kernel_tree"
 env.BISECT_CLONE_KERNEL_REPO = "true"
 env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "true"
+env.GOOD_COMMIT_PERF_RESULTS = ""
 
 properties ([
     overrideIndexTriggers(false),
@@ -48,11 +52,65 @@ properties ([
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE_NAME',
             defaultValue: '',
-            description: 'Functional or Performance test case name. Mandatory if the bisect type is Functional or Performance'],
+            description: 'Functional test case name. Mandatory if the bisect type is Functional.'],
         [$class: 'StringParameterDefinition',
             name: 'PERFORMANCE_VARIATION',
             defaultValue: '',
-            description: 'Performance variation. Mandatory if the bisect type is Performance.']
+            description: 'Performance variation. Mandatory if the bisect type is Performance.'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """STORAGE
+                    NETWORK""",
+            name: 'AZURE_PERF_TESTS',
+            description: 'What Azure Performance tests to run. Applies only if the bisect type is performance. You can customize the test cases from the options below.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """4k
+                    1024k""",
+            name: 'AZURE_PERF_STORAGE_IO_SIZE',
+            description: 'Azure Performance STORAGE IO SIZE.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """randread
+                    randwrite
+                    read
+                    write""",
+            name: 'AZURE_PERF_STORAGE_IO_MODE',
+            description: 'Azure Performance STORAGE IO MODE.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """IPERF3_1CONNECTION
+                    NTTTCP_TCP
+                    NTTTCP_UDP""",
+            name: 'AZURE_PERF_NETWORK_TEST_TYPE',
+            description: 'Azure Performance Network testing type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NET_IPERF3_TYPE',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION: SYNTHETIC or SRIOV type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: "32\n64\n128\n256\n512\n1024\n2048\n4096\n8192\n16384\n32768\n65536",
+            name: 'NET_IPERF3_BUFFER_LENGTH',
+            description: 'Azure Performance NETWORK IPERF3 1CONNECTION BUFFER LENGTH.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_TCP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: "1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240",
+            name: 'NTTTCP_TCP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP TCP number of connections.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: """SYNTHETIC
+                    SRIOV""",
+            name: 'NTTTCP_UDP_TYPE',
+            description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: "2\n4\n8\n16\n32\n64\n128\n256\n512\n1024",
+            name: 'NTTTCP_UDP_CONNECTIONS',
+            description: 'Azure Performance NETWORK NTTTCP UDP number of connections.']
         ]
     ]
 ])
@@ -85,31 +143,121 @@ def cloneKernelRepo() {
 
 def validateInitialCommits() {
     stage("validate_commits") {
-        validateCommit(params.BAD_COMMIT, "FAILURE")
-        println("Bad commit " + params.BAD_COMMIT + " has been validated to be bad")
-        validateCommit(params.GOOD_COMMIT, "SUCCESS")
-        println("Good commit " + params.GOOD_COMMIT + " has been validated to be good")
+        def commitStatusGood = validateCommit(params.GOOD_COMMIT)
+        if (commitStatusGood.status != "SUCCESS") {
+            throw new Exception("Commit " + params.GOOD_COMMIT + " was expected to be " + "SUCCESS" + " instead of " + commitStatusGood.status)
+        }
+        println("Good commit " + params.GOOD_COMMIT + " has been validated to be good.")
+        def jsonPerfResults = new JsonBuilder(commitStatusGood.perf_results)
+        env.GOOD_COMMIT_PERF_RESULTS = jsonPerfResults.toString()
+
+        def commitStatusBad = validateCommit(params.BAD_COMMIT)
+        if (commitStatusBad.status != "FAILURE") {
+            throw new Exception("Commit " + params.BAD_COMMIT + " was expected to be " + "FAILURE" + " instead of " + commitStatusBad.status)
+        }
+        println("Bad commit " + params.BAD_COMMIT + " has been validated to be bad.")
     }
 }
 
-def validateCommit (String commit, String expectedState) {
+def validateCommit(String commit) {
     if (!commit) {
         throw new Exception("Commit " + commit + " is not valid.")
     }
-    job = buildJobWrapper(commit)
-    if (job.buildResult != expectedState) {
-        throw new Exception("Commit " + commit + " was expected to be " + expectedState + " instead of " + job.buildResult)
-    }
-}
 
-def buildJobWrapper(String commit) {
-    if (!commit) {
-        throw new Exception("Commit " + commit + " is not valid.")
-    }
+    println("Checking if commit " + commit + " is good or bad.")
+
+    def currentPerfResults = getPerfResultObject()
+    def comparisonPerfResults = true
     def bisectParams = getCommonParams("bisect", commit)
     def job = build job: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
-                               parameters: bisectParams, propagate: false, wait: true;
-    return ["buildResult": job.result]
+                    parameters: bisectParams, propagate: false, wait: true;
+    def validationResult = job.result
+    if (validationResult && validationResult.equals("SUCCESS") && params.BISECT_TYPE.equals("Performance")) {
+        dir ('aggregate_results_' + commit) {
+            copyArtifacts(projectName: "${env.SLAVE_PIPELINE_NAME}/${env.BRANCH_NAME}",
+               selector: specific(job.number.toString()),
+               target: "bisect_run");
+        }
+        sh """#!/bin/bash
+          cp -f aggregate_results_${commit}/bisect_run/Report/*_perf_results.json aggregate_results_${commit}/bisect_run/Report/perf_results.json
+        """
+        archiveArtifacts("aggregate_results_" + commit + "/bisect_run/Report/**")
+        try {
+            def perfResultsRaw = readFile("aggregate_results_" + commit + "/bisect_run/Report/perf_results.json")
+            def jsonSlurper = new JsonSlurper()
+            def perfResults = jsonSlurper.parseText(perfResultsRaw)
+            def isPerfValid = false
+            println("Raw performance results for commit " + commit + " are: " + perfResults)
+            for (key in currentPerfResults.keySet()) {
+                def perfValue = perfResults[key]
+                if (perfValue) {
+                    try {
+                        perfValue = Float.valueOf(perfValue)
+                    } catch (Exception e) {}
+                    if (perfValue > 0.0000001) {
+                        currentPerfResults[key] = perfValue
+                        isPerfValid = true
+                    }
+                }
+            }
+            println("Parsed performance results for commit " + commit + " are: " + currentPerfResults)
+            if (isPerfValid) {
+                def isPerfBetter = compareGoodAndCurrentPerfResults(currentPerfResults)
+                if (isPerfBetter) {
+                    validationResult = "SUCCESS"
+                } else {
+                    validationResult = "FAILURE"
+                }
+            } else {
+                validationResult = "INVALID_PERF_RESULTS"
+            }
+        } catch (Exception e) {
+            echo e.toString()
+            throw new Exception("Could not parse performance results for commit " + commit)
+        }
+    }
+    return ["status": validationResult, 'perf_results': currentPerfResults]
+}
+
+def compareGoodAndCurrentPerfResults(currentPerfResults) {
+    if (!env.GOOD_COMMIT_PERF_RESULTS) {
+        println("There are no previous good performance results. The current commit is considered good.")
+        return true
+    }
+
+    def jsonSlurper = new JsonSlurper()
+    def goodPerfResults = jsonSlurper.parseText(env.GOOD_COMMIT_PERF_RESULTS)
+    def perfVariation = Float.valueOf(params.PERFORMANCE_VARIATION)
+    for (key in goodPerfResults.keySet()) {
+        def goodPerfVal = goodPerfResults[key]
+        def currentPerfVal = currentPerfResults[key]
+        try {
+            goodPerfVal = Float.valueOf(goodPerfVal)
+        } catch (Exception e) {}
+        try {
+            currentPerfVal = Float.valueOf(currentPerfVal)
+        } catch (Exception e) {}
+        println("Good result for " + key + ": " + goodPerfVal)
+        println("Current result for " + key + ": " + currentPerfVal)
+        if (goodPerfVal && goodPerfVal > currentPerfVal) {
+            def currentPerfVariation = 100 - (currentPerfVal / goodPerfVal * 100)
+            println("Current perf variation " + currentPerfVariation + " should be less than " + perfVariation)
+            if (currentPerfVariation > perfVariation) {
+                println("Current performance result for " + key + " has more than " + perfVariation + " percent variation.")
+                return false
+            }
+        }
+        println("Current performance result for " + key + " has expected variation.")
+    }
+    return true
+}
+
+def getPerfResultObject() {
+    return [
+        "rx_throughput_gbps": 0,
+        "tx_throughput_gbps": 0,
+        "io_per_second": 0
+    ]
 }
 
 String getCommit(String passed) {
@@ -167,6 +315,16 @@ def getCommonParams(buildTag, commit) {
         booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
         booleanParam(name: 'PUBLISH_KERNEL_ARTIFACTS', value: false),
         booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.BISECT_TYPE.equals("Boot")),
+        string(name: 'AZURE_PERF_TESTS', value: getPerfTests()),
+        string(name: 'AZURE_PERF_STORAGE_IO_SIZE', value: params.AZURE_PERF_STORAGE_IO_SIZE.trim()),
+        string(name: 'AZURE_PERF_STORAGE_IO_MODE', value: params.AZURE_PERF_STORAGE_IO_MODE.trim()),
+        string(name: 'AZURE_PERF_NETWORK_TEST_TYPE', value: params.AZURE_PERF_NETWORK_TEST_TYPE.trim()),
+        string(name: 'NET_IPERF3_TYPE', value: params.NET_IPERF3_TYPE.trim()),
+        string(name: 'NET_IPERF3_BUFFER_LENGTH', value: params.NET_IPERF3_BUFFER_LENGTH.trim()),
+        string(name: 'NTTTCP_TCP_TYPE', value: params.NTTTCP_TCP_TYPE.trim()),
+        string(name: 'NTTTCP_TCP_CONNECTIONS', value: params.NTTTCP_TCP_CONNECTIONS.trim()),
+        string(name: 'NTTTCP_UDP_TYPE', value: params.NTTTCP_UDP_TYPE.trim()),
+        string(name: 'NTTTCP_UDP_CONNECTIONS', value: params.NTTTCP_UDP_CONNECTIONS.trim()),
         string(name: 'CUSTOM_BUILD_TAG', value: "${buildTag}-${BUILD_NUMBER}")
     ]
 }
@@ -174,6 +332,13 @@ def getCommonParams(buildTag, commit) {
 def getFunctionalTestsPlatform() {
     if (params.BISECT_TYPE.equals("Functional")) {
         return "Azure"
+    }
+    return "NONE"
+}
+
+def getPerfTests() {
+    if (params.BISECT_TYPE.equals("Performance")) {
+        return params.AZURE_PERF_TESTS.trim()
     }
     return "NONE"
 }
@@ -204,9 +369,6 @@ node ("bisect_kernel_builder") {
     }
 
     if (params.BISECT_TYPE.equals('Performance')) {
-        if (!params.TEST_CASE_NAME) {
-            throw new Exception("You need to specify a test case name for Performance bisect.")
-        }
         if (!params.PERFORMANCE_VARIATION) {
             throw new Exception("You need to specify a performance variation for Performance bisect.")
         }
@@ -228,22 +390,22 @@ node ("bisect_kernel_builder") {
         currentBuild.displayName = "$BUILD_NUMBER-" + currentCommitId.substring(0,7)
         return
     }
-    println "Initial bisection commit is: " + currentCommitId
+    println("Initial bisection commit is " + currentCommitId)
 
     while (currentCommitId && env.BISECT_RUNS.toInteger() < env.BISECT_MAX_RUNS.toInteger()) {
         env.BISECT_RUNS = env.BISECT_RUNS.toInteger() + 1
         stage("bisect_" + currentCommitId.substring(0,7)) {
             println "Check if the following commit is good or bad: " + currentCommitId
-            job = buildJobWrapper(currentCommitId)
-            if (job.buildResult == 'SUCCESS') {
+            def commitStatus = validateCommit(currentCommitId)
+            if (commitStatus.status == 'SUCCESS') {
                 println "The following commit is good: " + currentCommitId
                 passed = 'good'
-            } else if (job.buildResult == 'FAILURE') {
+            } else if (commitStatus.status == 'FAILURE') {
                 println "The following commit is bad: " + currentCommitId
                 passed = 'bad'
             } else {
                 println "Bisect has been aborted because slave build result is not FAILURE or SUCCESS"
-                println "Slave build result is: " + job.buildResult
+                println "Slave build result is: " + commitStatus.status
                 break
             }
         }

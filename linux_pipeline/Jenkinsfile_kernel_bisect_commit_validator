@@ -6,7 +6,7 @@ env.LISAV2_RG_IDENTIFIER = "bisectk"
 
 env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.DISTRO_AZURE_CENTOS_IMAGE_75 = "OpenLogic CentOS 7.5 latest"
-env.DISTRO_TYPE = "ubuntu"
+env.DISTRO_TYPE = "deb"
 env.DISTRO_PACKAGE_TYPE = "deb"
 env.DISTRO_AZURE_IMAGE = env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC
 
