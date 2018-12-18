@@ -156,9 +156,11 @@ function get_sources_git (){
         git clone $git_params  "$source_path" > /dev/null
     fi
     pushd "$source"
+    git config merge.renameLimit 999999
     git reset --hard HEAD~1 > /dev/null
     # Note(avladu): the checkout to master is needed to
     # get from a detached HEAD state
+    git clean -fx > /dev/null
     git checkout -f master > /dev/null
     git fetch --all --tags > /dev/null
     git checkout -f "$git_branch" > /dev/null
