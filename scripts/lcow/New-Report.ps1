@@ -29,6 +29,9 @@ function Parse-LinuxKitResults {
         throw "Cannot find summary file: ${LINUXKIT_SUMMARY}"
     }
     
+    $totalTests = 0
+    $totalFailures = 0
+    
     $testResults = $summaryContent.results
     foreach ($result in $testResults) {
         $test = @{}
@@ -36,8 +39,10 @@ function Parse-LinuxKitResults {
         $test["TestStage"] = $StageName
         $test["TestName"] = $result.name
         $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
+        $totalTests ++
         if ($result.result -ne 0) {
             $test["TestResult"] = "FAIL"
+            $totalFailures ++
         } else {
             $test["TestResult"] = "PASS"
         }
@@ -45,7 +50,9 @@ function Parse-LinuxKitResults {
         $results += $test
     }
     
-    return $results
+    $summary = "Tests failed: ${totalFailures}/${totalTests}" 
+    
+    return $results, $summary
 }
 
 function Parse-HyperVDockerResults {
@@ -63,6 +70,9 @@ function Parse-HyperVDockerResults {
         throw "Cannot find summary file: ${$HYPERV_DOCKER_SUMMARY}"
     }
 
+    $totalTests = 0
+    $totalFailures = 0
+    
     $testResults = $($summaryContent -split "`r`n`r`n")
     foreach ($result in $testResults) {
         if ($result -eq "" ) {
@@ -74,16 +84,20 @@ function Parse-HyperVDockerResults {
         $test["TestStage"] = $StageName
         $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
         $test["TestName"] = $result[0].Trim()
+        $totalTests ++
         if ($result[12].Split(":")[1].Trim() -ne "0") {
             $test["TestResult"] = "FAIL"
+            $totalFailures ++
         } else {
             $test["TestResult"] = "PASS"
         }
 
         $results += $test
     }
+    
+    $summary = "Tests failed: ${totalFailures}/${totalTests}" 
 
-    return $results
+    return $results, $summary
 }
 
 function Parse-LTPResults {
@@ -101,6 +115,9 @@ function Parse-LTPResults {
         throw "Cannot find summary file: ${$HYPERV_DOCKER_SUMMARY}"
     }
     
+    $totalTests = 0
+    $totalFailures = 0
+    
     $testResults = $($summaryContent | Where-Object {$_ -cmatch "PASS" -or $_ -cmatch "FAIL"})
     foreach ($result in $testResults) {
         if ($result -eq "" ) {
@@ -113,11 +130,16 @@ function Parse-LTPResults {
         $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
         $test["TestName"] = $result.Split(" ")[0]
         $test["TestResult"] = $result.Split(" ")[1]
-        
+        $totalTests ++
+        if ($result.Split(" ")[1].Trim() -eq "FAIL") {
+            $totalFailures ++
+        }
         $results += $test
     }
     
-    return $results
+    $summary = "Tests failed: ${totalFailures}/${totalTests}" 
+    
+    return $results, $summary
 }
 
 function Parse-WSLResults {
@@ -135,6 +157,9 @@ function Parse-WSLResults {
         throw "Cannot find summary file: ${$WSL_SUMMARY}"
     }
     
+    $totalTests = 0
+    $totalFailures = 0
+    
     foreach ($result in $summaryContent) {
         if ($result -eq "") {
             continue
@@ -145,16 +170,20 @@ function Parse-WSLResults {
         $test["TestStage"] = $StageName
         $test["TestDate"] = Get-Date -UFormat "%Y-%m-%d"
         $test["TestName"] = $result.Split(" ")[0]
+        $totalTests ++
         if ($result.Split(" ")[2].Split(":")[1].Trim() -eq "0") {
             $test["TestResult"] = "PASS"
         } else {
+            $totalFailures ++
             $test["TestResult"] = "FAIL"
         }
         
         $results += $test
     }
     
-    return $results
+    $summary = "Tests failed: ${totalFailures}/${totalTests}" 
+    
+    return $results, $summary
 }
 
 function New-JsonReport {
@@ -218,22 +247,22 @@ function Main {
             break
         }
         "LINUXKIT" {
-            $results = Parse-LinuxKitResults -LogPath $LogPath -StageName $StageName `
+            $results, $summary = Parse-LinuxKitResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }
         "DOCKER_HYPERV" {
-            $results = Parse-HyperVDockerResults -LogPath $LogPath -StageName $StageName `
+            $results, $summary = Parse-HyperVDockerResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }
         "LTP" {
-            $results = Parse-LTPResults -LogPath $LogPath -StageName $StageName `
+            $results, $summary = Parse-LTPResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }
         "WSL" {
-            $results = Parse-WSLResults -LogPath $LogPath -StageName $StageName `
+            $results, $summary = Parse-WSLResults -LogPath $LogPath -StageName $StageName `
                 -BuildNumber $BuildNumber
             break
         }
