@@ -612,7 +612,7 @@ function build_debian (){
         fi
         make-kpkg $params
         popd
-        if [[ "light_build" == "False" ]];then
+        if [[ "${light_build}" == "False" ]];then
             build_kernel_metapackages_deb "$source" "$kernel_version_local" "$kernel_git_commit" "$artifacts_dir"
         fi
     elif [[ "$build_state" == "daemons" ]];then
@@ -1082,11 +1082,11 @@ function main {
     build_kernel "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$BASE_DESTINATION_PATH" \
         "$THREAD_NUMBER" "$GIT_BRANCH" "$BUILD_DATE" "$FOLDER_PREFIX" "$PACKAGE_PREFIX" "$CLONE_DEPTH" "$PATCHES" "$DEP_PATH" \
         "$CREATE_CHANGELOG" "$ENABLE_DEBUG" "$DEBUG_CONFIG_PATH" "$CUSTOM_BUILD_TAG" "$LIGHT_BUILD"
-    if [[ "LIGHT_BUILD" == "False" || "$os_FAMILY" == "debian" ]];then
+    if [[ "${LIGHT_BUILD}" == "False" || "$os_FAMILY" == "debian" ]];then
         build_daemons "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DOWNLOAD_METHOD" "$DEBIAN_OS_VERSION" \
             "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     fi
-    if [[ "LIGHT_BUILD" == "False" ]];then
+    if [[ "${LIGHT_BUILD}" == "False" ]];then
         build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
         build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
     fi
