@@ -110,6 +110,10 @@ properties ([
             name: 'FUNCTIONAL_TESTS_PLATFORM',
             description: 'On which platform to run LISAv2 functional tests.'],
         [$class: 'StringParameterDefinition',
+            name: 'FUNCTIONAL_TESTS_NAME',
+            defaultValue: "",
+            description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
+        [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
             defaultValue: "BVT",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
@@ -121,10 +125,6 @@ properties ([
             name: 'FUNCTIONAL_TESTS_TAG',
             defaultValue: "",
             description: 'LISAv2 test case tag. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test tags will be run.'],
-        [$class: 'StringParameterDefinition',
-            name: 'FUNCTIONAL_TESTS_NAME',
-            defaultValue: "",
-            description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
@@ -315,7 +315,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         if (testName.equals(env.LISAV2_PERFORMANCE_TEST)) {
             region = "localhost," + env.HYPERV_SECOND_PERF_NODE
         }
-        osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.DISTRO_AZURE_IMAGE) + "'"
+        osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, params.DISTRO_VERSION) + "'"
     }
 
     if (testIterations) {
@@ -339,6 +339,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -StorageAccount 'ExistingStorage_Standard'" +
         " -ForceDeleteResources" +
         " -XMLSecretFile '${secrets}'"
+
     )
 }
 
