@@ -31,7 +31,7 @@ def getVhdLocation(basePath, distroVersion) {
     return "${basePath}\\" + distroFamily + "\\" + distroVersion + "\\" + distroVersion + ".vhdx"
 }
 
-def prepareEnv(branch, remote, distroVersion, functionalTests) {
+def prepareEnv(branch, remote, distroVersion, functionalTests, platform) {
     cleanWs()
     git branch: branch, url: remote
     script {
@@ -48,7 +48,11 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
           env.LISAV2_PARAMS = "-TestCategory 'BVT'"
       }
       if (functionalTests.contains('FVT')) {
-          env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
+          if (platform == "Azure"){
+              env.LISAV2_PARAMS = "-TestCategory 'Functional,Community,Stress,BVT' -TestArea 'KVP,SRIOV,NETWORK,STORAGE,WALA,CORE,KDUMP,LTP,Xfstesting-cifs,stress,BVT,NVME'"
+          } else if (platform == "HyperV"){
+              env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
+          }
       }
     }
 }
@@ -276,7 +280,7 @@ pipeline {
                   file(credentialsId: 'CBS_Azure_Secrets_File',
                        variable: 'Azure_Secrets_File')
                 ]) {
-                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                         " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
@@ -310,7 +314,7 @@ pipeline {
                   file(credentialsId: 'CBS_Azure_Secrets_File',
                        variable: 'Azure_Secrets_File')
                 ]) {
-                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                    prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                         " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
@@ -378,7 +382,7 @@ pipeline {
           file(credentialsId: 'CBS_Azure_Secrets_File',
                variable: 'Azure_Secrets_File')
         ]) {
-            prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+            prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
             unstashKernel(env.KERNEL_ARTIFACTS_PATH)
             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                 " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
@@ -425,7 +429,7 @@ pipeline {
               string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "HyperV")
                 unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                 script {
                   env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
@@ -468,7 +472,7 @@ pipeline {
               string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "HyperV")
                 unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                 script {
                   env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, "Debian_8.11")
@@ -508,7 +512,7 @@ pipeline {
               file(credentialsId: 'CBS_Azure_Secrets_File',
                    variable: 'Azure_Secrets_File')
             ]) {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS)
+                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
                 unstash 'CapturedVHD.azure.env'
                 script {
                     env.CapturedVHD = readFile 'CapturedVHD.azure.env'
@@ -518,7 +522,6 @@ pipeline {
                     " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
                     " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'Azure'" +
-                    " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
                     " ${env.LISAV2_PARAMS} " +
                     " -OsVHD '${env.CapturedVHD}'" +
                     " -XMLSecretFile '${env.Azure_Secrets_File}'"
