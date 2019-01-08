@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-env.LISAV2_BRANCH = "master"
+env.LISAV2_BRANCH = "stable"
 env.LISAV2_RG_IDENTIFIER = "bisectk"
 
 env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
