@@ -117,6 +117,11 @@ function Download-VstsArtifacts {
                                              }
         $id = "$($identifier['CDP_BUILD_TYPE'])_$($identifier['BUILD_SOURCEBRANCHNAME'])_$($identifier['CDP_BUILD_NUMBER'])"
         Set-Content -Value $id -Path $BuildIdDestination
+        if ($identifier['BUILD_BUILDID'] -ne $null) {
+            $destDir = Split-Path -Parent $BuildIdDestination
+            $urlID = Join-Path $destDir "urlID.txt"
+            Set-Content -Value $identifier['BUILD_BUILDID'] -Path $urlID
+        }
     } else {
         Write-Host "Using package version"
         Set-Content -Value $Version -Path $BuildIdDestination
