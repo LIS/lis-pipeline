@@ -56,6 +56,9 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
       if (functionalTests.contains('FVT')) {
           env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
       }
+      if (functionalTests.contains('ETHTOOL')) {
+          env.LISAV2_PARAMS = "-TestNames 'BVT-NET-ETHTOOL-CHANGE-RINGBUFFER'"
+      }
     }
 }
 
@@ -79,7 +82,7 @@ pipeline {
     choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: 'Standard_E64_v3\nStandard_F72s_v2', description: 'Azure large boot flavor', name: 'LISAV2_AZURE_VM_SIZE_LARGE')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
-    choice(choices: 'BVT\nFVT\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
+    choice(choices: 'BVT\nFVT\nETHTOOL\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
