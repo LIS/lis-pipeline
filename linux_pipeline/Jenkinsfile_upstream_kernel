@@ -480,9 +480,9 @@ pipeline {
                         '''
                         returnValues = returnValues.replaceAll("\r", "").replaceAll("\n", "")
                         returnValues = returnValues.split(';')
-                        env.FUNC_FAIL_ONLOCAL = returnValues[0]
-                        env.FUNC_ABORT_ONLOCAL = returnValues[1]
-                        env.FUNC_PASS_ONLOCAL = returnValues[2]
+                        FUNC_FAIL_ONLOCAL = returnValues[0]
+                        FUNC_ABORT_ONLOCAL = returnValues[1]
+                        FUNC_PASS_ONLOCAL = returnValues[2]
                }
             }
           }
@@ -534,9 +534,9 @@ pipeline {
                         '''
                         returnValues = returnValues.replaceAll("\r", "").replaceAll("\n", "")
                         returnValues = returnValues.split(';')
-                        env.FUNC_FAIL_ONAZURE = returnValues[0]
-                        env.FUNC_ABORT_ONAZURE = returnValues[1]
-                        env.FUNC_PASS_ONAZURE = returnValues[2]
+                        FUNC_FAIL_ONAZURE = returnValues[0]
+                        FUNC_ABORT_ONAZURE = returnValues[1]
+                        FUNC_PASS_ONAZURE = returnValues[2]
                }
             }
           }
@@ -617,12 +617,12 @@ pipeline {
         }
       }
       steps {
-        reportStageStatus("FuncTestsFailedOnLocal", "${env.FUNC_FAIL_ONLOCAL}")
-        reportStageStatus("FuncTestsFailedOnAzure", "${env.FUNC_FAIL_ONAZURE}")
-        reportStageStatus("FuncTestsPassOnLocal", "${env.FUNC_PASS_ONLOCAL}")
-        reportStageStatus("FuncTestsPassOnAzure", "${env.FUNC_PASS_ONAZURE}")
-        reportStageStatus("FuncTestsAbortOnLocal", "${env.FUNC_FAIL_ONLOCAL}")
-        reportStageStatus("FuncTestsAbortOnAzure", "${env.FUNC_FAIL_ONAZURE}")
+        reportStageStatus("FuncTestsFailedOnLocal", "${FUNC_FAIL_ONLOCAL}")
+        reportStageStatus("FuncTestsFailedOnAzure", "${FUNC_FAIL_ONAZURE}")
+        reportStageStatus("FuncTestsPassOnLocal", "${FUNC_PASS_ONLOCAL}")
+        reportStageStatus("FuncTestsPassOnAzure", "${FUNC_PASS_ONAZURE}")
+        reportStageStatus("FuncTestsAbortOnLocal", "${FUNC_FAIL_ONLOCAL}")
+        reportStageStatus("FuncTestsAbortOnAzure", "${FUNC_FAIL_ONAZURE}")
       }
     }
 
