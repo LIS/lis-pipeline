@@ -148,6 +148,7 @@ stage("lisav2") {
                                 )
                                 junit "Report\\*-junit.xml"
                                 archiveArtifacts "TestResults\\**\\*"
+                                archiveArtifacts "Report\\*-junit.xml"
                             }
                         }
                     } catch (exc) {
@@ -185,6 +186,7 @@ stage("lisav2") {
                                 )
                                 junit "Report\\*-junit.xml"
                                 archiveArtifacts "TestResults\\**\\*"
+                                archiveArtifacts "Report\\*-junit.xml"
                             }
                         }
                     } catch (exc) {
@@ -199,4 +201,15 @@ stage("lisav2") {
     }
 
     parallel runs
+
+    node('meta_slave') {
+        stage("send_mail") {
+            emailext (
+                subject: "LISAv2-Staging-Pipeline",
+                body: '${SCRIPT, template="groovy-html.template"}',
+                recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                mimeType : "text/html"
+            )
+        }
+    }
 }
