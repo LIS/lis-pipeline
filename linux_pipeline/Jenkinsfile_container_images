@@ -110,6 +110,7 @@ def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
 skipBuild = false
 BUILD_NAME = ""
+URL_ID = ""
 
 def runTests(versionsMap, hostName){
     testMap.keySet().each {
@@ -519,6 +520,12 @@ stage ("check_kernel") {
                 if (exitCode != 0) {
                     error("Test script returned exit code: ${exitCode}")
                 }
+
+                if (fileExists("./urlID.txt")) {
+                    URL_ID = readFile "./urlID.txt"
+                    URL_ID = URL_ID.trim()
+                }
+
                 BUILD_NAME = readFile "./build_name"
                 if (BUILD_NAME != "" ) {
                     currentBuild.displayName = BUILD_NAME.trim() + "-${env.BUILD_NUMBER}"
@@ -593,6 +600,38 @@ if (!skipBuild) {
                             --db_config '${LCOW_DB_CONFIG}'
                     """
                     deleteDir()
+                }
+            }
+        }
+    }
+
+    if (URL_ID != "") {
+        stage ("publish_vsts_tags") {
+            node (hostName) {
+                withCredentials(bindings: [string(credentialsId: 'BASE_VSTS_URL', variable: 'VSTS_URL'),
+                                           string(credentialsId: 'LCOW_VSTS_TOKEN', variable: 'LCOW_VSTS_TOKEN')]) {
+                    dir ("lcow-report-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                        checkout scm
+                        def tags = "JenkinsTested=True"
+                        STAGES_RESULTS.keySet().each {
+                            def result = ""
+                            if (STAGES_RESULTS[key] != 0) {
+                                result = "FAIL"
+                            } else {
+                                result = "PASS"
+                            }
+                            tags += "${it}=${result};"
+                        }
+                        def exitCode = PowerShellWrapper("""
+                            & '.\\scripts\\lcow\\Publish-VstsTags.ps1'
+                                -RestToken '${env.LCOW_VSTS_TOKEN}'
+                                -BaseUrl '${env.VSTS_URL}'
+                                -BuildID '${URL_ID}'
+                                -Tags '${tags}'
+                            """)
+
+                        deleteDir()
+                    }
                 }
             }
         }
