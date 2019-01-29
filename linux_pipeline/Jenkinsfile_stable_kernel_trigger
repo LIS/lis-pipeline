@@ -9,7 +9,7 @@ env.KERNEL_TREE = "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-
 env.DISTRO = "Ubuntu_18.04.1;CentOS_7.5"
 env.AZURE_BOOT_LARGE_FLAVOR = "Standard_E64_v3"
 env.FUNCTIONAL_TESTS = "FVT"
-env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv"
+env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv, publish_results"
 
 node ("meta_slave") {
     stage ("Trigger pipeline") {
