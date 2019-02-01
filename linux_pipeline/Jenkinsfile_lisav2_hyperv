@@ -73,7 +73,7 @@ if (ECONOMY_MODE == "true") {
 }
 
 
-def regionAzure = "staginglisav2"
+def regionAzure = "staging"
 def osImageAzure = "RedHat RHEL 7-RAW 7.5.2018050901"
 def vmSizeAzure = "Standard_D14_v2"
 def testIterationsAzure = "1"
@@ -141,7 +141,6 @@ stage("lisav2") {
                                 " -TestPlatform  'HyperV'" +
                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
                                 " ${testParameterHyperV}" +
-                                " -ForceDeleteResources" +
                                 " -XMLSecretFile '${HyperV_Secrets_File}'" +
                                 " -ExitWithZero" +
                                 economyModeFlag
