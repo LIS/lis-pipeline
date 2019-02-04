@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/x86 4.14.83 Kernel Configuration
+# Linux/x86 4.14.96 Kernel Configuration
 #
 CONFIG_64BIT=y
 CONFIG_X86_64=y
@@ -1256,7 +1256,7 @@ CONFIG_IP_NF_MANGLE=m
 # CONFIG_IP_NF_TARGET_ECN is not set
 # CONFIG_IP_NF_TARGET_TTL is not set
 CONFIG_IP_NF_RAW=m
-# CONFIG_IP_NF_SECURITY is not set
+CONFIG_IP_NF_SECURITY=m
 # CONFIG_IP_NF_ARPTABLES is not set
 
 #
