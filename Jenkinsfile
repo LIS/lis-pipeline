@@ -48,9 +48,9 @@ def prepareEnv(branch, remote, distroVersion, functionalTests, platform) {
           env.LISAV2_PARAMS = "-TestCategory 'BVT'"
       }
       if (functionalTests.contains('FVT')) {
-          if (platform == "Azure"){
-              env.LISAV2_PARAMS = "-TestCategory 'Functional,Community,Stress,BVT' -TestArea 'KVP,SRIOV,NETWORK,STORAGE,WALA,CORE,KDUMP,LTP,Xfstesting-cifs,stress,BVT,NVME'"
-          } else if (platform == "HyperV"){
+          if (platform == "Azure") {
+              env.LISAV2_PARAMS = "-TestCategory 'Functional,Community,Stress,BVT' -TestArea 'KVP,SRIOV,NETWORK,STORAGE,WALA,CORE,KDUMP,LTP,stress,BVT,NVME'"
+          } else if (platform == "HyperV") {
               env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
           }
       }
