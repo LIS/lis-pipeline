@@ -2,7 +2,7 @@
 
 env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
 env.SEND_EMAIL = true
-env.BUILD_KERNEL_ARTIFACTS = true
+env.BUILD_KERNEL_ARTIFACTS = false
 env.KERNEL_ARTIFACTS_SMB_PATH = ""
 env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
 
