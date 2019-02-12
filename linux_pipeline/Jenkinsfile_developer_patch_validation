@@ -291,6 +291,11 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
     if (testName.equals(env.LISAV2_AZURE_STRESS_TEST)) {
         vmSize = "-OverrideVMSize '${params.AZURE_BOOT_STRESS_VM_SIZE}'"
     }
+    def testVmSize = "Standard_M64ms"
+    if (env.CUSTOM_BUILD_TAG.contains("unpatched")) {
+        testVmSize = "Standard_M128ms"
+    }
+    vmSize = "-OverrideVMSize '${testVmSize}'"
     if (platform.equals('HyperV')) {
         region = "localhost"
         if (testName.equals(env.LISAV2_PERFORMANCE_TEST)) {
