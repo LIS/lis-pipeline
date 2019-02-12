@@ -276,7 +276,7 @@ def buildKernel() {
 def runLisa(platform, secrets, testName, testCategory, testArea, testTag, customTestParams, testIterations) {
     def customKernel = ""
     def osVHD = ""
-    def region = params.LISAV2_AZURE_REGION
+    def region = params.LISAV2_AZURE_REGION.trim()
     def vmSize = ""
     def customTestIterations = ""
 
