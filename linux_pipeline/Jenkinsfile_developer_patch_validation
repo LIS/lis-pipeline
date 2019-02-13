@@ -322,7 +322,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -TestArea '${testArea}'" +
         " -TestTag '${testTag}'" +
         " -CustomParameters '${customTestParams}'" +
-        " -StorageAccount 'ExistingStorage_Standard'" +
+        " -StorageAccount 'ExistingStorage_Premium'" +
         " -XMLSecretFile '${secrets}'"
     )
 }
