@@ -3,6 +3,33 @@
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
+
+def GetTestResults(type) {
+    withEnv(["Type=${type}"]) {
+        def returnValues = powershell returnStdout: true, script: '''$file = Get-Item ".\\Report\\*-junit.xml" | Sort-Object LastWriteTimeUtc | select -Last 1
+           $content = [xml](Get-Content $file)
+           $failCase = [int]($content.testsuites.testsuite.failures)
+           $allCase = [int]($content.testsuites.testsuite.tests)
+           $abortCase = [int]($content.testsuites.testsuite.errors)
+           $skippedCase = [int]($content.testsuites.testsuite.skipped)
+           $passCase = $allCase - $failCase - $abortCase - $skippedCase
+
+           if ($env:Type -eq "pass") {
+               return $passCase
+           } elseif ($env:Type -eq "abort") {
+               return $abortCase
+           } elseif ($env:Type -eq "fail") {
+               return $failCase
+           } elseif ($env:Type -eq "skipped") {
+               return $skippedCase
+           } elseif ($env:Type -eq "all") {
+               return $allCase
+           }
+           '''
+        return "${returnValues}"
+    }
+}
+
 def reportStageStatus(stageName, stageStatus) {
     script {
         env.STAGE_NAME_REPORT = stageName
@@ -78,7 +105,7 @@ pipeline {
     choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     choice(choices: 'BVT\nFVT\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_jessie_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_jessie_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv, publish_results",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -97,6 +124,14 @@ pipeline {
     FOLDER_PREFIX = 'msft'
     AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
     AZURE_CENTOS_7_IMAGE = "OpenLogic CentOS 7.5 latest"
+    FUNC_FAIL_ONAZURE = 0
+    FUNC_FAIL_ONLOCAL = 0
+    FUNC_PASS_ONAZURE = 0
+    FUNC_PASS_ONLOCAL = 0
+    FUNC_ABORT_ONAZURE = 0
+    FUNC_ABORT_ONLOCAL = 0
+    FUNC_SKIP_ONAZURE = 0
+    FUNC_SKIP_ONLOCAL = 0
   }
   options {
     overrideIndexTriggers(false)
@@ -443,7 +478,8 @@ pipeline {
                     " ${env.LISAV2_PARAMS}" +
                     " -OsVHD '${env.HYPERV_VHD_PATH}'" +
                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                    " -XMLSecretFile '${env.HyperV_Secrets_File}'"
+                    " -XMLSecretFile '${env.HyperV_Secrets_File}'" +
+                    " -ExitWithZero"
                 )
             }
           }
@@ -451,6 +487,16 @@ pipeline {
             always {
               junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
+              script {
+                  def passCount = GetTestResults("pass")
+                  def abortCount = GetTestResults("abort")
+                  def failCount = GetTestResults("fail")
+                  def skippedCount = GetTestResults("skipped")
+                  FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                  FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                  FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                  FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+               }
             }
           }
         }
@@ -486,7 +532,8 @@ pipeline {
                     " ${env.LISAV2_PARAMS}" +
                     " -OsVHD '${env.HYPERV_VHD_PATH}'" +
                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                    " -XMLSecretFile '${env.HyperV_Secrets_File}'"
+                    " -XMLSecretFile '${env.HyperV_Secrets_File}'" +
+                    " -ExitWithZero"
                 )
             }
           }
@@ -494,6 +541,16 @@ pipeline {
             always {
               junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
+              script {
+                  def passCount = GetTestResults("pass")
+                  def abortCount = GetTestResults("abort")
+                  def failCount = GetTestResults("fail")
+                  def skippedCount = GetTestResults("skipped")
+                  FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                  FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                  FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                  FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+               }
             }
           }
         }
@@ -525,7 +582,8 @@ pipeline {
                     " -TestPlatform 'Azure'" +
                     " ${env.LISAV2_PARAMS} " +
                     " -OsVHD '${env.CapturedVHD}'" +
-                    " -XMLSecretFile '${env.Azure_Secrets_File}'"
+                    " -XMLSecretFile '${env.Azure_Secrets_File}'" +
+                    " -ExitWithZero"
                 )
             }
           }
@@ -533,6 +591,16 @@ pipeline {
             always {
               junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
+              script {
+                  def passCount = GetTestResults("pass")
+                  def abortCount = GetTestResults("abort")
+                  def failCount = GetTestResults("fail")
+                  def skippedCount = GetTestResults("skipped")
+                  FUNC_PASS_ONAZURE = FUNC_PASS_ONAZURE.toInteger() + passCount.toInteger()
+                  FUNC_ABORT_ONAZURE = FUNC_ABORT_ONAZURE.toInteger() + abortCount.toInteger()
+                  FUNC_FAIL_ONAZURE = FUNC_FAIL_ONAZURE.toInteger() + failCount.toInteger()
+                  FUNC_SKIP_ONAZURE = FUNC_SKIP_ONAZURE.toInteger() + skippedCount.toInteger()
+               }
             }
           }
         }
@@ -600,5 +668,28 @@ pipeline {
         }
       }
     }
+
+    stage('publish_results') {
+      when {
+        beforeAgent true
+        expression { params.ENABLED_STAGES.contains('publish_results') }
+      }
+      agent {
+        node {
+          label 'meta_slave'
+        }
+      }
+      steps {
+        reportStageStatus("FuncTestsFailedOnLocal", "${FUNC_FAIL_ONLOCAL}")
+        reportStageStatus("FuncTestsFailedOnAzure", "${FUNC_FAIL_ONAZURE}")
+        reportStageStatus("FuncTestsPassOnLocal", "${FUNC_PASS_ONLOCAL}")
+        reportStageStatus("FuncTestsPassOnAzure", "${FUNC_PASS_ONAZURE}")
+        reportStageStatus("FuncTestsAbortOnLocal", "${FUNC_ABORT_ONLOCAL}")
+        reportStageStatus("FuncTestsAbortOnAzure", "${FUNC_ABORT_ONAZURE}")
+        reportStageStatus("FuncTestsSkippedOnAzure", "${FUNC_SKIP_ONAZURE}")
+        reportStageStatus("FuncTestsSkippedOnLocal", "${FUNC_SKIP_ONLOCAL}")
+      }
+    }
+
   }
 }
