@@ -67,8 +67,8 @@ azureImages.each {
                                 " -TestIterations ${TEST_ITERATIONS}" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
-                                " -UseManagedDisks" +
-                                " -ResourceCleanup 'Delete'" +
+                                " -CustomParameters 'DiskType = Managed'" +
+                                " -ResourceCleanup Delete" +
                                 " -ExitWithZero"
                                 )
                                 junit "Report\\*-junit.xml"
