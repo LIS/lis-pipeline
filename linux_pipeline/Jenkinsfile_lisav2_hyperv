@@ -179,7 +179,7 @@ stage("lisav2") {
                                 " -TestIterations ${testIterationsAzure}" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
-                                " -ForceDeleteResources" +
+                                " -ResourceCleanup 'Delete'" +
                                 " -ExitWithZero" +
                                 economyModeFlag
                                 )
