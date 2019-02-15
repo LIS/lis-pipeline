@@ -68,7 +68,7 @@ azureImages.each {
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                 " -UseManagedDisks" +
-                                " -ForceDeleteResources" +
+                                " -ResourceCleanup 'Delete'" +
                                 " -ExitWithZero"
                                 )
                                 junit "Report\\*-junit.xml"
