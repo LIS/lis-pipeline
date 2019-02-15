@@ -292,7 +292,7 @@ pipeline {
                         " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
                         " -StorageAccount 'ExistingStorage_Standard'" +
                         " -XMLSecretFile '${env.Azure_Secrets_File}'" +
-                        " -UseManagedDisks"
+                        " -CustomParameters 'DiskType = Managed'"
                     )
                 }
             }
@@ -326,7 +326,7 @@ pipeline {
                         " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
                         " -StorageAccount 'ExistingStorage_Standard'" +
                         " -XMLSecretFile '${env.Azure_Secrets_File}'" +
-                        " -UseManagedDisks"
+                        " -CustomParameters 'DiskType = Managed'"
                     )
                 }
             }
