@@ -292,7 +292,7 @@ def buildKernel() {
 def runLisa(platform, secrets, testName, testCategory, testArea, testTag, customTestParams, testIterations) {
     def customKernel = ""
     def osVHD = ""
-    def region = params.LISAV2_AZURE_REGION
+    def region = params.LISAV2_AZURE_REGION.trim()
     def vmSize = ""
     def customTestIterations = ""
 
@@ -322,6 +322,11 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         customTestIterations = " -DeployVMPerEachTest -TestIterations " + testIterations
     }
 
+    def storageType = "-StorageAccount 'ExistingStorage_Standard'"
+    if (env.AZURE_PERF_TESTS && env.AZURE_PERF_TESTS.contains('STORAGE')) {
+        storageType = "-StorageAccount 'ExistingStorage_Premium'"
+    }
+
     RunPowershellCommand(".\\Run-LisaV2.ps1" +
         " -TestLocation '${region}'" +
         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
@@ -336,7 +341,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -TestArea '${testArea}'" +
         " -TestTag '${testTag}'" +
         " -CustomParameters '${customTestParams}'" +
-        " -StorageAccount 'ExistingStorage_Standard'" +
+        " ${storageType}" +
         " -ForceDeleteResources" +
         " -XMLSecretFile '${secrets}'"
 
