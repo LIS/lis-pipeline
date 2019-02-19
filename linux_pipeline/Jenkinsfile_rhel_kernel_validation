@@ -41,10 +41,10 @@ def getVersionFromURL(lisLink){
 
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
-        withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'), 
+        withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'),
                                    string(credentialsId: 'REMOTE_HTML_LOCATION',
                                           variable: 'REMOTE_HTML_LOCATION')]) {
-            dir ("check_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) { 
+            dir ("check_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) {
                 checkout scm
                 echo 'Checking if there is a new kernel version'
                 PowerShellWrapper('''
@@ -59,7 +59,7 @@ stage ("Check for kernel") {
                 echo 'Kernel versions checked'
                 deleteDir()
             }
-        } 
+        }
     }
 }
 

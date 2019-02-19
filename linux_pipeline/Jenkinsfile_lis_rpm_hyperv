@@ -59,11 +59,11 @@ def getDistros (distros, supportedDistros) {
     def validatedDistros = []
     suppList = supportedDistros.split(",")
     distros = distros.split(",")
-    
+
     for (distro in distros) {
         distroType = distro.split("_")[0]
         distroVersion = distro.split("_")[1]
-        
+
         if (distroVersion.toLowerCase() == "all") {
             for (suppDistro in suppList){
                 if (distroType.toLowerCase() == suppDistro.split("_")[0]) {
@@ -134,7 +134,7 @@ stage ("Deploy stage") {
                                             -JobId '${it}-d-${BUILD_NUMBER}'
                                             -InstanceName '${it}-deploy'
                                             -DistroVersion '${it}' -WorkingDirectory 'C:\\workspace'
-                                            -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}' 
+                                            -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}'
                                             -XmlTest 'lis_pipeline_deploy_scenarios.xml'
                                             -LisaTestDependencies '${LISA_TEST_DEPENDENCIES}'
                                             -LisUrl "\${env:LIS_ARCHIVE_LINK}"
@@ -157,12 +157,12 @@ stage ("Deploy stage") {
             }
         }
     }
-    
+
     try {
         if(env.ENABLED_STAGES.contains("deployment_scenarios")) {
             parallel runs
         }
-    } catch (exc) { 
+    } catch (exc) {
         currentBuild.result = 'SUCCESS'
     }
 }
@@ -201,7 +201,7 @@ stage("Validation stage") {
                                         string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
                                         string(credentialsId: 'LISA_TEST_DEPENDENCIES', variable: 'LISA_TEST_DEPENDENCIES'),
                                         string(credentialsId: 'LISA_LOG_DESTINATION', variable: 'LISA_LOG_DESTINATION'),
-                                        string(credentialsId: 'DB_CONFIG_VALIDATION', variable: 'DB_CONFIG_VALIDATION')]) { 
+                                        string(credentialsId: 'DB_CONFIG_VALIDATION', variable: 'DB_CONFIG_VALIDATION')]) {
                                 def sleepTime = globalSleepTime
                                 globalSleepTime = globalSleepTime + 30
                                 dir ("b${BUILD_NUMBER}") {
@@ -212,7 +212,7 @@ stage("Validation stage") {
                                             -JobId '${it}-b-${BUILD_NUMBER}'
                                             -InstanceName '${it}-${TEST_TYPE}'
                                             -DistroVersion '${it}' -WorkingDirectory 'C:\\workspace'
-                                            -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}' 
+                                            -LISAImagesShareUrl '${LISA_IMAGES_SHARE_URL}'
                                             -XmlTest '${XML_NAME}'
                                             -LisaTestDependencies '${LISA_TEST_DEPENDENCIES}'
                                             -LisUrl "\${env:LIS_ARCHIVE_LINK}"
@@ -232,7 +232,7 @@ stage("Validation stage") {
             }
         }
     }
-    
+
     try {
         if(env.ENABLED_STAGES.contains("validation")) {
             parallel runs
