@@ -28,14 +28,19 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   cosmic:'ubuntu_18.10\\ubuntu_18.10_gen1_gen2.vhdx']
 def HYPERV_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
-    FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
+    FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE' -ExcludeTests 'VHDX-RESIZE-LIVE-MIGRATION'",
     FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'",
     FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
 def AZURE_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
     FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
-    FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
-def AZURE_PERFORMANCE_TESTS_HASH = [PERFORMANCE_NETWORK:"-TestCategory 'Performance' -TestArea 'NETWORK'",
-    PERFORMANCE_STORAGE:"-TestNames 'PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K' -StorageAccount 'ExistingStorage_Premium'"]
+    FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'",
+    FUNCTIONAL_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
+    FUNCTIONAL_GPU:"-TestNames 'NVIDIA-CUDA-DRIVER-VALIDATION' -OverrideVMSize 'Standard_NC24'"]
+def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
+    PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
+    PERF_SINGLE_IPERF:"-TestNames 'PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV' -ResultDBTable 'Perf_Network_Single_TCP_Azure_DefaultKernel'",
+    PERF_LATENCY:"-TestNames 'PERF-NETWORK-TCP-LATENCY-MULTICONNECTION-Synthetic,PERF-NETWORK-TCP-LATENCY-MULTICONNECTION-SRIOV' -ResultDBTable 'Perf_Network_Latency_Azure_DefaultKernel'",
+    PERF_STORAGE_4K:"-TestNames 'PERF-STORAGE-4K-IO' -StorageAccount 'ExistingStorage_Premium' -ResultDBTable 'Perf_Storage_Azure_DefaultKernel'"]
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 PLATFORM_HYPERV = "hyperv"
 PLATFORM_AZURE = "azure"
