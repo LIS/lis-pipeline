@@ -6,7 +6,7 @@ def RunPowershellCommand(psCmd) {
 
 properties ([
     parameters([
-        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\ncosmic', 
+        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\ncosmic',
                 description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> cosmic - 18.10 validation'),
         choice (name: 'Kernel', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
@@ -34,7 +34,7 @@ def HYPERV_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
 def AZURE_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
     FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
     FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
-def AZURE_PERFORMANCE_TESTS_HASH = [PERFORMANCE_NETWORK:"-TestCategory 'Performance' -TestArea 'Network'",
+def AZURE_PERFORMANCE_TESTS_HASH = [PERFORMANCE_NETWORK:"-TestCategory 'Performance' -TestArea 'NETWORK'",
     PERFORMANCE_STORAGE:"-TestNames 'PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K' -StorageAccount 'ExistingStorage_Premium'"]
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 PLATFORM_HYPERV = "hyperv"
@@ -166,7 +166,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                 }
             }
         }
-        parallel runs  
+        parallel runs
     }
 } else {
     echo "Skipping Hyper-V validation"
@@ -230,7 +230,7 @@ if (env.sendMail == "yes"){
                 if (env.kernel == "linux-azure") {
                     version_identifier = "_azure"
                 } else {
-                    version_identifier = "_edge" 
+                    version_identifier = "_edge"
                 }
                 kernels_info = readFile (LATEST_VERSION_LOCATION)
                 kernels_info = kernels_info.split("\n")
@@ -253,5 +253,5 @@ if (env.sendMail == "yes"){
                 )
             }
         }
-    } 
+    }
 }

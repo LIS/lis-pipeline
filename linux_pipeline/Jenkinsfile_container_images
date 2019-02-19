@@ -85,7 +85,7 @@ env.LINUXKIT_BASE_NUMBER = "58"
 // This value represents the number of expected failures in the hyperv test stage
 // The stage will fail if the number of failures is greater than HYPERV_BASE_NUMBER
 // default to 5 failures
-env.HYPERV_BASE_NUMBER = "5"  
+env.HYPERV_BASE_NUMBER = "5"
 
 env.LAST_VERSION_FILE = "C:\\LCOW_LATEST_VERSION.txt"
 env.ARTIFATCS_DESTINATION = "C:\\Program Files\\Linux Containers"
@@ -194,13 +194,13 @@ def createStageReport(stageName, testType, logPath, exitCode) {
             -BuildNumber '${BUILD_NAME}'
             -StageSummary '.\\summary.log'
     """)
-    
+
     def summaryExists = fileExists 'summary.log'
     if (summaryExists) {
         def summary = readFile 'summary.log'
         STAGES_SUMMARY[stageName] = summary.trim()
     }
-    
+
     if (eCode != 0) {
         error("Test script returned exit code: ${eCode}")
     }
