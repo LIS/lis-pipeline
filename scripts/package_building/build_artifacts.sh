@@ -516,6 +516,7 @@ function prepare_perf_debian (){
     else 
         pushd "${source}/tools/perf"
         change_perf_options "./Makefile.perf" "NO_GTK2=True;NO_LIBAUDIT=True"
+        make DESTDIR="$pack_folder" clean
         make DESTDIR="$pack_folder" install install-doc
         pushd "$pack_folder"
         mkdir "./usr"
