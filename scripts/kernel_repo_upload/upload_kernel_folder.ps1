@@ -32,7 +32,7 @@ function Upload-FileToKernelRepo {
     [String] $RepoCertPath
     )
 
-    & $CURL_PATH -v -X PUT -T $File "$RepoUrl/$RepoType" `
+    & $CURL_PATH -v --fail -X PUT -T $File "$RepoUrl/$RepoType" `
         -H "Authorization: Bearer ${RepoApiKey}" --cacert $RepoCertPath
     if ($LASTEXITCODE) {
         throw "Could not upload file $File to repo!"
