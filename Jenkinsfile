@@ -90,7 +90,7 @@ pipeline {
     KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
     BUILD_PATH = '/mnt/tmp/kernel-build-folder'
     KERNEL_CONFIG = 'Microsoft/config-azure'
-    CLEAN_ENV = 'False'
+    CLEAN_ENV = 'True'
     USE_CCACHE = 'True'
     BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
