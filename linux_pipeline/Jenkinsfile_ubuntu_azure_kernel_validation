@@ -29,7 +29,7 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   cosmic:'ubuntu_18.10\\ubuntu_18.10_gen1_gen2.vhdx']
 def HYPERV_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
     FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE' -ExcludeTests 'VHDX-RESIZE-LIVE-MIGRATION'",
-    FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'",
+    FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP' -ExcludeTests 'LIS-CHECK-HYPERVDAEMONS-FILES-STATUS,DYNAMIC-MEMORY-HIGH-PRIORITY,ETHTOOL-CHECK-STATISTICS'",
     FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
 def AZURE_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
     FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
@@ -49,7 +49,8 @@ LABEL_SRIOV = "sriov_mlnx"
 LABEL_WS2016 = "ws2016"
 LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 LISAV2_BRANCH = "master"
-AZURE_LOCATION = "westus2"
+AZURE_LOCATION_DEFAULT = "westus2"
+AZURE_LOCATION_NVME = "eastus2"
 AZURE_ID = "ubuntuAz"
 
 def ARM_DISTRO = ARM_DISTRO_HASH.find{it.key == env.distro}.value
@@ -70,6 +71,11 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
             def test_cmd = it.value
             runs["${test_type}"] = {
                 stage ("${test_type}") {
+                    if (test_cmd.contains("NVME")){
+                        AZURE_LOCATION = AZURE_LOCATION_NVME
+                    } else {
+                        AZURE_LOCATION = AZURE_LOCATION_DEFAULT
+                    }
                     node ("azure"){
                         try {
                             timeout (32400) {
@@ -193,9 +199,9 @@ if (env.performance == "yes") {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                            " -TestLocation '${AZURE_LOCATION}'" +
+                                            " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
