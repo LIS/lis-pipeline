@@ -27,15 +27,15 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   xenial:'ubuntu_16.04.5\\ubuntu_16.04.5.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   cosmic:'ubuntu_18.10\\ubuntu_18.10_gen1_gen2.vhdx']
-def HYPERV_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
-    FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE' -ExcludeTests 'VHDX-RESIZE-LIVE-MIGRATION'",
-    FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP' -ExcludeTests 'LIS-CHECK-HYPERVDAEMONS-FILES-STATUS,DYNAMIC-MEMORY-HIGH-PRIORITY,ETHTOOL-CHECK-STATISTICS'",
-    FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
-def AZURE_VALIDATION_TESTS_HASH = [BVT:"-TestCategory 'BVT'",
-    FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
-    FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'",
-    FUNCTIONAL_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
-    FUNCTIONAL_GPU:"-TestNames 'NVIDIA-CUDA-DRIVER-VALIDATION' -OverrideVMSize 'Standard_NC24'"]
+def HYPERV_VALIDATION_TESTS_HASH = [HV_BVT:"-TestCategory 'BVT'",
+    HV_FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE' -ExcludeTests 'VHDX-RESIZE-LIVE-MIGRATION'",
+    HV_FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP' -ExcludeTests 'LIS-CHECK-HYPERVDAEMONS-FILES-STATUS,DYNAMIC-MEMORY-HIGH-PRIORITY,ETHTOOL-CHECK-STATISTICS,DYNAMIC-MEMORY-MAX-MEMORY-HONORED,DYNAMIC-MEMORY-MIN-MEMORY-HONORED'",
+    HV_FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
+def AZURE_VALIDATION_TESTS_HASH = [AZURE_BVT:"-TestCategory 'BVT'",
+    AZURE_FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE'",
+    AZURE_FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'",
+    AZURE_FUNCTIONAL_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
+    AZURE_FUNCTIONAL_GPU:"-TestNames 'NVIDIA-CUDA-DRIVER-VALIDATION' -OverrideVMSize 'Standard_NC24'"]
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
     PERF_SINGLE_IPERF:"-TestNames 'PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV' -ResultDBTable 'Perf_Network_Single_TCP_Azure_DefaultKernel'",
@@ -71,6 +71,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
             def test_cmd = it.value
             runs["${test_type}"] = {
                 stage ("${test_type}") {
+                    def AZURE_LOCATION = ""
                     if (test_cmd.contains("NVME")){
                         AZURE_LOCATION = AZURE_LOCATION_NVME
                     } else {
@@ -95,8 +96,8 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
+                                        archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
-                                        archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }
                                 }
@@ -160,8 +161,8 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
+                                        archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
-                                        archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }
                                 }
@@ -210,8 +211,8 @@ if (env.performance == "yes") {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
+                                        archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
-                                        archiveArtifacts "TestResults\\**\\*"
                                         deleteDir()
                                     }
                                 }
@@ -254,13 +255,7 @@ if (env.sendMail == "yes"){
                     subject: "Test results for ${env.distro} ${latest_kernel_version} ${env.kernel} kernel",
                     to: "${env.MAIL_LIST}",
                     mimeType : "text/html",
-                    body: """
-                        Hello,<br/><br/>
-                        Validation and Performance have been run for ${env.distro} ${latest_kernel_version} ${env.kernel} kernel.
-                        You can check the results at the following link:<br>
-                        ${env.RUN_DISPLAY_URL} <br/><br/>
-                        Thank you,<br/>Jenkins CI
-                    """
+                    body: '${SCRIPT, template="ubuntu.template"}'
                 )
             }
         }
