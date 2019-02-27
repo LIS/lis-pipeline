@@ -895,8 +895,9 @@ function main {
     ENABLE_DEBUG='False'
     # Note(v-advlad): Build only kernel and headers
     LIGHT_BUILD='False'
+    BUILD_PERF='True'
 
-    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k:m:r: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,custom_build_tag:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug:,light_build: -n 'build_artifacts.sh' -- "$@")
+    TEMP=$(getopt -o w:e:t:y:u:i:o:p:a:s:d:f:g:h:j:n:l:z:x:c:k:m:r:b: --long git_url:,git_branch:,archive_url:,local_path:,build_path:,debian_os_version:,artifacts_folder_prefix:,thread_number:,destination_path:,kernel_config:,default_branch:,git_tag:,clone_depth:,patch_file:,create_changelog:,build_date:,custom_build_tag:,use_ccache:,clean_env:,install_deps:,use_kernel_folder_prefix:,enable_kernel_debug:,light_build:,build_perf: -n 'build_artifacts.sh' -- "$@")
     if [[ $? -ne 0 ]]; then
         exit 1
     fi
@@ -1022,6 +1023,11 @@ function main {
                     "") shift 2 ;;
                     *) LIGHT_BUILD="$2" ; shift 2 ;;
                 esac ;;
+            --build_perf)
+                case "$2" in
+                    "") shift 2 ;;
+                    *) BUILD_PERF="$2" ; shift 2 ;;
+                esac ;;
             --) shift ; break ;;
             *) echo "Wrong parameters!" ; exit 1 ;;
         esac
@@ -1089,7 +1095,9 @@ function main {
     fi
     if [[ "${LIGHT_BUILD}" == "False" ]];then
         build_tools "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
-        build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+        if [[ "${BUILD_PERF}" == "True" ]];then
+            build_perf "$BASE_DIR" "$SOURCE_PATH" "$os_FAMILY" "$DESTINATION_PATH" "$DEP_PATH" "$PACKAGE_PREFIX"
+        fi
     fi
     if [[ "$INITIAL_BRANCH_NAME" == "stable" ]] || [[ "$INITIAL_BRANCH_NAME" == "unstable" ]];then
         pushd $BASE_DESTINATION_PATH
