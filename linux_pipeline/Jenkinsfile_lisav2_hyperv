@@ -58,7 +58,10 @@ properties ([
             name: 'OS_IMAGE_AZURE'],
         [$class: 'StringParameterDefinition',
             description: 'Whether to use a custom kernel location.',
-            name: 'CUSTOM_KERNEL']
+            name: 'CUSTOM_KERNEL'],
+        [$class: 'StringParameterDefinition',
+            description: 'Whether to use a custom vm size.',
+            name: 'OVERRIDE_VM_SIZE']
         ]
     ]
 ])
@@ -100,6 +103,10 @@ if (VM_GENERATION_2 == "true") {
 
 if (CUSTOM_KERNEL) {
     testParameter += " -CustomKernel '${CUSTOM_KERNEL}' "
+}
+
+if (OVERRIDE_VM_SIZE) {
+    testParameter += " -OverrideVMSize '${OVERRIDE_VM_SIZE}' "
 }
 
 testParameterHyperV = testParameter
