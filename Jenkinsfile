@@ -50,6 +50,7 @@ def prepareEnv(branch, remote, distroVersion, functionalTests, platform) {
       if (functionalTests.contains('FVT')) {
           if (platform == "Azure") {
               env.LISAV2_PARAMS = "-TestCategory 'Functional,Community,Stress,BVT' -TestArea 'KVP,SRIOV,NETWORK,STORAGE,WALA,CORE,KDUMP,LTP,STRESS,BVT,NVME'"
+              LISAV2_AZURE_REGION = "eastus2"
           } else if (platform == "HyperV") {
               env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP'"
           }
@@ -283,7 +284,7 @@ pipeline {
                     prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                        " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                        " -TestLocation '${LISAV2_AZURE_REGION}'" +
                         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                         " -TestPlatform 'Azure'" +
                         " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
@@ -317,7 +318,7 @@ pipeline {
                     prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
                     unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                        " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                        " -TestLocation '${LISAV2_AZURE_REGION}'" +
                         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                         " -TestPlatform 'Azure'" +
                         " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
@@ -385,7 +386,7 @@ pipeline {
             prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
             unstashKernel(env.KERNEL_ARTIFACTS_PATH)
             RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                " -TestLocation '${LISAV2_AZURE_REGION}'" +
                 " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                 " -TestPlatform 'Azure'" +
                 " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
@@ -519,7 +520,7 @@ pipeline {
                 }
                 println("VHD under test : ${env.CapturedVHD}")
                 RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                    " -TestLocation '${env.LISAV2_AZURE_REGION}'" +
+                    " -TestLocation '${LISAV2_AZURE_REGION}'" +
                     " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
                     " -TestPlatform 'Azure'" +
                     " ${env.LISAV2_PARAMS} " +
