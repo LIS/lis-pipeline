@@ -15,7 +15,7 @@ $HtmlStart = '
 .tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#999;color:#444;background-color:#F7FDFA;}
 .tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#999;color:#fff;background-color:#26ADE4;}
 .tg .tg-baqh{text-align:left;vertical-align:top}
-.tg .tg-lqy6{text-align:right;vertical-align:top}
+.tg .tg-lqy6{text-align:left;vertical-align:top}
 .tg .tg-yw4l{vertical-align:top}
 .tg .tg-amwmleft{text-align:left;font-weight:bold;vertical-align:top}
 </style>
