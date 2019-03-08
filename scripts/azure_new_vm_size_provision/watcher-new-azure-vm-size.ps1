@@ -8,6 +8,36 @@
 )
 
 function Main {
+
+$HtmlStart = '
+<style type="text/css">
+.tg  {border-collapse:collapse;border-spacing:0;border-color:#999;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#999;color:#444;background-color:#F7FDFA;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:#999;color:#fff;background-color:#26ADE4;}
+.tg .tg-baqh{text-align:left;vertical-align:top}
+.tg .tg-lqy6{text-align:left;vertical-align:top}
+.tg .tg-yw4l{vertical-align:top}
+.tg .tg-amwmleft{text-align:left;font-weight:bold;vertical-align:top}
+</style>
+<table class="tg">
+  <tr>
+    <th class="tg-amwmleft">SR. #</th>
+    <th class="tg-amwmleft">Region</th>
+    <th class="tg-amwmleft">Size</th>
+    <th class="tg-amwmleft">Added/Removed</th>    
+  </tr>
+'
+
+$HtmlRow = '
+  <tr>
+    <td class="tg-yw4l">NEWSERIAL</td>
+    <td class="tg-baqh">NEWREGION</td>
+    <td class="tg-lqy6">NEWSIZE</td>
+    <td class="tg-lqy6">ADDREMOVESTATUS</td>
+  </tr>
+'
+$HtmlEnd = '</table><p style="text-align: right;"><em><span style="font-size: 18px;"><span style="font-family: times new roman,times,serif;">&gt;</span></span></em></p>'
+
     if ( $customSecretsFilePath ) {
         $secretsFile = $customSecretsFilePath
         Write-Host "Using provided secrets file: $($secretsFile | Split-Path -Leaf)"
@@ -54,14 +84,40 @@ function Main {
     $newVMSizes = Compare-Object -ReferenceObject (Get-Content -Path $OldFile ) -DifferenceObject (Get-Content -Path $NewFile)
     $newVMs = 0
     $newVMsString = $null
+    $HeaderAdded = $false
+    $HtmlReportString = ""
     foreach ( $newSize in $newVMSizes ) {
         if ( $newSize.SideIndicator -eq '=>') {
+            if (-not $HeaderAdded) {
+                $HtmlReportString += "$HtmlStart`n"
+                $HeaderAdded = $true
+            }
             $newVMs += 1
-            Write-Host "$newVMs. $($newSize.InputObject)"
-            $newVMsString += "$($newSize.InputObject),"
+            $CurrentRegion = $newSize.InputObject.Split(" ")[0]
+            $CurrentSize = $newSize.InputObject.Split(" ")[1]
+            $CurrentRow  = $HtmlRow
+            $CurrentRow = $CurrentRow.Replace("NEWSERIAL","$newVMs")
+            $CurrentRow = $CurrentRow.Replace("NEWREGION","$CurrentRegion")
+            $CurrentRow = $CurrentRow.Replace("NEWSIZE","$CurrentSize")
+            $CurrentRow = $CurrentRow.Replace("ADDREMOVESTATUS","Added")
+            $HtmlReportString += $CurrentRow
+            Write-Host "$newVMs. $($newSize.InputObject) Added"
         }
-        else {
-            Write-Host "$newVMs. $($newSize.InputObject) $($newSize.SideIndicator)"
+        elseif ($newSize.SideIndicator -eq '<=') {
+            if (-not $HeaderAdded) {
+                $HtmlReportString += "$HtmlStart`n"
+                $HeaderAdded = $true
+            }
+            $newVMs += 1
+            $CurrentRegion = $newSize.InputObject.Split(" ")[0]
+            $CurrentSize = $newSize.InputObject.Split(" ")[1]
+            $CurrentRow  = $HtmlRow
+            $CurrentRow = $CurrentRow.Replace("NEWSERIAL","$newVMs")
+            $CurrentRow = $CurrentRow.Replace("NEWREGION","$CurrentRegion")
+            $CurrentRow = $CurrentRow.Replace("NEWSIZE","$CurrentSize")
+            $CurrentRow = $CurrentRow.Replace("ADDREMOVESTATUS","Removed")
+            $HtmlReportString += $CurrentRow
+            Write-Host "$newVMs. $($newSize.InputObject) Removed"
         }
     }
     if ( $newVMs -eq 0) {
@@ -69,7 +125,8 @@ function Main {
         Set-Content -Value "NO_NEW_VMS" -Path $VmOutputFile -NoNewline
     }
     else {
-        Set-Content -Value $($newVMsString.TrimEnd(",")) -Path $VmOutputFile -NoNewline
+        $HtmlReportString += $HtmlEnd
+        Set-Content -Value $HtmlReportString -Path $VmOutputFile -NoNewline
     }
     Write-Host "Exiting with zero"
     exit 0
