@@ -148,7 +148,7 @@ main() {
     echo "LIS modules install:" > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "@prepare_lis_vm.sh" \
-        "sec=install_lis workdir=\"/root/\" os_ver=\"$OS_VERSION\" lis_path=\"/root/LISISO\"" \
+        "sec=install_lis workdir=\"/root/\" kernel_ver=\"$KERNEL_VERSION\" os_ver=\"$OS_VERSION\" lis_path=\"/root/LISISO\"" \
         >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
 
     # Reboot vm
