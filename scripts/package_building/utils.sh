@@ -342,9 +342,9 @@ create_deb_changelog() {
 
     pushd "$repo"
     tags=$(git tag --sort version:refname | grep -i -B 1 $(git describe --tags --abbrev=0))
-    IFS=$'\n' tags=($tags)
+    IFS=$'\n' tags=($tags); unset IFS;
     commit_ids=$(git log HEAD...${tags[0]} --pretty=format:"%h")
-    IFS=$'\n' commit_ids=($commit_ids)
+    IFS=$'\n' commit_ids=($commit_ids); unset IFS;
     for i in ${commit_ids[@]};do
         git_entry=$(git show $i)
         #Get the commit tag
@@ -385,7 +385,6 @@ $commit_message
 
 EOF
     done
-    export IFS=$' '
     popd
 }
 
@@ -393,7 +392,7 @@ change_perf_options(){
     perf_makefile="$1"
     perf_options="$2"
 
-    IFS=$';' perf_options=($perf_options)
+    IFS=$';' perf_options=($perf_options); unset IFS;
 
     for i in ${perf_options[@]};do
         entry="$i"

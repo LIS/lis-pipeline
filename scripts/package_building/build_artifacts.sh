@@ -187,13 +187,13 @@ function get_sources_local (){
     pushd "${base_dir}/kernel"
     cp -rf "$source_path" .
     source="${base_dir}/kernel/$(ls)"
-    echo "$source"
     popd
     pushd "$source"
     if [[ -d ".git" ]];then
-        git checkout $git_branch||true
+        git checkout $git_branch > /dev/null||true
     fi
     popd
+    echo "$source"
 }
 
 function prepare_kernel_debian (){
@@ -523,7 +523,7 @@ function prepare_perf_debian (){
         dirs=(bin lib64 libexec)
         for dir in ${dirs[@]};do
             files=$(ls ./$dir)
-            IFS=$'\n' files=($files)
+            IFS=$'\n' files=($files); unset IFS;
             for file in ${files[@]};do
                 mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
             done
@@ -925,7 +925,7 @@ function main {
             --local_path)
                 case "$2" in
                     "") shift 2 ;;
-                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='local' shift 2 ;;
+                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='local' ; shift 2 ;;
                 esac;;
             --build_path)
                 case "$2" in
