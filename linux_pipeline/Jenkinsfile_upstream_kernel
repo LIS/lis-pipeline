@@ -54,7 +54,7 @@ def prepareEnv(branch, remote, distroVersion, functionalTests) {
           env.LISAV2_PARAMS = "-TestCategory 'BVT'"
       }
       if (functionalTests.contains('FVT')) {
-          env.LISAV2_PARAMS = "-TestCategory 'Functional' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP,NVME'"
+          env.LISAV2_PARAMS = "-TestCategory 'Functional,BVT' -TestArea 'KVP,FCOPY,CORE,LIS,NETWORK,KDUMP,STORAGE,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP,NVME,BVT'"
           LISAV2_AZURE_REGION = "eastus2"
       }
     }
