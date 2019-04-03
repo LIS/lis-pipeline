@@ -56,3 +56,16 @@ node ("meta_slave") {
         }
     }
 }
+
+node ("meta_slave") {
+    stage('Send-email') {
+        withCredentials([string(credentialsId: 'MAIL_LIST', variable: 'MAIL_LIST')]) {
+            echo "Send email"
+            emailext (
+                subject: '$DEFAULT_SUBJECT',
+                to: "${env.MAIL_LIST}",
+                body: '$DEFAULT_CONTENT'
+            )
+        }
+    }
+}
