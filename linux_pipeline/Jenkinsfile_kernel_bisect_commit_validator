@@ -340,9 +340,9 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -TestCategory '${testCategory}'" +
         " -TestArea '${testArea}'" +
         " -TestTag '${testTag}'" +
-        " -CustomParameters '${customTestParams}'" +
+        " -CustomTestParameters '${customTestParams}'" +
         " ${storageType}" +
-        " -ForceDeleteResources" +
+        " -ResourceCleanup Delete" +
         " -XMLSecretFile '${secrets}'"
 
     )
