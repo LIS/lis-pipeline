@@ -293,6 +293,11 @@ function prepare_daemons_debian (){
             mv "${base_dir}/daemons/hyperv-daemons" "${base_dir}/daemons/$build_folder"
         fi
         cp ./tools/hv/* "${base_dir}/daemons/$build_folder"
+        # Note(v-advlad): remove lsvmbus from daemons, as it conflicts with tools one
+        lsvmbus_path="${base_dir}/daemons/$build_folder/lsvmbus"
+        if [[ -e "${lsvmbus_path}" ]]; then
+          rm -f "${lsvmbus_path}"
+        fi
         sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
     fi
     popd
