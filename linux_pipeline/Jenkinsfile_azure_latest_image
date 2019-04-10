@@ -21,7 +21,7 @@ properties ([
             description: 'Azure vm size to be tested. The vm size requires support for 8 nics.'],
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE',
-            defaultValue: "STRESSTEST-VERIFY-RESTART-MAX-SRIOV-NICS,VERIFY-IFUP-NICS-SRIOV",
+            defaultValue: "STRESSTEST-VERIFY-RESTART-MAX-SRIOV-NICS,VERIFY-IFUP-NICS-SRIOV,NET-ADD-NIC-AFTER-PROVISION",
             description: 'Test cases to be run, comma separated'],
         [$class: 'StringParameterDefinition',
             name: 'TEST_ITERATIONS',
@@ -69,8 +69,10 @@ azureImages.each {
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                 " -CustomParameters 'DiskType = Managed'" +
                                 " -ResourceCleanup Delete" +
+                                " -EnableTelemetry" +
                                 " -ExitWithZero"
                                 )
+                                archiveArtifacts '*-TestLogs.zip'
                                 junit "Report\\*-junit.xml"
                             }
                         }
@@ -85,5 +87,19 @@ azureImages.each {
         }
 
         parallel ARMImage
+    }
+
+    node ("meta_slave") {
+        stage('Send-email') {
+            withCredentials([string(credentialsId: 'MAIL_LIST', variable: 'MAIL_LIST')]) {
+                def currentImage = "${it}".trim()
+                emailext (
+                    subject: "pipeline-azure-latest-image: test results for ${currentImage}",
+                    to: "${env.MAIL_LIST}",
+                    mimeType : "text/html",
+                    body: '${SCRIPT, template="ubuntu.template"}'
+                )
+            }
+        }
     }
 }
