@@ -278,7 +278,7 @@ pipeline {
             }
             steps {
                 withCredentials(bindings: [
-                  file(credentialsId: 'CBS_Azure_Secrets_File',
+                  file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                        variable: 'Azure_Secrets_File')
                 ]) {
                     prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
@@ -312,7 +312,7 @@ pipeline {
             }
             steps {
                 withCredentials(bindings: [
-                  file(credentialsId: 'CBS_Azure_Secrets_File',
+                  file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                        variable: 'Azure_Secrets_File')
                 ]) {
                     prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
@@ -380,7 +380,7 @@ pipeline {
       }
       steps {
         withCredentials(bindings: [
-          file(credentialsId: 'CBS_Azure_Secrets_File',
+          file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                variable: 'Azure_Secrets_File')
         ]) {
             prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
@@ -510,7 +510,7 @@ pipeline {
           }
           steps {
             withCredentials(bindings: [
-              file(credentialsId: 'CBS_Azure_Secrets_File',
+              file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                    variable: 'Azure_Secrets_File')
             ]) {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION, FUNCTIONAL_TESTS, "Azure")
