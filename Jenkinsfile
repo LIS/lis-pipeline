@@ -290,7 +290,7 @@ pipeline {
                         " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                         " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_LARGE}'" +
                         " -ARMImageName '${env.AZURE_OS_IMAGE}'" +
-                        " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
+                        " -TestNames 'VERIFY-LIS-MODULES'" +
                         " -StorageAccount 'ExistingStorage_Standard'" +
                         " -XMLSecretFile '${env.Azure_Secrets_File}'" +
                         " -CustomParameters 'DiskType = Managed'"
@@ -324,7 +324,7 @@ pipeline {
                         " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                         " -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
                         " -ARMImageName '${env.AZURE_OS_IMAGE}'" +
-                        " -TestNames 'BVT-CORE-VERIFY-LIS-MODULES'" +
+                        " -TestNames 'VERIFY-LIS-MODULES'" +
                         " -StorageAccount 'ExistingStorage_Standard'" +
                         " -XMLSecretFile '${env.Azure_Secrets_File}'" +
                         " -CustomParameters 'DiskType = Managed'"

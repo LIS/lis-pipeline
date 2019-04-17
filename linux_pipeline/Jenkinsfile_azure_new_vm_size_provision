@@ -11,7 +11,7 @@ env.EMAIL_BODY = "SR\t\tSize\t\tRegion\n"
 env.NEW_FILE = "Z:\\Jenkins_Shared_Do_Not_Delete\\userContent\\shared\\azure-vm-sizes.txt"
 env.OLD_FILE = "Z:\\Jenkins_Shared_Do_Not_Delete\\userContent\\shared\\azure-vm-sizes-base.txt"
 env.VM_OUTPUT_FILE = "todaysNewVMs.txt"
-env.TEST_CMD = "BVT-VERIFY-DEPLOYMENT-PROVISION"
+env.TEST_CMD = "VERIFY-DEPLOYMENT-PROVISION"
 
 stage("Checkout"){
     timeout(120) {
