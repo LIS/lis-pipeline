@@ -4,9 +4,10 @@ LATEST_IMAGES_PATH=""./latest_images.txt""
 get_latest_image() {
     local publisher=$1
     local sku=$2
+    local offer=$3
     last_image=$(az vm image list --all --location "westus2" \
-      --publisher "${publisher}" --sku "${sku}" | grep -v "SAP" \
-      | grep -v "CI" | grep -v "DAILY" | grep "urn" \
+      --publisher "${publisher}" --sku "${sku}" --offer "${offer}" \
+      | grep -v "SAP" | grep -v "CI" | grep -v "DAILY" | grep "urn" \
       | sort -r --version-sort | sed -n '1 p' | awk '{print $2}')
     last_image=${last_image//\"/}
     last_image=${last_image//:/ }
