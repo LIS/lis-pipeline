@@ -7,7 +7,7 @@ get_latest_image() {
     local offer=$3
     last_image=$(az vm image list --all --location "westus2" \
       --publisher "${publisher}" --sku "${sku}" --offer "${offer}" \
-      | grep -v "SAP" | grep -v "CI" | grep -v "DAILY" | grep "urn" \
+      | grep -v "SAP\|CI\|DAILY" | grep "urn" \
       | sort -r --version-sort | sed -n '1 p' | awk '{print $2}')
     last_image=${last_image//\"/}
     last_image=${last_image//:/ }
