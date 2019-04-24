@@ -55,7 +55,7 @@ function get_latest_commits {
 }
 
 function main {
-    
+    EXCLUDE_VERSIONS=True
     while true;do
         case "$1" in
             --work_dir)
@@ -67,10 +67,13 @@ function main {
             --results)
                 RESULTS_PATH="$(readlink -ef $2)"
                 shift 2;;
+            --exclude_versions)
+                EXCLUDE_VERSIONS="$2"
+                shift 2;;
             *) break ;;
         esac
     done
-    
+
     if [[ ! $WORK_DIR || ! $KERNEL_TREE || ! $RESULTS_PATH ]];then
         echo "Error: Not enough parameters"
         exit 1
@@ -84,10 +87,14 @@ function main {
     touch $RESULTS_PATH
     REPO_NAME="$(basename "$KERNEL_TREE")"
     REPO_NAME="${REPO_NAME%.*}"
-    
+
     pushd "$WORK_DIR"
     resolve_tree_state "$REPO_NAME" "$KERNEL_TREE"
-    VERSIONS="$(get_latest_versions "$REPO_NAME")"
+
+    if [[ "${EXCLUDE_VERSIONS}" == "True" ]];then
+        VERSIONS="$(get_latest_versions "$REPO_NAME")"
+    fi
+
     get_latest_commits "$REPO_NAME" "$VERSIONS" "$RESULTS_PATH"
     popd
 }
