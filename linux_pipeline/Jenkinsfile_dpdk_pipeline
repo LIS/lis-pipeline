@@ -1,0 +1,179 @@
+#!/usr/bin/env groovy
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+def isJobCronTriggered() {
+    for (cause in currentBuild.rawBuild.getCauses()) {
+        if (cause != null) {
+            def causeDescription = cause.getShortDescription()
+            if (causeDescription && causeDescription.contains("Started by timer")) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+properties ([
+    pipelineTriggers([cron('H 1 * * *')]),
+    [$class: 'ParametersDefinitionProperty',
+        parameterDefinitions: [
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_IMAGES',
+            defaultValue: 'Canonical UbuntuServer 16.04-LTS latest,Canonical UbuntuServer 18.04-DAILY-LTS latest,RedHat RHEL 7-RAW latest,RedHat RHEL 7.5 latest,Openlogic CentOS 7.5 latest,SUSE SLES 15 latest',
+            description: 'Azure images to be tested, comma separated.'],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_CASE',
+            defaultValue: "VERIFY-DPDK-FAILSAFE-DURING-TRAFFIC,VERIFY-DPDK-BUILD-AND-TESTPMD-TEST,VERIFY-SRIOV-FAILSAFE-FOR-DPDK,VERIFY-DPDK-COMPLIANCE,VERIFY-DPDK-OVS,VERIFY-DPDK-RING-LATENCY,PERF-DPDK-FWD-PPS-DS15,PERF-DPDK-SINGLE-CORE-PPS-DS4,PERF-DPDK-SINGLE-CORE-PPS-DS15,PERF-DPDK-MULTICORE-PPS-DS15,PERF-DPDK-MULTICORE-PPS-F32",
+            description: 'DPDK test cases to be run, comma separated. If set to empty, all the DPDK tests will be run.'],
+        [$class: 'StringParameterDefinition',
+            name: 'AZURE_REGION',
+            defaultValue: 'westus2',
+            description: 'Azure region for the test runs'],
+        [$class: 'StringParameterDefinition',
+            name: 'DPDK_SOURCE',
+            defaultValue: '',
+            description: 'If set, the DPDK source will be used and the latest tag check will not be performed. Examples: git://dpdk.org/next/dpdk-next-net , https://fast.dpdk.org/rel/dpdk-18.11.tar.xz'],
+        [$class: 'StringParameterDefinition',
+            name: 'CUSTOM_LIS_SOURCE',
+            defaultValue: '',
+            description: 'If set, the LIS drivers will be installed: Example: http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.3.0.tar.gz']
+        ]
+    ]
+])
+
+def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
+def lisav2BranchName = "master"
+
+env.DPDK_REMOTE_URL = "git://git.dpdk.org/dpdk"
+env.BUILD_TAGS = ""
+
+def azureImages = env.AZURE_IMAGES.split(",")
+def azureRegion = env.AZURE_REGION.trim()
+def testCases = env.TEST_CASE.trim()
+def dpdkSource = []
+
+if (!azureImages || !azureRegion || !testCases) {
+  throw 'Failed to validate the pipeline parameters'
+}
+
+stages = [:]
+dpdkTags = ""
+
+if (!DPDK_SOURCE || DPDK_SOURCE == "") {
+    node('meta_slave') {
+        stage("check_new_tags") {
+            dir ("dpdk-new-tags-checker-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+                checkout scm
+                sh '''
+                    #!/bin/bash
+                    bash ./scripts/package_building/check_latest_tags.sh \\
+                        --work_dir "./" \\
+                        --kernel_tree "$DPDK_REMOTE_URL" \\
+                        --results "./results.txt" \\
+                        --exclude_versions "False"
+                '''
+                env.BUILD_TAGS = readFile ("results.txt")
+            }
+            cleanWs()
+        }
+    }
+}
+
+if (env.BUILD_TAGS && env.BUILD_TAGS != "") {
+    env.BUILD_TAGS.eachLine {
+        dpdkSource.add(it)
+    }
+}
+
+if (DPDK_SOURCE && DPDK_SOURCE != "") {
+    dpdkSource = [DPDK_SOURCE]
+}
+
+if (dpdkSource.size()) {
+    dpdkSource.each {
+        def currentTag = it
+        def currentTagAzureId = ""
+        def stageName = ""
+        def dpdkSourceUrl = it
+
+        if (!DPDK_SOURCE || DPDK_SOURCE == "") {
+            currentTag = it.replace("refs/tags/", "")
+            currentTagAzureId = "-" + currentTag.replace("-", "").replace(".","").replace("_","")
+            stageName = currentTag + "-"
+            dpdkSourceUrl = "https://git.dpdk.org/dpdk/snapshot/dpdk-${currentTag}.tar.gz"
+        }
+
+        dpdkTags += "${currentTag}, "
+        azureImages.each {
+            def currentImage = it
+            stages["${stageName}${currentImage}"] = {
+                try {
+                    timeout (3600) {
+
+                        node('azure') {
+                            withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File',
+                                             variable: 'Azure_Secrets_File')]) {
+                                echo "Current Image: ${currentImage}, Current Region: ${azureRegion}"
+                                cleanWs()
+                                git branch: lisav2BranchName, url: lisav2RemoteUrl
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                " -TestLocation '${azureRegion}'" +
+                                " -RGIdentifier 'dpdkp-${currentTagAzureId}'" +
+                                " -TestPlatform  'Azure'" +
+                                " -ARMImageName '${currentImage}'" +
+                                " -TestNames '${TEST_CASE}'" +
+                                " -TestArea 'DPDK'" +
+                                " -ResultDBTestTag 'DAILY-FUNCTIONAL'"+
+                                " -ResultDBTable 'Perf_DPDK_TestPmd'"+
+                                " -CustomLIS '${CUSTOM_LIS_SOURCE}'" +
+                                " -StorageAccount 'ExistingStorage_Standard'" +
+                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                " -CustomTestParameters 'DPDK_SOURCE_URL=${dpdkSourceUrl}'" +
+                                " -ResourceCleanup Delete" +
+                                " -EnableTelemetry" +
+                                " -ExitWithZero"
+                                )
+                                archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
+                                junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
+                            }
+                        }
+                    }
+                } catch (exc) {
+                    println(exc)
+                    println "${currentImage}: STAGE_FAILED_EXCEPTION."
+                    currentBuild.result = 'FAILURE'
+                } finally {
+                    echo "Cleaning up environment"
+                }
+            }
+        }
+    }
+    stage('validation') {
+        parallel stages
+    }
+
+    node('meta_slave') {
+        stage("send_mail") {
+            dpdkTags = dpdkTags.replace(", ","")
+            withCredentials([string(credentialsId: 'DPDK_MAILING_LIST',
+                                  variable: 'DPDK_MAILING_LIST')]) {
+                def mailList = null
+                if (isJobCronTriggered()) {
+                    mailList = DPDK_MAILING_LIST
+                }
+                emailext (
+                    subject: "DPDK validation results for ${dpdkTags}",
+                    body: '${SCRIPT, template="groovy-html.template"}',
+                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                    mimeType : "text/html",
+                    to: mailList
+                )
+            }
+        }
+    }
+} else {
+    echo "No new DPDK tags have been found."
+}
