@@ -4,6 +4,32 @@ def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
+def GetTestResults(type) {
+    withEnv(["Type=${type}"]) {
+        def returnValues = powershell returnStdout: true, script: '''$file = Get-Item ".\\Report\\*-junit.xml" | Sort-Object LastWriteTimeUtc | select -Last 1
+           $content = [xml](Get-Content $file)
+           $failCase = [int]($content.testsuites.testsuite.failures)
+           $allCase = [int]($content.testsuites.testsuite.tests)
+           $abortCase = [int]($content.testsuites.testsuite.errors)
+           $skippedCase = [int]($content.testsuites.testsuite.skipped)
+           $passCase = $allCase - $failCase - $abortCase - $skippedCase
+
+           if ($env:Type -eq "pass") {
+               return $passCase
+           } elseif ($env:Type -eq "abort") {
+               return $abortCase
+           } elseif ($env:Type -eq "fail") {
+               return $failCase
+           } elseif ($env:Type -eq "skipped") {
+               return $skippedCase
+           } elseif ($env:Type -eq "all") {
+               return $allCase
+           }
+           '''
+        return "${returnValues}"
+    }
+}
+
 def reportStageStatus(stageName, stageStatus) {
     script {
         env.STAGE_NAME_REPORT = stageName
@@ -81,7 +107,7 @@ pipeline {
     choice(choices: 'Standard_E64_v3\nStandard_F72s_v2', description: 'Azure large boot flavor', name: 'LISAV2_AZURE_VM_SIZE_LARGE')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     choice(choices: 'BVT\nFVT\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv, publish_results",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -109,6 +135,8 @@ pipeline {
     FUNC_PASS_ONLOCAL = 0
     FUNC_ABORT_ONAZURE = 0
     FUNC_ABORT_ONLOCAL = 0
+    FUNC_SKIP_ONAZURE = 0
+    FUNC_SKIP_ONLOCAL = 0
   }
   options {
     overrideIndexTriggers(false)
@@ -472,18 +500,14 @@ pipeline {
               junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
               script {
-                    def returnValues = powershell returnStdout: true, script: '''$content = [xml](Get-Content ".\\Report\\*-junit.xml")
-                        $failCase = [int]($content.testsuites.testsuite.failures)
-                        $allCase = [int]($content.testsuites.testsuite.tests)
-                        $abortCase = [int]($content.testsuites.testsuite.errors)
-                        $passCase = $allCase - $failCase - $abortCase
-                        return [string]::Format("{0};{1};{2}",$failCase,$abortCase,$passCase)
-                        '''
-                        returnValues = returnValues.replaceAll("\r", "").replaceAll("\n", "")
-                        returnValues = returnValues.split(';')
-                        FUNC_FAIL_ONLOCAL = returnValues[0]
-                        FUNC_ABORT_ONLOCAL = returnValues[1]
-                        FUNC_PASS_ONLOCAL = returnValues[2]
+                  def passCount = GetTestResults("pass")
+                  def abortCount = GetTestResults("abort")
+                  def failCount = GetTestResults("fail")
+                  def skippedCount = GetTestResults("skipped")
+                  FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                  FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                  FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                  FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
                }
             }
           }
@@ -526,18 +550,14 @@ pipeline {
               junit "Report\\*-junit.xml"
               archiveArtifacts "TestResults\\**\\*"
               script {
-                    def returnValues = powershell returnStdout: true, script: '''$content = [xml](Get-Content ".\\Report\\*-junit.xml")
-                        $failCase = [int]($content.testsuites.testsuite.failures)
-                        $allCase = [int]($content.testsuites.testsuite.tests)
-                        $abortCase = [int]($content.testsuites.testsuite.errors)
-                        $passCase = $allCase - $failCase - $abortCase
-                        return [string]::Format("{0};{1};{2}",$failCase,$abortCase,$passCase)
-                        '''
-                        returnValues = returnValues.replaceAll("\r", "").replaceAll("\n", "")
-                        returnValues = returnValues.split(';')
-                        FUNC_FAIL_ONAZURE = returnValues[0]
-                        FUNC_ABORT_ONAZURE = returnValues[1]
-                        FUNC_PASS_ONAZURE = returnValues[2]
+                  def passCount = GetTestResults("pass")
+                  def abortCount = GetTestResults("abort")
+                  def failCount = GetTestResults("fail")
+                  def skippedCount = GetTestResults("skipped")
+                  FUNC_PASS_ONAZURE = FUNC_PASS_ONAZURE.toInteger() + passCount.toInteger()
+                  FUNC_ABORT_ONAZURE = FUNC_ABORT_ONAZURE.toInteger() + abortCount.toInteger()
+                  FUNC_FAIL_ONAZURE = FUNC_FAIL_ONAZURE.toInteger() + failCount.toInteger()
+                  FUNC_SKIP_ONAZURE = FUNC_SKIP_ONAZURE.toInteger() + skippedCount.toInteger()
                }
             }
           }
@@ -622,8 +642,10 @@ pipeline {
         reportStageStatus("FuncTestsFailedOnAzure", "${FUNC_FAIL_ONAZURE}")
         reportStageStatus("FuncTestsPassOnLocal", "${FUNC_PASS_ONLOCAL}")
         reportStageStatus("FuncTestsPassOnAzure", "${FUNC_PASS_ONAZURE}")
-        reportStageStatus("FuncTestsAbortOnLocal", "${FUNC_FAIL_ONLOCAL}")
-        reportStageStatus("FuncTestsAbortOnAzure", "${FUNC_FAIL_ONAZURE}")
+        reportStageStatus("FuncTestsAbortOnLocal", "${FUNC_ABORT_ONLOCAL}")
+        reportStageStatus("FuncTestsAbortOnAzure", "${FUNC_ABORT_ONAZURE}")
+        reportStageStatus("FuncTestsSkippedOnAzure", "${FUNC_SKIP_ONAZURE}")
+        reportStageStatus("FuncTestsSkippedOnLocal", "${FUNC_SKIP_ONLOCAL}")
       }
     }
 
