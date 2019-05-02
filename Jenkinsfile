@@ -102,7 +102,7 @@ pipeline {
   parameters {
     string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
     string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
-    choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
+    choice(choices: 'Ubuntu_18.04.1\nCentOS_7.6', description: 'Distro version.', name: 'DISTRO_VERSION')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     choice(choices: 'BVT\nFVT\nALL', description: 'Functional Tests', name: 'FUNCTIONAL_TESTS')
     string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, publish_vhd, publish_azure_vhd, publish_hyperv_vhd, validation_functional_hyperv, validation_functional_jessie_hyperv, validation_functional_azure, validation_perf_azure, validation_perf_hyperv, publish_results",
@@ -123,7 +123,7 @@ pipeline {
     BUILD_NAME = 'm'
     FOLDER_PREFIX = 'msft'
     AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
-    AZURE_CENTOS_7_IMAGE = "OpenLogic CentOS 7.5 latest"
+    AZURE_CENTOS_7_IMAGE = "OpenLogic CentOS 7.6 latest"
     FUNC_FAIL_ONAZURE = 0
     FUNC_FAIL_ONLOCAL = 0
     FUNC_PASS_ONAZURE = 0
