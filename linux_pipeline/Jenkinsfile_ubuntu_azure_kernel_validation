@@ -27,16 +27,13 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   xenial:'ubuntu_16.04.5\\ubuntu_16.04.5.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   cosmic:'ubuntu_18.10\\ubuntu_18.10_gen1_gen2.vhdx']
-def HYPERV_VALIDATION_TESTS_HASH = [HV_BVT:"-TestCategory 'BVT'",
-    HV_FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE' -ExcludeTests 'VHDX-RESIZE-LIVE-MIGRATION'",
-    HV_FUNCTIONAL_EXTRA:"-TestCategory 'Functional' -TestArea 'FCOPY,LIS,NETWORK,PROD_CHECKPOINT,DYNAMIC_MEMORY,RUNTIME_MEMORY,BACKUP' -ExcludeTests 'LIS-CHECK-HYPERVDAEMONS-FILES-STATUS,DYNAMIC-MEMORY-HIGH-PRIORITY,ETHTOOL-CHECK-STATISTICS,DYNAMIC-MEMORY-MAX-MEMORY-HONORED,DYNAMIC-MEMORY-MIN-MEMORY-HONORED'",
-    HV_FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
-def AZURE_VALIDATION_TESTS_HASH = [AZURE_BVT:"-TestCategory 'BVT'",
-    AZURE_FUNCTIONAL_COMMON:"-TestCategory 'Functional' -TestArea 'CORE,KVP,KDUMP,STORAGE,NETWORK,WALA'",
-    AZURE_FUNCTIONAL_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV'",
-    AZURE_FUNCTIONAL_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
-    AZURE_FUNCTIONAL_GPU_CUDA:"-TestNames 'NVIDIA-CUDA-DRIVER-VALIDATION,GPU-PCI-RESCIND' -OverrideVMSize 'Standard_NC6,Standard_NC12,Standard_NC24'",
-    AZURE_FUNCTIONAL_GPU_GRID:"-TestNames 'NVIDIA-GRID-DRIVER-VALIDATION,GPU-PCI-RESCIND' -OverrideVMSize 'Standard_NV6,Standard_NV12,Standard_NV24'"]
+def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'SRIOV-VERIFY-LSPCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION,LIVE-MIGRATE'",
+    HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests 'LIVE-MIGRATE-FAILOVER,DYNAMIC-MEMORY-HIGH-PRIORITY,SRIOV-DISABLE-ENABLE-PCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION-ONE-VCPU,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-ADD-MAX-NICS-DURING-PROVISION,SRIOV-INTERRUPTS-CHANGE,SRIOV-DISABLEVF-ON-GUEST,SRIOV-RELOAD-MODULE,SRIOV-DISABLEVF-PING,SRIOV-DISABLEVF-IPERF,SRIOV-DETACH-NIC,SRIOV-DISABLEVF-ONHOST,SRIOV-DISABLE-NIC,SRIOV-DISABLE-VMQ,SRIOV-CHANGE-RSS,SRIOV-MEASURE-VF-FAILBACK,SRIOV-MULTICAST,SRIOV-BROADCAST,SRIOV-REBOOT-VM,SRIOV-STRESS-SAVE,SRIOV-STRESS-PAUSE'",
+    HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
+def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'NVME-DISK-VALIDATION,NVME-FSTRIM,NVME-BLKDISCARD'",
+    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV,PERF-SYSCALL-BENCHMARK,PERF-NVME-4K-IO,NVME-MAX-DISK-VALIDATION,NVME-DISK-OPERATIONS,NVME-CHECK-EXPECTED-FAILURES,NVME-FILE-SYSTEM-VERIFICATION-GENERIC,NVME-PCI-RESCIND'",
+    AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-Synthetic,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-SRIOV,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-SRIOV,PERF-NETWORK-TCP-NETPERF-MAX-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-MAX-PPS-SRIOV,PERF-GOLANG-BENCHMARK,NVME-FILE-SYSTEM-VERIFICATION-XFS,NVME-FILE-SYSTEM-VERIFICATION-EXT4,NVME-FILE-SYSTEM-VERIFICATION-BTRFS'",
+    AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
     PERF_SINGLE_IPERF:"-TestNames 'PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV' -ResultDBTable 'Perf_Network_Single_TCP_Azure_DefaultKernel'",
@@ -47,7 +44,7 @@ PLATFORM_HYPERV = "hyperv"
 PLATFORM_AZURE = "azure"
 PLATFORM_ALL = "all"
 LABEL_SRIOV = "sriov_mlnx"
-LABEL_WS2016 = "ws2016"
+LABEL_WS2016 = "ubuntu_azure_kernel_validation"
 LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 LISAV2_BRANCH = "master"
 AZURE_LOCATION_DEFAULT = "westus2"
@@ -73,7 +70,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
             runs["${test_type}"] = {
                 stage ("${test_type}") {
                     def AZURE_LOCATION = ""
-                    if (test_cmd.contains("NVME")){
+                    if (test_cmd.contains("-TestArea 'NVME'")){
                         AZURE_LOCATION = AZURE_LOCATION_NVME
                     } else {
                         AZURE_LOCATION = AZURE_LOCATION_DEFAULT
@@ -128,7 +125,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
             def test_cmd = it.value
             runs["${test_type}"] = {
                 stage ("${test_type}") {
-                    if (test_cmd.contains("SRIOV")){
+                    if (test_cmd.contains("TestArea 'SRIOV'")){
                         LABEL_NAME = LABEL_SRIOV
                     } else {
                         LABEL_NAME = LABEL_WS2016
@@ -140,25 +137,25 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                 string(credentialsId:'SRIOV_TEST_LOCATION', variable: 'SRIOV_TEST_LOCATION'),
                                 string(credentialsId:'SRIOV_VHD_LOCATION', variable: 'SRIOV_VHD_LOCATION'),
                                 string(credentialsId:'LISAV2_IMAGES_SHARE_URL', variable: 'LISAV2_IMAGES_SHARE_URL'),
-                                file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+                                file(credentialsId:'HYPERV_LISAV2_SECRETS', variable: 'HYPERV_LISAV2_SECRETS')]) {
                                     dir ("${test_type}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        if (test_cmd.contains("SRIOV")){
+                                        if (test_cmd.contains("TestArea 'SRIOV'")){
                                             test_location = "${SRIOV_TEST_LOCATION}"
                                             HYPERV_VHD_PATH = "${SRIOV_VHD_LOCATION}${HYPERV_VHD}"
                                         } else {
                                             test_location = "localhost"
                                             HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
                                         }
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${test_location}'" +
                                             " -RGIdentifier 'ubuntuAzure${distro}'" +
                                             " -TestPlatform 'HyperV'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -OsVHD '${HYPERV_VHD_PATH}'" +
-                                            " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                                            " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
