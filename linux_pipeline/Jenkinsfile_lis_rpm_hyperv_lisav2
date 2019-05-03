@@ -21,11 +21,11 @@ properties ([
             description: 'Full run local Hyper-V perf switch.'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_TEST_CATEGORIES',
-            defaultValue: "Functional,BVT,Stress",
+            defaultValue: "Functional,Community,Stress",
             description: 'What test categories to run'],
         [$class: 'StringParameterDefinition',
             name: 'ENABLED_TEST_AREAS',
-            defaultValue: "BVT,LIS_DEPLOY,LIS,BACKUP,CORE,DYNAMIC_MEMORY,FCOPY,KDUMP,KVP,MIGRATION,NETWORK,PROD_CHECKPOINT,RUNTIME_MEMORY,SRIOV,STORAGE,stress",
+            defaultValue: "LIS_DEPLOY,LIS,BACKUP,CORE,DYNAMIC_MEMORY,FCOPY,KDUMP,KVP,MIGRATION,NETWORK,PROD_CHECKPOINT,RUNTIME_MEMORY,SECUREBOOT,SRIOV,STORAGE,LTP,STRESS",
             description: 'What test areas to run'],
         [$class: 'StringParameterDefinition',
             name: 'EXCLUDE_TESTS',
@@ -34,6 +34,10 @@ properties ([
         [$class: 'StringParameterDefinition',
             name: 'RUN_SELECTED_TESTS',
             defaultValue: "",
+            description: ''],
+        [$class: 'StringParameterDefinition',
+            name: 'TEST_PRIORITY',
+            defaultValue: "0,1,2,3",
             description: ''],
         [$class: 'StringParameterDefinition',
             name: 'GIT_REPO',
@@ -100,28 +104,27 @@ def FVTDistros = "centos_6.8_x64,centos_7.2_x64,rhel_6.6_x64,centos_7.4_gen2vm,r
 def BVTDistros = "centos_6.4_x64,rhel_7.1,rhel_6.4_32bit,rhel_6.9_x64,rhel_7.0,centos_6.5_x64,centos_7.3,centos_7.5,"
 def SRIOVDistros = "rhel_7.3,rhel_7.4,centos_7.4,centos_7.3,rhel_7.3_gen2vm,rhel_7.5,centos_7.5,"
 
-def CategoryAreaMap = ["Functional" : "LIS_DEPLOY,LIS,DYNAMIC_MEMORY,KVP,MIGRATION,NETWORK,SRIOV,STORAGE,BACKUP,CORE,FCOPY,KDUMP,PROD_CHECKPOINT,RUNTIME_MEMORY",\
-                "BVT":"BVT,CORE,NETWORK",\
-                "Stress":"stress" ]
+def CategoryAreaMap = ["Functional" : "LIS_DEPLOY,LIS,BACKUP,CORE,DYNAMIC_MEMORY,FCOPY,KDUMP,KVP,MIGRATION,NETWORK,PROD_CHECKPOINT,RUNTIME_MEMORY,SECUREBOOT,SRIOV,STORAGE",\
+                "Community":"LTP",\
+                "Stress":"STRESS" ]
 
 def TestAndDistroMap = ["Functional-LIS_DEPLOY" : "${supportedDistros}",\
                 "Functional-LIS" : "${supportedDistros}",\
+                "Functional-BACKUP": "${FVTDistros}",\
+                "Functional-CORE": "${FVTDistros}",\
                 "Functional-DYNAMIC_MEMORY": "${FVTDistros}",\
+                "Functional-FCOPY": "${FVTDistros}",\
+                "Functional-KDUMP": "${SRIOVDistros}",\
                 "Functional-KVP": "${FVTDistros}",\
                 "Functional-MIGRATION": "${FVTDistros}",\
                 "Functional-NETWORK": "${FVTDistros}",\
-                "Functional-SRIOV": "${SRIOVDistros}",\
-                "Functional-STORAGE": "${FVTDistros}",\
-                "Functional-BACKUP": "${FVTDistros}",\
-                "Functional-CORE": "${FVTDistros}",\
-                "Functional-FCOPY": "${FVTDistros}",\
-                "Functional-KDUMP": "${FVTDistros}",\
                 "Functional-PROD_CHECKPOINT": "${FVTDistros}",\
                 "Functional-RUNTIME_MEMORY": "${FVTDistros}",\
-                "BVT-BVT": "${BVTDistros}",\
-                "BVT-CORE": "${BVTDistros}",\
-                "BVT-NETWORK": "${BVTDistros}",\
-                "Stress-stress": "${FVTDistros}"
+                "Functional-SECUREBOOT": "${FVTDistros}",\
+                "Functional-SRIOV": "${FVTDistros}",\
+                "Functional-STORAGE": "${FVTDistros}",\
+                "Community-LTP": "${FVTDistros}",\
+                "Stress-STRESS": "${FVTDistros}",\
                 ]
 
 def Prepare()
@@ -197,7 +200,7 @@ node("meta_slave") {
                                                             withCredentials([string(credentialsId: 'REDMOND_VHD_SHARE', variable: 'LISAImagesShareUrl'),
                                                                 file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
                                                                 def sleepTime = globalSleepTime
-                                                                globalSleepTime = globalSleepTime + 30
+                                                                globalSleepTime = globalSleepTime + 60
                                                                 def lisSuite = ''
                                                                 dir ("d${BUILD_NUMBER}") {
                                                                     checkout scm
@@ -213,6 +216,7 @@ node("meta_slave") {
                                                                         " -ExcludeTests '${env:EXCLUDE_TESTS}'" +
                                                                         " -IncludeTests '${env:RUN_SELECTED_TESTS}'" +
                                                                         " -ExecutionTag '${env:EXECUTION_TAG}'" +
+                                                                        " -TestPriority '${env:TEST_PRIORITY}'" +
                                                                         " -Delay '${sleepTime}'"
                                                                     )
                                                                     junit "Report\\*-junit.xml"

@@ -60,6 +60,9 @@ function Main {
             $command += " -VMGeneration '$VMgeneration'"
             $command += " -EnableTelemetry"
             $command += " -ExitWithZero"
+            if ($TestPriority) {
+                $command += " -TestPriority '$TestPriority'"
+            }
             if ($ExecutionTag) {
                 $command += " -ResultDBTestTag '$ExecutionTag'"
             }
