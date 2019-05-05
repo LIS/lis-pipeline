@@ -73,12 +73,12 @@ function Main {
                 $command += " -ExcludeTests '$ExcludeTests'"
             }
             if ($TestArea -imatch "LIS_DEPLOY") {
-                $command += " -CustomTestParameters 'LIS_OLD_URL=$LisOldUrl;LIS_CURRENT_URL=$LisUrl'"
                 $command += " -OverrideVMSize 'Standard_A1'"
             } else {
                 $command += " -CustomLIS '$LisUrl'"
                 $command += " -ResourceCleanup Delete"
             }
+            $command += " -CustomTestParameters 'LIS_OLD_URL=$LisOldUrl;LIS_CURRENT_URL=$LisUrl'"
             Write-Output $PsCmd
             powershell.exe -NonInteractive -ExecutionPolicy Bypass `
                 -Command "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$command;EXIT $global:LastExitCode"
