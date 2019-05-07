@@ -309,8 +309,9 @@ build_metapackages () {
     KERNEL_VERSION=$1
     DESTINATION_FOLDER=$2
     DEBIAN_FOLDER=$3
+    BASEDIR=$4
 
-    custom_builddeb=$(dirname "${DEBIAN_FOLDER}/..")
+    custom_builddeb="${BASEDIR}/kernel_metapackages"
     aux_PATH="$PATH"
     export PATH="$custom_builddeb:$PATH"
 
