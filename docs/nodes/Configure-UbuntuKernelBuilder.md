@@ -16,7 +16,7 @@ https://github.com/LIS/lis-pipeline/blob/master/scripts/package_building/build_a
         devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison \
         asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
         libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
-        libbabeltrace-ctf-dev libbabeltrace-dev pigz pbzip2 python-pip)
+        libbabeltrace-ctf-dev libbabeltrace-dev pigz pbzip2 python-pip rename)
     sudo DEBIAN_FRONTEND=noninteractive apt-get -y install ${deb_packages[@]}
     sudo pip install envparse
   ```
