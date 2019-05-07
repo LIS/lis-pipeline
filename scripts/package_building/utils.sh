@@ -310,7 +310,7 @@ build_metapackages () {
     DESTINATION_FOLDER=$2
     DEBIAN_FOLDER=$3
 
-    custom_builddeb=$(dirname $(find $(pwd) -name "dh_builddeb"))
+    custom_builddeb=$(dirname "${DEBIAN_FOLDER}/..")
     aux_PATH="$PATH"
     export PATH="$custom_builddeb:$PATH"
 
