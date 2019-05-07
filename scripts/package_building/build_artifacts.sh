@@ -110,7 +110,7 @@ function build_kernel_metapackages_deb () {
     changelog_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name changelog))
     debian_rules_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
-    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc"
+    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc" "${BASEDIR}"
 }
 
 function get_sources_http (){
