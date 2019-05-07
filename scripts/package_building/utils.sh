@@ -315,7 +315,7 @@ build_metapackages () {
     export PATH="$custom_builddeb:$PATH"
 
     custom_mkdir $DESTINATION_FOLDER "meta_packages"
-    DESTINATION_FOLDER="$DESTINATION_FOLDER/meta_packages"
+    DESTINATION_FOLDER=$(readlink -f "$DESTINATION_FOLDER/meta_packages")
 
     pushd "$DEBIAN_FOLDER"
     fakeroot debian/rules clean
