@@ -309,13 +309,14 @@ build_metapackages () {
     KERNEL_VERSION=$1
     DESTINATION_FOLDER=$2
     DEBIAN_FOLDER=$3
+    BASEDIR=$4
 
-    custom_builddeb=$(dirname $(find $(pwd) -name "dh_builddeb"))
+    custom_builddeb="${BASEDIR}/kernel_metapackages"
     aux_PATH="$PATH"
     export PATH="$custom_builddeb:$PATH"
 
     custom_mkdir $DESTINATION_FOLDER "meta_packages"
-    DESTINATION_FOLDER="$DESTINATION_FOLDER/meta_packages"
+    DESTINATION_FOLDER=$(readlink -f "$DESTINATION_FOLDER/meta_packages")
 
     pushd "$DEBIAN_FOLDER"
     fakeroot debian/rules clean

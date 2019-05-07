@@ -2,7 +2,7 @@
 
 set -xe -o pipefail
 BASEDIR=$(dirname $0)
-BASEDIR=$(readlink -f ./$BASEDIR)
+BASEDIR=$(readlink -f $BASEDIR)
 . "${BASEDIR}/utils.sh"
 
 KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
@@ -42,7 +42,7 @@ function install_deps_debian {
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison  \
     asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
     libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
-    libbabeltrace-ctf-dev libbabeltrace-dev)
+    libbabeltrace-ctf-dev libbabeltrace-dev rename)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
 }
 
@@ -110,7 +110,7 @@ function build_kernel_metapackages_deb () {
     changelog_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name changelog))
     debian_rules_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
-    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc"
+    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc" "${BASEDIR}"
 }
 
 function get_sources_http (){
@@ -880,7 +880,6 @@ function main {
 
     # Optional:
     GIT_BRANCH='master'
-    BASE_DIR="$(pwd)/temp_build"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     FOLDER_PREFIX='msft'
     THREAD_NUMBER='x2'
