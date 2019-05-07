@@ -42,7 +42,7 @@ function install_deps_debian {
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison  \
     asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
     libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
-    libbabeltrace-ctf-dev libbabeltrace-dev)
+    libbabeltrace-ctf-dev libbabeltrace-dev rename)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
 }
 
