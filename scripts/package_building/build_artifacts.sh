@@ -880,7 +880,6 @@ function main {
 
     # Optional:
     GIT_BRANCH='master'
-    BASE_DIR="$(pwd)/temp_build"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     FOLDER_PREFIX='msft'
     THREAD_NUMBER='x2'
