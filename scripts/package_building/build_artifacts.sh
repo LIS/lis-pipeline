@@ -2,7 +2,7 @@
 
 set -xe -o pipefail
 BASEDIR=$(dirname $0)
-BASEDIR=$(readlink -f ./$BASEDIR)
+BASEDIR=$(readlink -f $BASEDIR)
 . "${BASEDIR}/utils.sh"
 
 KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
