@@ -138,6 +138,8 @@ if (dpdkSource.size()) {
                                 )
                                 archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
                                 junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
+                                def stashName = (currentTag + currentImage).replace("/","").replace(":","").replace(".","")
+                                stash name: stashName, includes: "Report\\*-junit.xml", allowEmpty: true
                             }
                         }
                     }
@@ -164,11 +166,62 @@ if (dpdkSource.size()) {
                 if (isJobCronTriggered()) {
                     mailList = DPDK_MAILING_LIST
                 }
+                checkout scm
+                def emailBody = readFile "./scripts/dpdk/dpdk-email-groovy-text.template"
+                emailBody = emailBody.replace("DPDK_VERSION", dpdkTags)
+                emailBody = emailBody.replace("AZURE_IMAGE", azureImages.join(", "))
+                def testResults = "\n DPDK job exited with status: ${currentBuild.currentResult} - ${env.BUILD_URL}. \n"
+                azureImages.each {
+                    def currentImage = it
+                    dpdkTags.split(" ").each() {
+                        def stashName = (it + currentImage).replace("/","").replace(":","").replace(".","")
+                        try {
+                            unstash stashName
+                            def junitFiles = findFiles glob: "Report/*-junit.xml"
+                            if (junitFiles) {
+                                def junitFile = junitFiles[0].path
+                                def junitResult = readFile junitFile
+                                def response = new XmlSlurper().parseText(junitResult)
+                                def testResult = ""
+                                response.testsuite.testcase.each{
+                                    def tcName = it.@name.text()
+                                    def tcStatusFailure = it.failure
+                                    def tcStatusError = it.error
+                                    def tcStatusSkipped = it.skipped
+                                    def tcStatus = "PASSED"
+                                    if (tcStatusFailure.text()) {
+                                        tcStatus = "FAILED"
+                                    }
+                                    if (tcStatusError.text()) {
+                                        tcStatus = "ABORTED"
+                                    }
+                                    if (tcStatusSkipped.text()) {
+                                        tcStatus = "SKIPPED"
+                                    }
+                                    testResult += "* ${tcName}: ${tcStatus} \n"
+                                }
+                                if (testResult != "") {
+                                    testResults += "\nTest results for Azure image: '${currentImage}': \n \n"
+                                    testResults += testResult
+                                } else {
+                                    testResults += "\nThere are no test results for Azure image: '${currentImage}'. Please check the Jenkins job."
+                                }
+                                sh "rm -f '${junitFile}'"
+                            } else {
+                                println "No stashed results for stash ${stashName}"
+                                testResults += "\nThere are no test results for Azure image: '${currentImage}'. Please check the Jenkins job."
+                            }
+                        } catch (exc) {
+                            println(exc)
+                        }
+                    }
+                }
+                emailBody = emailBody.replace("TEST_RESULTS", testResults)
                 emailext (
                     subject: "DPDK validation results for ${dpdkTags}",
-                    body: '${SCRIPT, template="groovy-html.template"}',
+                    body: emailBody,
                     recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                    mimeType : "text/html",
+                    mimeType : "text/plain",
                     to: mailList
                 )
             }
