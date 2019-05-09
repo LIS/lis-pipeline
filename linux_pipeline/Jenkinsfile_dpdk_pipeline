@@ -132,7 +132,7 @@ if (dpdkSource.size()) {
                                 " -StorageAccount 'ExistingStorage_Standard'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                 " -CustomTestParameters 'DPDK_SOURCE_URL=${dpdkSourceUrl}'" +
-                                " -ResourceCleanup Delete" +
+                                " -ResourceCleanup Default" +
                                 " -EnableTelemetry" +
                                 " -DeployVMPerEachTest" +
                                 " -ExitWithZero"
