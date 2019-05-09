@@ -121,7 +121,7 @@ if (dpdkSource.size()) {
                                 git branch: lisav2BranchName, url: lisav2RemoteUrl
                                 RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                 " -TestLocation '${azureRegion}'" +
-                                " -RGIdentifier 'dpdkp-${currentTagAzureId}'" +
+                                " -RGIdentifier 'dpdkp${currentTagAzureId}'" +
                                 " -TestPlatform  'Azure'" +
                                 " -ARMImageName '${currentImage}'" +
                                 " -TestNames '${TEST_CASE}'" +
@@ -134,6 +134,7 @@ if (dpdkSource.size()) {
                                 " -CustomTestParameters 'DPDK_SOURCE_URL=${dpdkSourceUrl}'" +
                                 " -ResourceCleanup Delete" +
                                 " -EnableTelemetry" +
+                                " -DeployVMPerEachTest" +
                                 " -ExitWithZero"
                                 )
                                 archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
