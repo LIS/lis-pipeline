@@ -51,7 +51,7 @@ function Main {
             Write-Host "ComputerName: $env:computername"
             Write-Host "VHD : $VHD_Path"
             $command = ".\Run-LisaV2.ps1 -TestPlatform HyperV"
-            $command += " -XMLSecretFile '$env:Azure_Secrets_File'"
+            $command += " -XMLSecretFile '$env:HYPERV_LISAV2_SECRETS'"
             $command += " -TestLocation 'localhost'"
             $command += " -RGIdentifier '$JobId'"
             $command += " -OsVHD '$VHD_Path'"

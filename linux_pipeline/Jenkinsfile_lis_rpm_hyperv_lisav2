@@ -198,7 +198,7 @@ node("meta_slave") {
                                                         stage ("${CurrentDistro}-${testNode}") {
                                                         println ("stage ${CurrentDistro}-${testNode}")
                                                             withCredentials([string(credentialsId: 'REDMOND_VHD_SHARE', variable: 'LISAImagesShareUrl'),
-                                                                file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+                                                                file(credentialsId: 'HYPERV_LISAV2_SECRETS', variable: 'HYPERV_LISAV2_SECRETS')]) {
                                                                 def sleepTime = globalSleepTime
                                                                 globalSleepTime = globalSleepTime + 60
                                                                 def lisSuite = ''
