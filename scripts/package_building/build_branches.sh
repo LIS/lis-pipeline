@@ -89,7 +89,7 @@ function main() {
             fi
         done
         if [[ "$branch_found" == "n" ]];then
-            echo "Stable branch $SOURCE_LAST_UNSTABLE will be built."
+            echo "Branch ${source_branch} will be built."
             BUILD_BRANCHES=("${BUILD_BRANCHES[@]}" "$source_branch")
         fi
     done
