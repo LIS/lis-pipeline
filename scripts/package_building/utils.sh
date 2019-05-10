@@ -253,7 +253,7 @@ get_stable_branches() {
     git_dir="$1"
 
     pushd "$git_dir"
-    branches=$(git branch -r | sort | grep "y")
+    branches=$(git branch -r | sort | grep "linux-msft.*y" | grep -v "staging")
     for branch in $branches;do
         small_branch="${branch/origin\//}"
         tag=$(get_git_tag "." $branch)
@@ -278,7 +278,9 @@ get_latest_unstable_branch() {
     tag=$(get_git_tag "." $branch)
     result="${small_branch}#${tag}"
     popd
-    echo "${result}"
+    #echo "${result}"
+    # NOTE(avladu): temp fix until RCs are back in repo
+    echo "msft-4.14-rc6#80d3389"
 }
 
 custom_mkdir () {
