@@ -29,7 +29,6 @@ def getTests(priority, platform) {
     HYPERV_VALIDATION_TESTS_HASH_P3= [HV_P3_VALIDATION:"-TestPriority 3"]
 
     if ("${priority}" == "P0") {
-    if ("${priority}" == "P0") {
         AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P0
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_TESTS_HASH_P0
     }
