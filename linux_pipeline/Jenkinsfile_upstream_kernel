@@ -739,9 +739,18 @@ pipeline {
         }
       }
       steps {
+          sh '''#!/bin/bash
+              KERNEL_SOURCE="${KERNEL_GIT_URL##*/}"
+              KERNEL_SOURCE="${KERNEL_SOURCE%.*}"
+              KERNEL_SOURCE=$(echo $KERNEL_SOURCE | tr /a-z/ /A-Z/)
+              echo ${KERNEL_SOURCE} > ./kernel_source
+          '''
+          script {
+              KERNEL_SOURCE = readFile "./kernel_source"
+          }
           withCredentials([string(credentialsId: 'MAIL_LIST', variable: 'MAIL_LIST')]) {
             emailext (
-            subject: "Test results for ${DISTRO_VERSION} Kernel",
+            subject: "Test results for ${KERNEL_SOURCE} against ${DISTRO_VERSION}",
             to: "${env.MAIL_LIST}",
             mimeType : "text/html",
             body: '${SCRIPT, template="ubuntu.template"}'
