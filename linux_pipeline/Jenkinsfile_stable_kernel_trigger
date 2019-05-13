@@ -8,8 +8,8 @@ env.WORK_DIR = "/mnt/tmp/watcher-kernel-stable"
 env.KERNEL_TREE = "https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git"
 env.DISTRO = "Ubuntu_18.04.1;CentOS_7.5"
 env.AZURE_BOOT_LARGE_FLAVOR = "Standard_E64_v3"
-env.FUNCTIONAL_TESTS = "FVT"
-env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation_functional, validation_functional_hyperv, publish_azure_vhd, validation_functional_azure, validation_perf_azure, validation_perf_hyperv, publish_results"
+env.PRIORITY = "P1"
+env.STAGES = "build_artifacts, publish_temp_artifacts, boot_test, boot_test_large, publish_artifacts, validation, validation_hyperv, validation_hyperv_sriov, publish_azure_vhd, validation_azure, publish_results, send_mail"
 
 node ("meta_slave") {
     stage ("Trigger pipeline") {
@@ -40,7 +40,7 @@ node ("meta_slave") {
                                     string(name: 'KERNEL_GIT_URL', value: "${env.KERNEL_TREE}"),
                                     string(name: 'KERNEL_GIT_BRANCH', value: "${tag}"),
                                     string(name: 'DISTRO_VERSION', value: "${distro}"),
-                                    string(name: 'FUNCTIONAL_TESTS', value: "${env.FUNCTIONAL_TESTS}"),
+                                    string(name: 'PRIORITY', value: "${env.PRIORITY}"),
                                     string(name: 'KERNEL_DEBUG', value: "False"),
                                     string(name: 'LISAV2_AZURE_VM_SIZE_LARGE', value: "${env.AZURE_BOOT_LARGE_FLAVOR}"),
                                     string(name: 'ENABLED_STAGES', value: "${env.STAGES}")],
@@ -53,19 +53,6 @@ node ("meta_slave") {
             parallel runs
 
             deleteDir()
-        }
-    }
-}
-
-node ("meta_slave") {
-    stage('Send-email') {
-        withCredentials([string(credentialsId: 'MAIL_LIST', variable: 'MAIL_LIST')]) {
-            echo "Send email"
-            emailext (
-                subject: '$DEFAULT_SUBJECT',
-                to: "${env.MAIL_LIST}",
-                body: '$DEFAULT_CONTENT'
-            )
         }
     }
 }
