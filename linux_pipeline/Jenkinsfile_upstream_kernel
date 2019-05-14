@@ -168,7 +168,7 @@ pipeline {
     choice(choices: 'Standard_E64_v3\nStandard_F72s_v2', description: 'Azure large boot flavor', name: 'LISAV2_AZURE_VM_SIZE_LARGE')
     choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
     choice(choices: 'P0\nP1\nP2\nP3\n', description: 'Priority', name: 'PRIORITY')
-    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_hyperv, validation_hyperv_sriov, publish_azure_vhd, validation_azure, publish_results, send_mail",
+    string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_hyperv, validation_sriov_hyperv, publish_azure_vhd, validation_azure, publish_results, send_mail",
            description: 'What stages to run', name: 'ENABLED_STAGES')
   }
   environment {
@@ -641,10 +641,10 @@ pipeline {
           }
         }
 
-        stage('validation_hyperv_sriov') {
+        stage('validation_sriov_hyperv') {
           when {
             beforeAgent true
-            expression { params.ENABLED_STAGES.contains('validation_hyperv_sriov') }
+            expression { params.ENABLED_STAGES.contains('validation_sriov_hyperv') }
           }
           agent {
             node {
