@@ -79,18 +79,18 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                         try {
                             timeout (32400) {
                                 withCredentials(bindings: [
-                                file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+                                file(credentialsId:'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_File')]) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
@@ -194,18 +194,18 @@ if (env.performance == "yes") {
                         try {
                             timeout (43200) {
                                 withCredentials(bindings: [
-                                file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+                                file(credentialsId:'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_File')]) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
