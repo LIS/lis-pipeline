@@ -537,14 +537,15 @@ pipeline {
             ]) {
             script {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
-                hashtable=getTests("${PRIORITY}", "Azure")
+                hashtableAZ=[:]
+                hashtableAZ=getTests("${PRIORITY}", "Azure")
                 unstash 'CapturedVHD.azure.env'
                 script {
                     env.CapturedVHD = readFile 'CapturedVHD.azure.env'
                 }
                 println("VHD under test : ${env.CapturedVHD}")
                 def stepsForParallel = [:]
-                hashtable.each {
+                hashtableAZ.each {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
@@ -598,14 +599,15 @@ pipeline {
             ]) {
             script {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
-                hashtable=getTests("${PRIORITY}", "HyperV")
+                hashtableHV=[:]
+                hashtableHV=getTests("${PRIORITY}", "HyperV")
                 unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                 script {
                   env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
                 }
                 println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
-                hashtable.each {
+                hashtableHV.each {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
@@ -660,14 +662,15 @@ pipeline {
             ]) {
             script {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
-                hashtable=getTests("${PRIORITY}-SRIOV", "HyperV")
+                hashtableSRIOV=[:]
+                hashtableSRIOV=getTests("${PRIORITY}-SRIOV", "HyperV")
                 unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                 script {
                   env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
                 }
                 println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
-                hashtable.each {
+                hashtableSRIOV.each {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
