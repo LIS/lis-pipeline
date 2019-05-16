@@ -32,7 +32,7 @@ def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTe
     HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV'"]
 def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'NVME-DISK-VALIDATION,NVME-FSTRIM,NVME-BLKDISCARD'",
     AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV,PERF-SYSCALL-BENCHMARK,PERF-NVME-4K-IO,NVME-MAX-DISK-VALIDATION,NVME-DISK-OPERATIONS,NVME-CHECK-EXPECTED-FAILURES,NVME-FILE-SYSTEM-VERIFICATION-GENERIC,NVME-PCI-RESCIND'",
-    AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-Synthetic,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-SRIOV,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-SRIOV,PERF-NETWORK-TCP-NETPERF-MAX-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-MAX-PPS-SRIOV,PERF-GOLANG-BENCHMARK,NVME-FILE-SYSTEM-VERIFICATION-XFS,NVME-FILE-SYSTEM-VERIFICATION-EXT4,NVME-FILE-SYSTEM-VERIFICATION-BTRFS'",
+    AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-Synthetic,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-SRIOV,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-SRIOV,PERF-NETWORK-TCP-NETPERF-MAX-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-MAX-PPS-SRIOV,PERF-GOLANG-BENCHMARK,NVME-FILE-SYSTEM-VERIFICATION-XFS,NVME-FILE-SYSTEM-VERIFICATION-EXT4,NVME-FILE-SYSTEM-VERIFICATION-BTRFS,AZURE-WINDOWS-NESTED-HYPERV-STORAGE-MULTIDISK,AZURE-NESTED-HYPERV-NTTTCP-DIFFERENT-L1-NAT,AZURE-WINDOWS-NESTED-HYPERV-STORAGE-SINGLE-DISK'",
     AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
@@ -79,18 +79,18 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                         try {
                             timeout (32400) {
                                 withCredentials(bindings: [
-                                file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+                                file(credentialsId:'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_File')]) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
@@ -194,18 +194,18 @@ if (env.performance == "yes") {
                         try {
                             timeout (43200) {
                                 withCredentials(bindings: [
-                                file(credentialsId:'GLOBAL_LISAV2_SECRETS', variable: 'GLOBAL_LISAV2_SECRETS')]) {
+                                file(credentialsId:'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_File')]) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${GLOBAL_LISAV2_SECRETS}'" +
+                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
