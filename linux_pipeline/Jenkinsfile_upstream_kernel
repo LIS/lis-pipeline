@@ -658,7 +658,9 @@ pipeline {
               file(credentialsId: 'HyperV_Secrets_File',
                    variable: 'HyperV_Secrets_File'),
               string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-                   variable: 'LISAV2_IMAGES_SHARE_URL')
+                   variable: 'LISAV2_IMAGES_SHARE_URL'),
+              string(credentialsId:'SRIOV_TEST_LOCATION',
+                   variable: 'SRIOV_TEST_LOCATION')
             ]) {
             script {
                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
@@ -676,7 +678,7 @@ pipeline {
                     stepsForParallel[stepName] = { ->
                         try {
                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation 'localhost'" +
+                            " -TestLocation '${SRIOV_TEST_LOCATION}'" +
                             " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
                             " -TestPlatform 'HyperV'" +
                             " ${test_cmd}" +
