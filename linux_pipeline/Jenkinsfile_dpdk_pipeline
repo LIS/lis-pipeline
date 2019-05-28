@@ -179,7 +179,6 @@ if (dpdkSource.size()) {
 
     node('meta_slave') {
         stage("send_mail") {
-            dpdkTags = dpdkTags.replace(", ","")
             withCredentials([string(credentialsId: 'DPDK_MAILING_LIST',
                                   variable: 'DPDK_MAILING_LIST')]) {
                 def mailList = null
@@ -193,8 +192,9 @@ if (dpdkSource.size()) {
                 def testResults = "\n DPDK job exited with status: ${currentBuild.currentResult} - ${env.BUILD_URL}. \n"
                 azureImages.each {
                     def currentImage = it
-                    dpdkTags.split(" ").each() {
-                        def stashName = (it + currentImage).replace("/","").replace(":","").replace(".","")
+                    dpdkTags.trim().replace(", "," ").split(" ").each() {
+                        def dpdkVersion = it.trim().replace(",","")
+                        def stashName = (dpdkVersion + currentImage).replace("/","").replace(":","").replace(".","")
                         try {
                             unstash stashName
                             def junitFiles = findFiles glob: "Report/*-junit.xml"
@@ -221,10 +221,10 @@ if (dpdkSource.size()) {
                                     testResult += "* ${tcName}: ${tcStatus} \n"
                                 }
                                 if (testResult != "") {
-                                    testResults += "\nTest results for Azure image: '${currentImage}': \n \n"
+                                    testResults += "\nTest results for DPDK '${dpdkVersion}' and Azure image: '${currentImage}': \n \n"
                                     testResults += testResult
                                 } else {
-                                    testResults += "\nThere are no test results for Azure image: '${currentImage}'. Please check the Jenkins job."
+                                    testResults += "\nThere are no test results for DPDK '${dpdkVersion}' and Azure image: '${currentImage}'. Please check the Jenkins job."
                                 }
                                 sh "rm -f '${junitFile}'"
                             } else {
