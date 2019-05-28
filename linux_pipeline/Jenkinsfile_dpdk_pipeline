@@ -121,7 +121,7 @@ if (dpdkSource.size()) {
             stageName = currentTag + "-"
             dpdkSourceUrl = "https://git.dpdk.org/dpdk/snapshot/dpdk-${currentTag}.tar.gz"
             if (it && it[1] && it[1] == "stable") {
-                dpdkSourceUrl = "https://git.dpdk.org/dpdk-stable/snapshot/dpdk-${currentTag}.tar.gz"
+                dpdkSourceUrl = "https://git.dpdk.org/dpdk-stable/snapshot/dpdk-stable-${currentTag}.tar.gz"
             }
         }
 
