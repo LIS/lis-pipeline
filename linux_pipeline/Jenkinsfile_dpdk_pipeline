@@ -48,7 +48,9 @@ def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
 def lisav2BranchName = "master"
 
 env.DPDK_REMOTE_URL = "git://git.dpdk.org/dpdk"
-env.BUILD_TAGS = ""
+env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
+env.BUILD_TAGS_LATEST = ""
+env.BUILD_TAGS_STABLE = ""
 
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegion = env.AZURE_REGION.trim()
@@ -72,38 +74,55 @@ if (!DPDK_SOURCE || DPDK_SOURCE == "") {
                     bash ./scripts/package_building/check_latest_tags.sh \\
                         --work_dir "./" \\
                         --kernel_tree "$DPDK_REMOTE_URL" \\
-                        --results "./results.txt" \\
+                        --results "./latest_tags.txt" \\
                         --exclude_versions "False"
                 '''
-                env.BUILD_TAGS = readFile ("results.txt")
+                sh '''
+                    #!/bin/bash
+                    bash ./scripts/package_building/check_latest_tags.sh \\
+                        --work_dir "./" \\
+                        --kernel_tree "$DPDK_STABLE_REMOTE_URL" \\
+                        --results "./stable_tags.txt" \\
+                        --exclude_versions "False"
+                '''
+                env.BUILD_TAGS_LATEST = readFile ("latest_tags.txt")
+                env.BUILD_TAGS_STABLE = readFile ("stable_tags.txt")
             }
             cleanWs()
         }
     }
 }
 
-if (env.BUILD_TAGS && env.BUILD_TAGS != "") {
-    env.BUILD_TAGS.eachLine {
-        dpdkSource.add(it)
+if (env.BUILD_TAGS_LATEST && env.BUILD_TAGS_LATEST != "") {
+    env.BUILD_TAGS_LATEST.eachLine {
+        dpdkSource.add([it, 'latest'])
+    }
+}
+if (env.BUILD_TAGS_STABLE && env.BUILD_TAGS_STABLE != "") {
+    env.BUILD_TAGS_STABLE.eachLine {
+        dpdkSource.add([it, 'stable'])
     }
 }
 
 if (DPDK_SOURCE && DPDK_SOURCE != "") {
-    dpdkSource = [DPDK_SOURCE]
+    dpdkSource = [[DPDK_SOURCE, '']]
 }
 
 if (dpdkSource.size()) {
     dpdkSource.each {
-        def currentTag = it
+        def currentTag = it[0]
         def currentTagAzureId = ""
         def stageName = ""
-        def dpdkSourceUrl = it
+        def dpdkSourceUrl = it[0]
 
         if (!DPDK_SOURCE || DPDK_SOURCE == "") {
-            currentTag = it.replace("refs/tags/", "")
+            currentTag = it[0].replace("refs/tags/", "")
             currentTagAzureId = "-" + currentTag.replace("-", "").replace(".","").replace("_","")
             stageName = currentTag + "-"
             dpdkSourceUrl = "https://git.dpdk.org/dpdk/snapshot/dpdk-${currentTag}.tar.gz"
+            if (it && it[1] && it[1] == "stable") {
+                dpdkSourceUrl = "https://git.dpdk.org/dpdk-stable/snapshot/dpdk-${currentTag}.tar.gz"
+            }
         }
 
         dpdkTags += "${currentTag}, "
