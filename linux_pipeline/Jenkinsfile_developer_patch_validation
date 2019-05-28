@@ -5,7 +5,7 @@ env.LISAV2_BRANCH = "stable"
 env.LISAV2_RG_IDENTIFIER = "developerk"
 env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
-env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
+env.LISAV2_FUNCTIONAL_BOOT_TEST = "LIS-MODULES-CHECK"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
 env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
@@ -94,7 +94,7 @@ properties ([
             description: 'On which platform to run LISAv2 functional tests.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
-            defaultValue: "BVT",
+            defaultValue: "FUNCTIONAL",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_AREA',
