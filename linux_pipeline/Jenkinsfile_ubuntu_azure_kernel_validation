@@ -208,6 +208,7 @@ if (env.performance == "yes") {
                                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -EnableTelemetry" +
                                             " -ExitWithZero" +
+                                            " -ResultDBTestTag '${env.distro}_${env.kernel}_${env.BUILD_NUMBER}'" +
                                             " ${test_cmd}"
                                         )
                                         archiveArtifacts '*-TestLogs.zip'
