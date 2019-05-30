@@ -209,13 +209,13 @@ if (dpdkSource.size()) {
                                     def tcStatusError = it.error
                                     def tcStatusSkipped = it.skipped
                                     def tcStatus = "PASSED"
-                                    if (tcStatusFailure.text()) {
+                                    if (tcStatusFailure.size()) {
                                         tcStatus = "FAILED"
                                     }
-                                    if (tcStatusError.text()) {
+                                    if (tcStatusError.size()) {
                                         tcStatus = "ABORTED"
                                     }
-                                    if (tcStatusSkipped.text()) {
+                                    if (tcStatusSkipped.size()) {
                                         tcStatus = "SKIPPED"
                                     }
                                     testResult += "* ${tcName}: ${tcStatus} \n"
