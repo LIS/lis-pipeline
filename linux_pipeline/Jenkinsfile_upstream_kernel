@@ -567,27 +567,33 @@ pipeline {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
-                        try {
-                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation '${LISAV2_AZURE_REGION}'" +
-                            " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                            " -TestPlatform 'Azure'" +
-                            " ${test_cmd}" +
-                            " -OsVHD '${CapturedVHD}'" +
-                            " -XMLSecretFile '${Azure_Secrets_File}'" +
-                            " -ExitWithZero")
-                        } finally {
-                            junit "Report\\*-junit.xml"
-                            archiveArtifacts "*-TestLogs.zip"
-                            script {
-                                def passCount = GetTestResults("pass")
-                                def abortCount = GetTestResults("abort")
-                                def failCount = GetTestResults("fail")
-                                def skippedCount = GetTestResults("skipped")
-                                FUNC_PASS_ONAZURE = FUNC_PASS_ONAZURE.toInteger() + passCount.toInteger()
-                                FUNC_ABORT_ONAZURE = FUNC_ABORT_ONAZURE.toInteger() + abortCount.toInteger()
-                                FUNC_FAIL_ONAZURE = FUNC_FAIL_ONAZURE.toInteger() + failCount.toInteger()
-                                FUNC_SKIP_ONAZURE = FUNC_SKIP_ONAZURE.toInteger() + skippedCount.toInteger()
+                        stage("${stepName}") {
+                            dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+                                deleteDir()
+                                try {
+                                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                    " -TestLocation '${LISAV2_AZURE_REGION}'" +
+                                    " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                    " -TestPlatform 'Azure'" +
+                                    " ${test_cmd}" +
+                                    " -OsVHD '${CapturedVHD}'" +
+                                    " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                    " -ExitWithZero")
+                                } finally {
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts "*-TestLogs.zip"
+                                    script {
+                                        def passCount = GetTestResults("pass")
+                                        def abortCount = GetTestResults("abort")
+                                        def failCount = GetTestResults("fail")
+                                        def skippedCount = GetTestResults("skipped")
+                                        FUNC_PASS_ONAZURE = FUNC_PASS_ONAZURE.toInteger() + passCount.toInteger()
+                                        FUNC_ABORT_ONAZURE = FUNC_ABORT_ONAZURE.toInteger() + abortCount.toInteger()
+                                        FUNC_FAIL_ONAZURE = FUNC_FAIL_ONAZURE.toInteger() + failCount.toInteger()
+                                        FUNC_SKIP_ONAZURE = FUNC_SKIP_ONAZURE.toInteger() + skippedCount.toInteger()
+                                    }
+                                }
+                                deleteDir()
                             }
                         }
                     }
@@ -629,28 +635,34 @@ pipeline {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
-                        try {
-                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation 'localhost'" +
-                            " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                            " -TestPlatform 'HyperV'" +
-                            " ${test_cmd}" +
-                            " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                            " -OsVHD '${HYPERV_VHD_PATH}'" +
-                            " -XMLSecretFile '${HyperV_Secrets_File}'" +
-                            " -ExitWithZero")
-                        } finally {
-                            junit "Report\\*-junit.xml"
-                            archiveArtifacts "*-TestLogs.zip"
-                            script {
-                                def passCount = GetTestResults("pass")
-                                def abortCount = GetTestResults("abort")
-                                def failCount = GetTestResults("fail")
-                                def skippedCount = GetTestResults("skipped")
-                                FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-                                FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-                                FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-                                FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                        stage("${stepName}") {
+                            dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+                                deleteDir()
+                                try {
+                                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                    " -TestLocation 'localhost'" +
+                                    " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                    " -TestPlatform 'HyperV'" +
+                                    " ${test_cmd}" +
+                                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                                    " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                    " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ExitWithZero")
+                                } finally {
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts "*-TestLogs.zip"
+                                    script {
+                                        def passCount = GetTestResults("pass")
+                                        def abortCount = GetTestResults("abort")
+                                        def failCount = GetTestResults("fail")
+                                        def skippedCount = GetTestResults("skipped")
+                                        FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                                        FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                                        FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                                        FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                    }
+                                }
+                                deleteDir()
                             }
                         }
                     }
@@ -694,28 +706,34 @@ pipeline {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
-                        try {
-                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation '${SRIOV_TEST_LOCATION}'" +
-                            " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                            " -TestPlatform 'HyperV'" +
-                            " ${test_cmd}" +
-                            " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                            " -OsVHD '${HYPERV_VHD_PATH}'" +
-                            " -XMLSecretFile '${HyperV_Secrets_File}'" +
-                            " -ExitWithZero")
-                        } finally {
-                            junit "Report\\*-junit.xml"
-                            archiveArtifacts "*-TestLogs.zip"
-                            script {
-                                def passCount = GetTestResults("pass")
-                                def abortCount = GetTestResults("abort")
-                                def failCount = GetTestResults("fail")
-                                def skippedCount = GetTestResults("skipped")
-                                FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-                                FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-                                FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-                                FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                        stage("${stepName}") {
+                            dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+                                deleteDir()
+                                try {
+                                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                    " -TestLocation '${SRIOV_TEST_LOCATION}'" +
+                                    " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                    " -TestPlatform 'HyperV'" +
+                                    " ${test_cmd}" +
+                                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                                    " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                    " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ExitWithZero")
+                                } finally {
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts "*-TestLogs.zip"
+                                    script {
+                                        def passCount = GetTestResults("pass")
+                                        def abortCount = GetTestResults("abort")
+                                        def failCount = GetTestResults("fail")
+                                        def skippedCount = GetTestResults("skipped")
+                                        FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                                        FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                                        FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                                        FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                    }
+                                }
+                                deleteDir()
                             }
                         }
                     }
@@ -757,28 +775,34 @@ pipeline {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
-                        try {
-                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation 'localhost'" +
-                            " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                            " -TestPlatform 'HyperV'" +
-                            " ${test_cmd}" +
-                            " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                            " -OsVHD '${HYPERV_VHD_PATH}'" +
-                            " -XMLSecretFile '${HyperV_Secrets_File}'" +
-                            " -ExitWithZero")
-                        } finally {
-                            junit "Report\\*-junit.xml"
-                            archiveArtifacts "*-TestLogs.zip"
-                            script {
-                                def passCount = GetTestResults("pass")
-                                def abortCount = GetTestResults("abort")
-                                def failCount = GetTestResults("fail")
-                                def skippedCount = GetTestResults("skipped")
-                                FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-                                FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-                                FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-                                FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                        stage("${stepName}") {
+                            dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+                                deleteDir()
+                                try {
+                                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                    " -TestLocation 'localhost'" +
+                                    " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                    " -TestPlatform 'HyperV'" +
+                                    " ${test_cmd}" +
+                                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                                    " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                    " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ExitWithZero")
+                                } finally {
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts "*-TestLogs.zip"
+                                    script {
+                                            def passCount = GetTestResults("pass")
+                                            def abortCount = GetTestResults("abort")
+                                            def failCount = GetTestResults("fail")
+                                            def skippedCount = GetTestResults("skipped")
+                                            FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                                            FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                                            FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                                            FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                    }
+                                }
+                                deleteDir()
                             }
                         }
                     }
@@ -820,34 +844,40 @@ pipeline {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
-                        try {
-                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                            " -TestLocation 'localhost'" +
-                            " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                            " -TestPlatform 'HyperV'" +
-                            " ${test_cmd}" +
-                            " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                            " -OsVHD '${HYPERV_VHD_PATH}'" +
-                            " -XMLSecretFile '${HyperV_Secrets_File}'" +
-                            " -ExitWithZero")
-                        } finally {
-                            junit "Report\\*-junit.xml"
-                            archiveArtifacts "*-TestLogs.zip"
-                            script {
-                                def passCount = GetTestResults("pass")
-                                def abortCount = GetTestResults("abort")
-                                def failCount = GetTestResults("fail")
-                                def skippedCount = GetTestResults("skipped")
-                                FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-                                FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-                                FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-                                FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                        stage("${stepName}") {
+                            dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+                            deleteDir()
+                            try {
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                " -TestLocation 'localhost'" +
+                                " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                " -TestPlatform 'HyperV'" +
+                                " ${test_cmd}" +
+                                " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                                " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                " -ExitWithZero")
+                            } finally {
+                                junit "Report\\*-junit.xml"
+                                archiveArtifacts "*-TestLogs.zip"
+                                script {
+                                    def passCount = GetTestResults("pass")
+                                    def abortCount = GetTestResults("abort")
+                                    def failCount = GetTestResults("fail")
+                                    def skippedCount = GetTestResults("skipped")
+                                    FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                                    FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                                    FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                                    FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                }
+                            }
+                            deleteDir()
                             }
                         }
                     }
                 }
                 parallel stepsForParallel
-                }
+            }
             }
           }
         }
