@@ -10,7 +10,7 @@ env.DISTRO_TYPE = "deb"
 env.DISTRO_PACKAGE_TYPE = "deb"
 env.DISTRO_AZURE_IMAGE = env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC
 
-env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
+env.LISAV2_FUNCTIONAL_BOOT_TEST = "LIS-MODULES-CHECK"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
 env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
@@ -115,7 +115,7 @@ properties ([
             description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
-            defaultValue: "BVT",
+            defaultValue: "FUNCTIONAL",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_AREA',
