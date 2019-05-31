@@ -22,7 +22,7 @@ withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
 
 def sendMail = true
 def stashList = []
-def azureSku = ["rhel_6.7": "6.7", "rhel_6.8": "6.8", "rhel_6.9": "6.9", "rhel_6.10": "6.10", "rhel_7.3": "7.3", "rhel_7.4": "7.4", "rhel_7.5": "7-RAW"]
+def azureSku = ["rhel_6.7": "6.7", "rhel_6.8": "6.8", "rhel_6.9": "6.9", "rhel_6.10": "6.10", "rhel_7.3": "7.3", "rhel_7.4": "7.4", "rhel_7.5": "7-RAW", "rhel_7.6": "7.6"]
 
 def getVersionFromURL(lisLink){
     def realLink = ""

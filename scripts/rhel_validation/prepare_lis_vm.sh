@@ -99,7 +99,7 @@ function main {
         fi
         prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD"
     elif [[ "$SECTION" == "install_lis" ]];then
-        MODULES_DIR="$(get_lis_os RHEL "${OS_VERSION}")"
+        MODULES_DIR="$(get_lis_os RPMS "${OS_VERSION}")"
         install_modules "${LIS_PATH}/${MODULES_DIR}" "$KERNEL_VERSION"
     fi
     popd
