@@ -19,7 +19,7 @@ run_remote_az_commands() {
     COMMANDS="$4"
     PARAMS="$5"
     
-    TIMEOUT=600
+    TIMEOUT=1800
     
     IFS=';'; COMMANDS=($COMMANDS); unset IFS;
     for comm in "${COMMANDS[@]}"; do

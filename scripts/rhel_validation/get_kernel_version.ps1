@@ -47,7 +47,8 @@ $RHEL_VERSIONS_TO_KERNEL_MAP = @{"rhel_6.7" = @{"baseVer" = "2.6.32-573"; "newVe
                                  "rhel_6.10" = @{"baseVer" = "2.6.32-754"; "newVer" = @()};
                                  "rhel_7.3" = @{"baseVer" = "3.10.0-514"; "newVer" = @()};
                                  "rhel_7.4" = @{"baseVer" = "3.10.0-693"; "newVer" = @()};
-                                 "rhel_7.5" = @{"baseVer" = "3.10.0-862"; "newVer" = @()}}
+                                 "rhel_7.5" = @{"baseVer" = "3.10.0-862"; "newVer" = @()};
+                                 "rhel_7.6" = @{"baseVer" = "3.10.0-957"; "newVer" = @()}}
 
 function Get-StoredVersions {
     param (
