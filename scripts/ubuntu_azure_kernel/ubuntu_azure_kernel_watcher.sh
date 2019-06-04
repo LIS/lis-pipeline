@@ -5,14 +5,15 @@
 # DESCRIPTION
 #
 #    This bash script is looking for linux-azure and linux-azure-edge proposed
-# kernels. There are 4 Ubuntu versions checked: Trusty, Xenial, Bionic, Cosmic.
+# kernels. There are 5 Ubuntu versions checked: Trusty, Xenial, Bionic, Cosmic,
+# Disco.
 # It will take the latest version available for each using apt-cache and compare
 # it to latest known version.
 #
 # -- If there is a new version, an Azure container will be deployed matching the
 # distro version and a proposed kernel install will be attempted: -
-# ----- If the install is successful, this script will save on a file the info 
-# that a new kernel has to be validated. The Jenkinsfile 
+# ----- If the install is successful, this script will save on a file the info
+# that a new kernel has to be validated. The Jenkinsfile
 # (Jenkinsfile_ubuntu_azure_kernel_watcher) will get that data and will trigger
 # the validation job for the new available kernel
 # ----- If the install in the container is not successful, the Jenkinsfile will
@@ -44,10 +45,10 @@ function Search_New_Kernel() {
                 echo "SKIPPING validation for $kernel_type on ${release}. Kernel couldn't be installed!"
                 echo "Will try again the install in 4 hours"
             else
-                echo "Setting $release $kernel_type for validation testing" 
+                echo "Setting $release $kernel_type for validation testing"
                 # Updating the value in latest_versions.sh
                 sudo sed -i -e "s|${release}${kernel_type_short}=.*|${release}${kernel_type_short}=${latest_kernel}|g" $VERSION_HISTORY_LOCATION
-                sudo sed -i -e "s|${release},${kernel_type},.*|${release},${kernel_type},yes;|g" $VERSION_TO_TEST_LOCATION  
+                sudo sed -i -e "s|${release},${kernel_type},.*|${release},${kernel_type},yes;|g" $VERSION_TO_TEST_LOCATION
             fi
         else
             echo "NO NEW VERSIONS are available for $release proposed $kernel_type kernel"
@@ -93,7 +94,7 @@ EOM
 }
 
 # Main
-RELEASES=(trusty xenial bionic cosmic)
+RELEASES=(trusty xenial bionic cosmic disco)
 VERSION_HISTORY_LOCATION="/home/lisa/latest_versions.sh"
 VERSION_TO_TEST_LOCATION="/home/lisa/version_to_test.sh"
 . $VERSION_HISTORY_LOCATION
@@ -110,7 +111,7 @@ for release in ${RELEASES[@]}; do
 
     latest_azure=$(sudo apt-cache madison linux-azure | grep ${release}-proposed | awk '{print $3}')
     latest_edge=$(sudo apt-cache madison linux-azure-edge | grep ${release}-proposed | awk '{print $3}')
-    
+
     # Check linux-azure proposed kernel for a new version
     Search_New_Kernel $release "linux-azure" $azure_release
 
