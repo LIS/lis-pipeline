@@ -17,9 +17,9 @@ def getTests(priority, platform) {
     AZURE_VALIDATION_TESTS_HASH_P1 = [AZURE_P1_FUNCTIONAL_VALIDATION:"-TestPriority 1 -TestCategory Functional -ExcludeTests 'NVIDIA-CUDA-DRIVER-VALIDATION-MAX-GPU,NVIDIA-GRID-DRIVER-VALIDATION-MAX-GPU,INFINIBAND-OPEN-MPI-2VM,VERIFY-DPDK-FAILSAFE-DURING-TRAFFIC,VERIFY-DPDK-RING-LATENCY,GPU-PCI-RESCIND'"]
     HYPERV_VALIDATION_TESTS_HASH_P1 = [HV_P1_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 1 -ExcludeTests 'LIVE-MIGRATE-FAILOVER,DYNAMIC-MEMORY-HIGH-PRIORITY,SRIOV-DISABLE-ENABLE-PCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION-ONE-VCPU,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-ADD-MAX-NICS-DURING-PROVISION,SRIOV-INTERRUPTS-CHANGE,SRIOV-DISABLEVF-ON-GUEST,SRIOV-RELOAD-MODULE,SRIOV-DISABLEVF-PING,SRIOV-DISABLEVF-IPERF,SRIOV-DETACH-NIC,SRIOV-DISABLEVF-ONHOST,SRIOV-DISABLE-NIC,SRIOV-DISABLE-VMQ,SRIOV-CHANGE-RSS,SRIOV-MEASURE-VF-FAILBACK,SRIOV-MULTICAST,SRIOV-BROADCAST,SRIOV-REBOOT-VM,SRIOV-STRESS-SAVE,SRIOV-STRESS-PAUSE,NVME-DISK-OPERATIONS,NVME-CHECK-EXPECTED-FAILURES,NVME-PCI-RESCIND'",
         HV_P1_STRESS_VALIDATION:"-TestPriority 1 -TestCategory Stress"]
-    HYPERV_VALIDATION_SRIOV_TESTS_HASH_P1 = [HV_P1_SRIOV_VALIDATION:"-TestPriority 1 -TestCategory Functional -TestArea SRIOV"]
-    HYPERV_VALIDATION_NVME_TESTS_HASH_P1 = [HV_P1_NVME_VALIDATION:"-TestPriority 1 -TestCategory Functional -TestArea NVME"]
-    HYPERV_VALIDATION_MIGRATE_TESTS_HASH_P1 = [HV_P1_MIGRATE_VALIDATION:"-TestPriority 1 -TestCategory Functional -TestArea MIGRATION"]
+    HYPERV_VALIDATION_SRIOV_TESTS_HASH_P1 = [HV_P1_SRIOV_VALIDATION:"-TestPriority '0,1' -TestCategory Functional -TestArea SRIOV"]
+    HYPERV_VALIDATION_NVME_TESTS_HASH_P1 = [HV_P1_NVME_VALIDATION:"-TestPriority '0,1' -TestCategory Functional -TestArea NVME"]
+    HYPERV_VALIDATION_MIGRATE_TESTS_HASH_P1 = [HV_P1_MIGRATE_VALIDATION:"-TestPriority '0,1' -TestCategory Functional -TestArea MIGRATION"]
 
     AZURE_VALIDATION_TESTS_HASH_P2 = [AZURE_P2_FUNCTIONAL_VALIDATION:"-TestPriority 2 -TestCategory Functional",
         AZURE_P2_COMMUNITY_VALIDATION:"-TestPriority 2 -TestCategory Community",
@@ -27,7 +27,7 @@ def getTests(priority, platform) {
     HYPERV_VALIDATION_TESTS_HASH_P2= [HV_P2_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 2 -ExcludeTests 'SRIOV-IPERF-STRESS,SRIOV-MOVE-VHD'",
         HV_P2_STRESS_VALIDATION:"-TestPriority 2 -TestCategory Stress",
         HV_P2_COMMUNITY_VALIDATION:"-TestPriority 2 -TestCategory Community"]
-    HYPERV_VALIDATION_SRIOV_TESTS_HASH_P2 = [HV_P2_SRIOV_VALIDATION:"-TestPriority 2 -TestCategory Functional -TestArea SRIOV"]
+    HYPERV_VALIDATION_SRIOV_TESTS_HASH_P2 = [HV_P2_SRIOV_VALIDATION:"-TestPriority '0,1,2' -TestCategory Functional -TestArea SRIOV"]
 
     AZURE_VALIDATION_TESTS_HASH_P3 = [AZURE_P3_COMMUNITY_VALIDATION:"-TestPriority 3 -TestCategory Community"]
     HYPERV_VALIDATION_TESTS_HASH_P3= [HV_P3_VALIDATION:"-TestPriority 3"]
@@ -64,26 +64,21 @@ def getTests(priority, platform) {
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P0
     }
     if ("${priority}" == "P1-SRIOV") {
-        HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P0
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P1
     }
     if ("${priority}" == "P2-SRIOV") {
-        HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P0
-        HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P1
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_SRIOV_TESTS_HASH_P2
     }
     if ("${priority}" == "P0-NVME") {
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_NVME_TESTS_HASH_P0
     }
     if ("${priority}" == "P1-NVME") {
-        HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_NVME_TESTS_HASH_P0
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_NVME_TESTS_HASH_P1
     }
     if ("${priority}" == "P0-MIGRATE") {
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_MIGRATE_TESTS_HASH_P0
     }
     if ("${priority}" == "P1-MIGRATE") {
-        HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_MIGRATE_TESTS_HASH_P0
         HYPERV_VALIDATION_TESTS_HASH += HYPERV_VALIDATION_MIGRATE_TESTS_HASH_P1
     }
     if ("${platform}".contains("Azure")) {
@@ -93,6 +88,7 @@ def getTests(priority, platform) {
         return HYPERV_VALIDATION_TESTS_HASH
     }
 }
+
 def GetTestResults(type) {
     withEnv(["Type=${type}"]) {
         def returnValues = powershell returnStdout: true, script: '''$file = Get-Item ".\\Report\\*-junit.xml" | Sort-Object LastWriteTimeUtc | select -Last 1
@@ -554,22 +550,23 @@ pipeline {
                    variable: 'Azure_Secrets_File')
             ]) {
             script {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
                 hashtableAZ=[:]
                 hashtableAZ=getTests("${PRIORITY}", "Azure")
-                unstash 'CapturedVHD.azure.env'
-                script {
-                    env.CapturedVHD = readFile 'CapturedVHD.azure.env'
-                }
-                println("VHD under test : ${env.CapturedVHD}")
                 def stepsForParallel = [:]
                 hashtableAZ.each {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
+                        node('azure') {
                         stage("${stepName}") {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
+                                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+                                unstash 'CapturedVHD.azure.env'
+                                script {
+                                    env.CapturedVHD = readFile 'CapturedVHD.azure.env'
+                                }
+                                println("VHD under test : ${env.CapturedVHD}")
                                 try {
                                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                     " -TestLocation '${LISAV2_AZURE_REGION}'" +
@@ -578,6 +575,7 @@ pipeline {
                                     " ${test_cmd}" +
                                     " -OsVHD '${CapturedVHD}'" +
                                     " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                    " -ResourceCleanup Delete" +
                                     " -ExitWithZero")
                                 } finally {
                                     junit "Report\\*-junit.xml"
@@ -595,6 +593,7 @@ pipeline {
                                 }
                                 deleteDir()
                             }
+                        }
                         }
                     }
                 }
@@ -622,22 +621,23 @@ pipeline {
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
             script {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
                 hashtableHV=[:]
                 hashtableHV=getTests("${PRIORITY}", "HyperV")
-                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-                script {
-                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
-                }
-                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
                 hashtableHV.each {
                     def stepName = it.key
                     def test_cmd = it.value
                     stepsForParallel[stepName] = { ->
+                        node('hyper-v') {
                         stage("${stepName}") {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
+                                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+                                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                                script {
+                                env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
+                                }
+                                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                                 try {
                                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                     " -TestLocation 'localhost'" +
@@ -647,6 +647,7 @@ pipeline {
                                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                                     " -OsVHD '${HYPERV_VHD_PATH}'" +
                                     " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ResourceCleanup Delete" +
                                     " -ExitWithZero")
                                 } finally {
                                     junit "Report\\*-junit.xml"
@@ -664,6 +665,7 @@ pipeline {
                                 }
                                 deleteDir()
                             }
+                        }
                         }
                     }
                 }
@@ -693,14 +695,8 @@ pipeline {
                    variable: 'SRIOV_TEST_LOCATION')
             ]) {
             script {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
                 hashtableSRIOV=[:]
                 hashtableSRIOV=getTests("${PRIORITY}-SRIOV", "HyperV")
-                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-                script {
-                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
-                }
-                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
                 hashtableSRIOV.each {
                     def stepName = it.key
@@ -709,6 +705,12 @@ pipeline {
                         stage("${stepName}") {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
+                                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+                                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                                script {
+                                    env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
+                                }
+                                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                                 try {
                                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                     " -TestLocation '${SRIOV_TEST_LOCATION}'" +
@@ -718,6 +720,7 @@ pipeline {
                                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                                     " -OsVHD '${HYPERV_VHD_PATH}'" +
                                     " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ResourceCleanup Delete" +
                                     " -ExitWithZero")
                                 } finally {
                                     junit "Report\\*-junit.xml"
@@ -762,14 +765,8 @@ pipeline {
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
             script {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
                 hashtableNVME=[:]
                 hashtableNVME=getTests("${PRIORITY}-NVME", "HyperV")
-                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-                script {
-                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
-                }
-                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
                 hashtableNVME.each {
                     def stepName = it.key
@@ -778,6 +775,12 @@ pipeline {
                         stage("${stepName}") {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
+                                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+                                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+                                script {
+                                    env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
+                                }
+                                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                                 try {
                                     RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                     " -TestLocation 'localhost'" +
@@ -787,6 +790,7 @@ pipeline {
                                     " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
                                     " -OsVHD '${HYPERV_VHD_PATH}'" +
                                     " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ResourceCleanup Delete" +
                                     " -ExitWithZero")
                                 } finally {
                                     junit "Report\\*-junit.xml"
@@ -831,14 +835,8 @@ pipeline {
                    variable: 'LISAV2_IMAGES_SHARE_URL')
             ]) {
             script {
-                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
                 hashtableMIGRATE=[:]
                 hashtableMIGRATE=getTests("${PRIORITY}-MIGRATE", "HyperV")
-                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-                script {
-                  env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
-                }
-                println("Current VHD: ${env.HYPERV_VHD_PATH}")
                 def stepsForParallel = [:]
                 hashtableMIGRATE.each {
                     def stepName = it.key
@@ -846,32 +844,39 @@ pipeline {
                     stepsForParallel[stepName] = { ->
                         stage("${stepName}") {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
-                            deleteDir()
-                            try {
-                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                " -TestLocation 'localhost'" +
-                                " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-                                " -TestPlatform 'HyperV'" +
-                                " ${test_cmd}" +
-                                " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-                                " -OsVHD '${HYPERV_VHD_PATH}'" +
-                                " -XMLSecretFile '${HyperV_Secrets_File}'" +
-                                " -ExitWithZero")
-                            } finally {
-                                junit "Report\\*-junit.xml"
-                                archiveArtifacts "*-TestLogs.zip"
+                                deleteDir()
+                                prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+                                unstashKernel(env.KERNEL_ARTIFACTS_PATH)
                                 script {
-                                    def passCount = GetTestResults("pass")
-                                    def abortCount = GetTestResults("abort")
-                                    def failCount = GetTestResults("fail")
-                                    def skippedCount = GetTestResults("skipped")
-                                    FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-                                    FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-                                    FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-                                    FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                    env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
                                 }
-                            }
-                            deleteDir()
+                                println("Current VHD: ${env.HYPERV_VHD_PATH}")
+                                try {
+                                    RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                    " -TestLocation 'localhost'" +
+                                    " -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+                                    " -TestPlatform 'HyperV'" +
+                                    " ${test_cmd}" +
+                                    " -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+                                    " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                    " -XMLSecretFile '${HyperV_Secrets_File}'" +
+                                    " -ResourceCleanup Delete" +
+                                    " -ExitWithZero")
+                                } finally {
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts "*-TestLogs.zip"
+                                    script {
+                                        def passCount = GetTestResults("pass")
+                                        def abortCount = GetTestResults("abort")
+                                        def failCount = GetTestResults("fail")
+                                        def skippedCount = GetTestResults("skipped")
+                                        FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+                                        FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+                                        FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+                                        FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+                                    }
+                                }
+                                deleteDir()
                             }
                         }
                     }
