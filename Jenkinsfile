@@ -530,12 +530,6 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [
-              file(credentialsId: 'HyperV_Secrets_File',
-                   variable: 'HyperV_Secrets_File'),
-              string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-                   variable: 'LISAV2_IMAGES_SHARE_URL')
-            ]) {
             script {
                 hashtableHV=[:]
                 hashtableHV=getTests("${PRIORITY}", "HyperV")
@@ -546,6 +540,12 @@ pipeline {
                     stepsForParallel[stepName] = { ->
                         node('hyper-v') {
                         stage("${stepName}") {
+                            withCredentials(bindings: [
+                                file(credentialsId: 'HyperV_Secrets_File',
+                                variable: 'HyperV_Secrets_File'),
+                                string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                                variable: 'LISAV2_IMAGES_SHARE_URL')
+                            ]) {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
                                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
@@ -581,13 +581,13 @@ pipeline {
                                 }
                                 deleteDir()
                             }
+                            }
                         }
                         }
                     }
                 }
                 parallel stepsForParallel
                 }
-            }
           }
         }
 
@@ -814,10 +814,6 @@ pipeline {
             }
           }
           steps {
-            withCredentials(bindings: [
-              file(credentialsId: 'Azure_Secrets_TESTONLY_File',
-                   variable: 'Azure_Secrets_File')
-            ]) {
             script {
                 hashtableAZ=[:]
                 hashtableAZ=getTests("${PRIORITY}", "Azure")
@@ -828,6 +824,10 @@ pipeline {
                     stepsForParallel[stepName] = { ->
                         node('azure') {
                         stage("${stepName}") {
+                            withCredentials(bindings: [
+                                file(credentialsId: 'Azure_Secrets_TESTONLY_File',
+                                variable: 'Azure_Secrets_File')
+                            ]) {
                             dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
                                 deleteDir()
                                 prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
@@ -862,13 +862,13 @@ pipeline {
                                 }
                                 deleteDir()
                             }
+                            }
                         }
                         }
                     }
                 }
                 parallel stepsForParallel
                 }
-            }
           }
         }
 
