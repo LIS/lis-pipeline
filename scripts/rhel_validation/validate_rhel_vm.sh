@@ -99,6 +99,9 @@ main() {
             --sku)
                 AZURE_SKU="$2"
                 shift 2;;
+            --kernelrepolist)
+                KERNEL_REPO_LIST="$2"
+                shift 2;;
             --azure_token)
                 AZURE_TOKEN="$2"
                 shift 2;;
@@ -133,7 +136,7 @@ main() {
     # Install the desired kernel version
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "@prepare_lis_vm.sh" \
-        "sec=install_kernel os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
+        "sec=install_kernel kernel_repolist=\"$KERNEL_REPO_LIST\" os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
             kernel_ver=\"$KERNEL_VERSION\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
     
     # Reboot vm

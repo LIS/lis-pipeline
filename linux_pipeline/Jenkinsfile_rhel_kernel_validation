@@ -54,8 +54,10 @@ stage ("Check for kernel") {
                         -LatestVersionsFile "${env:UTILS_DIR}\\latest_tested_versions.txt"
                         -RemoteHtmlLocation "${env:REMOTE_HTML_LOCATION}"
                         -OutputFile "kernel_versions.txt"
+                        -RepoListOutFile "Kernel_Repolist.txt"
                 ''') // LatestVersionsFile changed
                 stash includes: 'kernel_versions.txt', name: 'kernel_versions'
+                stash includes: 'Kernel_Repolist.txt', name: 'Kernel_Repolist'
                 echo 'Kernel versions checked'
                 deleteDir()
             }
@@ -67,8 +69,10 @@ stage ("Test kernel") {
     node ("jenkins-meta-slave") {
         def runNumber = 1
         def runs = [:]
+        def kernelrepolist = ""
         dir ("rhel_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) {
             unstash 'kernel_versions'
+            unstash 'Kernel_Repolist'
         }
         versionsPath = "./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/kernel_versions.txt"
         kernelVersions = readFile(versionsPath)
@@ -78,6 +82,9 @@ stage ("Test kernel") {
             currentBuild.result = 'SUCCESS'
             return
         }
+        kernelrepolistPath = "./rhel_versions-${env.BUILD_NUMBER}${env.BRANCH_NAME}/Kernel_Repolist.txt"
+        kernelrepolists = readFile(kernelrepolistPath)
+        kernelrepolists = kernelrepolists.trim().replaceAll("[^A-Za-z0-9.=_;\\-\\^\\s]", "").split(";")
         kernelVersions = kernelVersions.replaceAll("[^A-Za-z0-9.=_;\\-]", "").split(";")
         kernelVersions.each() {
             def distro = it.split("=")[0]
@@ -93,6 +100,13 @@ stage ("Test kernel") {
                         runNumber = runNumber + 1
                         checkout scm
                         echo "Testing kernel: ${version} on distro: ${distro}"
+                        for (line in kernelrepolists) {
+                            def kernel = line.trim().split("=")[0]
+                            def repolist = line.trim().split("=")[1]
+                            if (kernel.matches(version)) {
+                                kernelrepolist=repolist
+                            }
+                        }
                         def exitCode = sh (returnStatus: true, script: """
                             bash scripts/rhel_validation/validate_rhel_vm.sh \
                                 --workdir "r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}" \
@@ -103,6 +117,7 @@ stage ("Test kernel") {
                                 --rhel_username '${USERNAME}' \
                                 --rhel_password '${PASSWORD}' \
                                 --sku "${azureSku[distro]}" \
+                                --kernelrepolist "${kernelrepolist}" \
                                 --azure_token '${AZURE_SAS}'
                         """)
                         archiveArtifacts artifacts: "${distro}_lis_install.log"
