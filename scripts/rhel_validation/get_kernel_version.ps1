@@ -37,7 +37,8 @@ param (
     [String] $LatestVersionsFile,
     [String] $OutputFile,
     [String] $RemoteHtmlLocation,
-    [String] $UtilsDir
+    [String] $UtilsDir,
+    [String] $RepoListOutFile
 )
 
 # generate hash table with list of kernels for each version of rhel
@@ -141,6 +142,39 @@ function Get-UpdatedVersionsList {
     return $resultList, $latestVersionsList
 }
 
+Function Get-KernelRepositoryName {
+    param (
+        [string] $Kernel_link,
+        [string] $kernelhtmlRepo,
+        [string] $CookiePath
+    )
+
+    $RepoList=''
+    $isTextDetected = $false
+    $isTableDetected = $false
+    $PrefixURL = "https://access.redhat.com"
+    $fullURL = $PrefixURL + $Kernel_link
+    Get-VersionsHtml -HtmlPath $kernelhtmlRepo -RemoteUrl $fullURL -CookiePath  $CookiePath
+    $RepoData = Get-Content -Path $kernelhtmlRepo -Raw
+    foreach ($line in $RepoData.split("`n")) {
+        if ($line -imatch "Repos shown are based on your active subscriptions") {
+            $isTextDetected = $true
+        }
+        if ($line -imatch "<table") {
+            $isTableDetected = $true
+        }
+        if ($isTextDetected -and $isTableDetected ) {
+            if ($line -imatch '</table>') {
+                break;
+            }
+            if ($line -imatch '<br') {
+                $RepoList += $line.Trim().Split(" ")[0] + "^"
+            }
+        }
+    }
+    return $RepoList
+}
+
 ################################################################################
 #
 # Main script body
@@ -157,6 +191,9 @@ function Main {
     New-Item -Path $OutputFile -Force
     $OutputFile = Resolve-Path $OutputFile
     
+    New-Item -Path $RepoListOutFile -Force
+    $RepoListOutFile = Resolve-Path $RepoListOutFile
+
     $latestVersionsHash = Get-StoredVersions -LatestVersionsFile $LatestVersionsFile
     
     Push-Location $WorkDir
@@ -168,6 +205,19 @@ function Main {
 
     if ($resultList) {
         Write-Output "${resultList}" | Out-File $OutputFile
+        $kernelVersions = ($resultlist -replace "rhel_\d+.\d+=","").Split(";").trim()
+        foreach ($kernel in $kernelVersions) {
+            if ($kernel) {
+                $kernelhtmlpath=Get-Content -Path ".\package.html" | `
+                          where { $_ | Select-String -Pattern $kernel } | `
+                          where { $_ | Select-String -Pattern 'x86_64' } | `
+                          where { $_ | Select-String -Pattern 'value="(.*)"' }
+                $kernelpath=$kernelhtmlpath.ToString().Trim() -replace 'value=',"" -replace '\"',''
+                $RepoList=Get-KernelRepositoryName -CookiePath $cookiePath -Kernel_link $kernelpath -kernelhtmlRepo "repo.html"
+                $ResultRepoList += @("{0}={1};" -f @($kernel, $RepoList))
+            }
+        }
+        Write-Output "${ResultRepoList}" | Out-File $RepoListOutFile
     } else {
         Write-Output "No new kernel versions were found"
     }

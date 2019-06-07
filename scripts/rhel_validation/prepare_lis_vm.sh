@@ -25,7 +25,11 @@ function prepare_vm {
     subscription-manager register --force --username "${rhel_username}" --password "${rhel_password}"
     subscription-manager attach --auto
     subscription-manager release --set=${os_version}
-    subscription-manager repos --enable=${kernel_repo}
+    IFS='^'
+    read -ra kernel_repos <<< "$kernel_repo"
+    for repo in "${kernel_repos[@]}"; do
+        subscription-manager repos --enable=${repo}
+    done
     yum clean all
     yum -y install wget gcc redhat-lsb-core
     yum -y install kernel-${kernel_version}
@@ -80,6 +84,7 @@ function install_modules {
 function main {
     SECTION="$sec"
     OS_VERSION="$os_ver"
+    KERNEL_REPO="$kernel_repolist"
     WORK_DIR="$workdir"
     KERNEL_VERSION="$kernel_ver"
     RHEL_USERNAME="$rhel_user"
@@ -92,11 +97,6 @@ function main {
     
     if [[ "$SECTION" == "install_kernel" ]];then        
         MAJOR_VERSION="${OS_VERSION%.*}"
-        if [[ "${OS_VERSION}" == "6.8" ]] || [[ "${OS_VERSION}" == "6.9" ]] || [[ "${OS_VERSION}" == "6.10" ]];then
-            KERNEL_REPO="rhel-${MAJOR_VERSION}-server-rpms"
-        else 
-            KERNEL_REPO="rhel-${MAJOR_VERSION}-server-eus-rpms"
-        fi
         prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD"
     elif [[ "$SECTION" == "install_lis" ]];then
         MODULES_DIR="$(get_lis_os RPMS "${OS_VERSION}")"
