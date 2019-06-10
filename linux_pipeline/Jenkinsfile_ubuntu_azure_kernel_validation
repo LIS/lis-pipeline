@@ -4,6 +4,81 @@ def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
+def GetTestResults(type) {
+    withEnv(["Type=${type}"]) {
+        def returnValues = powershell returnStdout: true, script: '''$file = Get-Item ".\\Report\\*-junit.xml" | Sort-Object LastWriteTimeUtc | select -Last 1
+            $content = [xml](Get-Content $file)
+            $failCase = [int]($content.testsuites.testsuite.failures)
+            $allCase = [int]($content.testsuites.testsuite.tests)
+            $abortCase = [int]($content.testsuites.testsuite.errors)
+            $skippedCase = [int]($content.testsuites.testsuite.skipped)
+            $passCase = $allCase - $failCase - $abortCase - $skippedCase
+
+            if ($env:Type -eq "pass") {
+                return $passCase
+            } elseif ($env:Type -eq "abort") {
+                return $abortCase
+            } elseif ($env:Type -eq "fail") {
+                return $failCase
+            } elseif ($env:Type -eq "skipped") {
+                return $skippedCase
+            } elseif ($env:Type -eq "all") {
+                return $allCase
+            }
+        '''
+        return "${returnValues}"
+    }
+}
+
+def reportPipelineStatus(status) {
+    println "Pipeline report for status: ${status}"
+
+    env.COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
+    withCredentials(bindings: [file(credentialsId: 'KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS',
+        variable: 'KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS')]) {
+        dir('kernel_pipeline_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            sh '''#!/bin/bash
+                cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows.json"
+[{  "StartDate": "${START_DATE}",
+    "EndDate": "${END_DATE}",
+    "PipelineName": "${JOB_NAME}",
+    "PipelineBuildNumber": ${BUILD_NUMBER},
+    "PipelineBuildUrl": "${BUILD_URL}",
+    "KernelVersion": "${KERNEL_TYPE}",
+    "SignedOffBy": "${SIGNED_OFF_BY}",
+    "SignedOffResult": "${SIGNED_OFF_RESULT}",
+    "DistroVersion": "${Distro}"  }]
+EOF
+                python "${WORKSPACE}/scripts/reporting/report_pipeline_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows.json" \
+                --composite_keys "${COMPOSITE_KEYS}" \
+                --db_config "${KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS}"
+            '''
+        }
+    }
+}
+
+def reportStageStatus(stageInfo) {
+        println "Reporting pipeline status for stage: " + stageInfo["name"]
+        println "Stage platform: " + stageInfo["platform"]
+        println "Stage start date: " + stageInfo["StartDate"]
+        println "Stage end date: " + stageInfo["EndDate"]
+
+        println "PipelineName: ${JOB_NAME}"
+        println "PipelineBuildNumber: ${BUILD_NUMBER}"
+
+        def passCount = GetTestResults("pass")
+        def abortCount = GetTestResults("abort")
+        def failCount = GetTestResults("fail")
+        def skippedCount = GetTestResults("skipped")
+
+        println("PASS: ${passCount}")
+        println("ABORT: ${abortCount}")
+        println("FAIL: ${failCount}")
+        println("SKIP: ${skippedCount}")
+}
+
+
 properties ([
     overrideIndexTriggers(false),
     parameters([
@@ -30,13 +105,16 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   cosmic:'ubuntu_18.10\\ubuntu_18.10_gen1_gen2.vhdx',
                   disco: 'ubuntu_19.04\\ubuntu_19.04_gen1_gen2.vhdx']
+
 def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'LIVE-MIGRATE-QUICK-MIGRATE,NVME-DISK-VALIDATION,SRIOV-VERIFY-LSPCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION,LIVE-MIGRATE,NVME-FSTRIM,NVME-BLKDISCARD'",
     HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests 'LIVE-MIGRATE-FAILOVER,DYNAMIC-MEMORY-HIGH-PRIORITY,SRIOV-DISABLE-ENABLE-PCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION-ONE-VCPU,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-ADD-MAX-NICS-DURING-PROVISION,SRIOV-INTERRUPTS-CHANGE,SRIOV-DISABLEVF-ON-GUEST,SRIOV-RELOAD-MODULE,SRIOV-DISABLEVF-PING,SRIOV-DISABLEVF-IPERF,SRIOV-DETACH-NIC,SRIOV-DISABLEVF-ONHOST,SRIOV-DISABLE-NIC,SRIOV-DISABLE-VMQ,SRIOV-CHANGE-RSS,SRIOV-MEASURE-VF-FAILBACK,SRIOV-MULTICAST,SRIOV-BROADCAST,SRIOV-REBOOT-VM,SRIOV-STRESS-SAVE,SRIOV-STRESS-PAUSE,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV,PERF-NVME-4K-IO,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,NVME-DISK-OPERATIONS,NVME-CHECK-EXPECTED-FAILURES,NVME-PCI-RESCIND,PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-STORAGE-4K-IO'",
     HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
+
 def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'NVME-DISK-VALIDATION,NVME-FSTRIM,NVME-BLKDISCARD,VERIFY-DPDK-COMPLIANCE'",
     AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-STORAGE-4K-IO,PERF-STORAGE-1024K-IO,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV,PERF-SYSCALL-BENCHMARK,PERF-NVME-4K-IO,NVME-MAX-DISK-VALIDATION,NVME-DISK-OPERATIONS,NVME-CHECK-EXPECTED-FAILURES,NVME-FILE-SYSTEM-VERIFICATION-GENERIC,NVME-PCI-RESCIND'",
     AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-Synthetic,PERF-NETWORK-UDP-THROUGHPUT-MULTICONNECTION-SRIOV,PERF-STORAGE-OVER-NFS-Synthetic-TCP-4K,PERF-STORAGE-OVER-NFS-Synthetic-UDP-4K,PERF-STORAGE-OVER-NFS-SRIOV-TCP-4K,PERF-STORAGE-OVER-NFS-SRIOV-UDP-4K,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-SINGLE-PPS-SRIOV,PERF-NETWORK-TCP-NETPERF-MAX-PPS-Synthetic,PERF-NETWORK-TCP-NETPERF-MAX-PPS-SRIOV,PERF-GOLANG-BENCHMARK,NVME-FILE-SYSTEM-VERIFICATION-XFS,NVME-FILE-SYSTEM-VERIFICATION-EXT4,NVME-FILE-SYSTEM-VERIFICATION-BTRFS,AZURE-WINDOWS-NESTED-HYPERV-STORAGE-MULTIDISK,AZURE-NESTED-HYPERV-NTTTCP-DIFFERENT-L1-NAT,AZURE-WINDOWS-NESTED-HYPERV-STORAGE-SINGLE-DISK,VERIFY-DPDK-NFF-GO,PERF-DPDK-SINGLE-CORE-PPS-DS4,VERIFY-DPDK-OVS,PERF-DPDK-SINGLE-CORE-PPS-DS15,PERF-DPDK-FWD-PPS-DS15,PERF-DPDK-MULTICORE-PPS-F32'",
     AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
+
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
     PERF_SINGLE_IPERF:"-TestNames 'PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV' -ResultDBTable 'Perf_Network_Single_TCP_Azure_DefaultKernel'",
@@ -58,10 +136,22 @@ def ARM_DISTRO = ARM_DISTRO_HASH.find{it.key == env.distro}.value
 def HYPERV_VHD = HYPERV_VHD_HASH.find{it.key == env.distro}.value
 
 if (env.kernel == "linux-azure") {
-    KERNEL_TYPE = "proposed-azure"
+    env.KERNEL_TYPE = "proposed-azure"
 }
 if (env.kernel == "linux-azure-edge"){
-    KERNEL_TYPE = "proposed-edge"
+    env.KERNEL_TYPE = "proposed-edge"
+}
+
+env.START_DATE = new java.sql.Timestamp(new Date().getTime())
+env.END_DATE = ""
+env.SIGNED_OFF_BY = ""
+env.SIGNED_OFF_RESULT = ""
+
+stage ("report_status_initial") {
+    node ("meta_slave") {
+        checkout scm
+        reportPipelineStatus("start")
+    }
 }
 
 if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
@@ -86,6 +176,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
+                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
                                         echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION}'" +
@@ -98,8 +189,15 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
+                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
                                         archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
+                                        def stageInfo = [:]
+                                        stageInfo["name"] = "Azure-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = stageStartedDate.toString()
+                                        stageInfo["EndDate"] = stageEndedDate.toString()
+                                        stageInfo["Platform"] = "Azure"
+                                        reportStageStatus(stageInfo)
                                         deleteDir()
                                     }
                                 }
@@ -108,8 +206,6 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                             println exc
                             println "Azure-Validation-${test_type}: STAGE_FAILED_EXCEPTION."
                             currentBuild.result = 'SUCCESS'
-                        } finally {
-                            echo "Cleaning up environment"
                         }
                     }
                 }
@@ -150,6 +246,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             test_location = "localhost"
                                         }
                                         HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
+                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
                                         echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${test_location}'" +
@@ -162,8 +259,15 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
+                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
                                         archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
+                                        def stageInfo = [:]
+                                        stageInfo["name"] = "HyperV-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = stageStartedDate.toString()
+                                        stageInfo["EndDate"] = stageEndedDate.toString()
+                                        stageInfo["Platform"] = "HyperV"
+                                        reportStageStatus(stageInfo)
                                         deleteDir()
                                     }
                                 }
@@ -172,8 +276,6 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                             println exc
                             println "HyperV-Validation-${test_type}: STAGE_FAILED_EXCEPTION."
                             currentBuild.result = 'SUCCESS'
-                        } finally {
-                            echo "Cleaning up environment"
                         }
                     }
                 }
@@ -201,6 +303,7 @@ if (env.performance == "yes") {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
+                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
                                         echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
@@ -214,8 +317,15 @@ if (env.performance == "yes") {
                                             " -ResultDBTestTag '${env.distro}_${env.kernel}_${env.BUILD_NUMBER}'" +
                                             " ${test_cmd}"
                                         )
+                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
                                         archiveArtifacts '*-TestLogs.zip'
                                         junit "Report\\*-junit.xml"
+                                        def stageInfo = [:]
+                                        stageInfo["name"] = "Performance-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = stageStartedDate.toString()
+                                        stageInfo["EndDate"] = stageEndedDate.toString()
+                                        stageInfo["Platform"] = "Azure"
+                                        reportStageStatus(stageInfo)
                                         deleteDir()
                                     }
                                 }
@@ -224,8 +334,6 @@ if (env.performance == "yes") {
                             println exc
                             println "Azure-${test_type}: STAGE_FAILED_EXCEPTION."
                             currentBuild.result = 'SUCCESS'
-                        } finally {
-                            echo "Cleaning up environment"
                         }
                     }
                 }
@@ -279,6 +387,8 @@ if (env.sendMail == "yes"){
                             submitterParameter: "USER")
                         owner = signoff["USER"]
                     }
+                    env.SIGNED_OFF_BY = owner
+                    env.SIGNED_OFF_RESULT = "true"
                     emailext (
                         subject: "${latest_kernel_version} ${env.kernel} kernel for ${env.distro} can be signed off. ${owner}",
                         to:"${env.MAIL_LIST_SIGNOFF}",
@@ -292,6 +402,8 @@ if (env.sendMail == "yes"){
                     )
                 } catch (exc) {
                     owner = exc.getCauses()[0].getUser()
+                    env.SIGNED_OFF_BY = owner
+                    env.SIGNED_OFF_RESULT = "false"
                     emailext (
                         subject: "${latest_kernel_version} ${env.kernel} kernel for ${env.distro} can't be signed off. ${owner}",
                         to: "${env.MAIL_LIST_SIGNOFF}",
@@ -306,5 +418,13 @@ if (env.sendMail == "yes"){
                 }
             }
         }
+    }
+}
+
+stage ("report_status_final") {
+    node ("meta_slave") {
+        checkout scm
+        env.END_DATE = new java.sql.Timestamp(new Date().getTime())
+        reportPipelineStatus("finish")
     }
 }
