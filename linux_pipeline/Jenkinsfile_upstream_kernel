@@ -434,7 +434,7 @@ pipeline {
 					steps {
 						withCredentials(bindings: [
 							file(credentialsId: 'Azure_Secrets_TESTONLY_File',
-							ariable: 'Azure_Secrets_File')
+							variable: 'Azure_Secrets_File')
 						]) {
 							prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
 							unstashKernel(env.KERNEL_ARTIFACTS_PATH)
