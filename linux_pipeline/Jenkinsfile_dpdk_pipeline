@@ -32,6 +32,10 @@ properties ([
             name: 'AZURE_REGION',
             defaultValue: 'westus2',
             description: 'Azure region for the test runs'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'dpdk\ndpdk-core\ndpdk-community',
+            name: 'TEST_TAG',
+            description: 'DPDK test case tag. "dpdk" -> all tests will be run. "dpdk-core" -> testpmd/ring-latency based will be run. "dpdk-community" -> tests like OVS/VPP/NFF-GO will be run. .'],
         [$class: 'StringParameterDefinition',
             name: 'DPDK_SOURCE',
             defaultValue: '',
@@ -55,9 +59,10 @@ env.BUILD_TAGS_STABLE = ""
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegion = env.AZURE_REGION.trim()
 def testCases = env.TEST_CASE.trim()
+def testCaseTag = env.TEST_TAG.trim()
 def dpdkSource = []
 
-if (!azureImages || !azureRegion || !testCases) {
+if (!azureImages || !azureRegion || !testCases || !testCaseTag) {
   throw 'Failed to validate the pipeline parameters'
 }
 
@@ -144,7 +149,7 @@ if (dpdkSource.size()) {
                                 " -TestPlatform  'Azure'" +
                                 " -ARMImageName '${currentImage}'" +
                                 " -TestNames '${TEST_CASE}'" +
-                                " -TestArea 'DPDK'" +
+                                " -TestTag '${TEST_TAG}'" +
                                 " -ResultDBTestTag 'DAILY-FUNCTIONAL'"+
                                 " -ResultDBTable 'Perf_DPDK_TestPmd'"+
                                 " -CustomLIS '${CUSTOM_LIS_SOURCE}'" +
