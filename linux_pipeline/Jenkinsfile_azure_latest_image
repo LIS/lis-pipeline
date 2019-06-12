@@ -24,6 +24,8 @@ def gitBranchName = "master"
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegions = env.AZURE_REGIONS.split(",")
 
+def P1_EXCLUDE = "PERF-*"
+
 if (!azureImages || !azureRegions) {
   throw 'Failed to validate the pipeline parameters'
 }
@@ -90,6 +92,7 @@ azureImages.each {
                             " -TestPlatform  'Azure'" +
                             " -ARMImageName '${currentImage}'" +
                             " -TestPriority '1'" +
+                            " -ExcludeTests ${P1_EXCLUDE}" +
                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                             " -ResourceCleanup Delete" +
                             " -EnableTelemetry" +
