@@ -168,7 +168,7 @@ Function Get-KernelRepositoryName {
                 break;
             }
             if ($line -imatch '<br') {
-                $RepoList += $line.Trim().Split(" ")[0] + "^"
+                $RepoList += $line.Trim().Split("<")[0].Trim() + "^"
             }
         }
     }

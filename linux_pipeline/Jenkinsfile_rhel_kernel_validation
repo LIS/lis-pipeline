@@ -105,6 +105,7 @@ stage ("Test kernel") {
                             def repolist = line.trim().split("=")[1]
                             if (kernel.matches(version)) {
                                 kernelrepolist=repolist
+                                break
                             }
                         }
                         def exitCode = sh (returnStatus: true, script: """
