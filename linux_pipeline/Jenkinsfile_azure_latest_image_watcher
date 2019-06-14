@@ -7,7 +7,7 @@ properties ([
 env.PREVIOUS_LATEST_IMAGES = "/mnt/tmp/watcher-azure-latest-image/${BRANCH_NAME}/latest_images.txt"
 env.LATEST_IMAGES = "latest_images.txt"
 env.TEMP_PREVIOUS_IMAGES = "previous_images.txt"
-env.PIPELINE_NAME = "pipeline-azure-latest-image"
+env.PIPELINE_NAME = "Azure-Marketplace-Image-Test/pipeline-azure-latest-image"
 
 node ("meta_slave") {
     stage ("latest_azure_image") {
