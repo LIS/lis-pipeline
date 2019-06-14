@@ -5,8 +5,7 @@ def PowerShellWrapper(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"\$ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
-withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK',
-                                  variable: 'LIS_ARCHIVE_LINK')]) {
+withCredentials(bindings: [string(credentialsId: 'LIS_ARCHIVE_LINK', variable: 'LIS_ARCHIVE_LINK')]) {
     properties ([
         pipelineTriggers([cron('H H/12 * * *')]),
         [$class: 'ParametersDefinitionProperty',
@@ -42,8 +41,7 @@ def getVersionFromURL(lisLink){
 stage ("Check for kernel") {
     node ("monitor-hyperv") {
         withCredentials(bindings: [string(credentialsId: 'UTILS_DIR', variable: 'UTILS_DIR'),
-                                   string(credentialsId: 'REMOTE_HTML_LOCATION',
-                                          variable: 'REMOTE_HTML_LOCATION')]) {
+            string(credentialsId: 'REMOTE_HTML_LOCATION', variable: 'REMOTE_HTML_LOCATION')]) {
             dir ("check_versions-" + env.BUILD_NUMBER + env.BRANCH_NAME) {
                 checkout scm
                 echo 'Checking if there is a new kernel version'
@@ -91,10 +89,10 @@ stage ("Test kernel") {
             def version = it.split("=")[1]
             runs["${distro}-${version}"] = {
                 stage ("${distro}-${version}") {
-                withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',
-                                                            passwordVariable: 'PASSWORD',
-                                                            usernameVariable: 'USERNAME'),
-                                           string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS')]) {
+                withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',passwordVariable: 'PASSWORD',usernameVariable: 'USERNAME'),
+                    string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
+                    string(credentialsId: 'LIS_HOTFIX_STORAGE_ACCOUNT', variable: 'STORAGE_ACCOUNT'),
+                    string(credentialsId: 'LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY', variable: 'STORAGE_SAS_KEY')]) {
                     dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                         def vmNumber = runNumber
                         runNumber = runNumber + 1
@@ -119,6 +117,8 @@ stage ("Test kernel") {
                                 --rhel_password '${PASSWORD}' \
                                 --sku "${azureSku[distro]}" \
                                 --kernelrepolist "${kernelrepolist}" \
+                                --storage_account "${STORAGE_ACCOUNT}" \
+                                --storage_token "${STORAGE_SAS_KEY}" \
                                 --azure_token '${AZURE_SAS}'
                         """)
                         archiveArtifacts artifacts: "${distro}_lis_install.log"
