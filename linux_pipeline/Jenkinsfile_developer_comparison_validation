@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
+env.SLAVE_PIPELINE_NAME = "Developers/pipeline-developer-patch-runner"
 env.SEND_EMAIL = true
 env.BUILD_KERNEL_ARTIFACTS = true
 env.KERNEL_ARTIFACTS_SMB_PATH = ""
