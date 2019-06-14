@@ -3,7 +3,7 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonBuilder
 
-env.SLAVE_PIPELINE_NAME = "pipeline-kernel-bisect-runner"
+env.SLAVE_PIPELINE_NAME = "Developers/pipeline-kernel-bisect-runner"
 env.BUILD_KERNEL_ARTIFACTS = "true"
 env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
 
@@ -374,14 +374,14 @@ node ("bisect_kernel_builder") {
         }
     }
 
-    if (env.BISECT_CLONE_KERNEL_REPO.equals("true")) {
-        println "Clone kernel repo."
-        cloneKernelRepo()
-    }
-
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
         println "Validate initial good and bad commits."
         validateInitialCommits()
+    }
+
+    if (env.BISECT_CLONE_KERNEL_REPO.equals("true")) {
+        println "Clone kernel repo."
+        cloneKernelRepo()
     }
 
     currentCommitId = getCurrentCommitId()
