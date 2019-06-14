@@ -5,7 +5,7 @@ properties ([
 ])
 
 env.VERSION_TO_TEST = "/home/lisa/version_to_test.sh"
-env.PIPELINE_NAME = "pipeline-ubuntu-azure-kernel-validation"
+env.PIPELINE_NAME = "Distro-Partner-Kernels-Ubuntu/pipeline-ubuntu-azure-kernel-validation"
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 SEND_MAIL = "no"
 MESSAGE_LIST = ""
