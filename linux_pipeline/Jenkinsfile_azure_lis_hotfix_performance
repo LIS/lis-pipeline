@@ -1,0 +1,207 @@
+#!/usr/bin/env groovy
+def currentStage = ""
+
+def HOTFIX_PERFROMANCE_TESTS = ["TCPNetworkPerformance_Multiclient", "TCPNetworkPerformance_SingleClient", "Storage4K", "Storage1024K", "NVME4K", "UDPNetworkPerformance_Multiclient", "PERF-SYSCALL-BENCHMARK" ]
+def TCPNetwork1Tests = "PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV"
+def TCPNetwork2Tests = "PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV"
+def UDPNetworkTests = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
+def PERFORMANCE_TESTS = ["${TCPNetwork1Tests}", "${TCPNetwork2Tests}","PERF-STORAGE-4K-IO","PERF-STORAGE-1024K-IO", "PERF-NVME-4K-IO", "${UDPNetworkTests}", "PERF-SYSCALL-BENCHMARK" ]
+def TEST_REGIONS = ["westus2", "westus2", "westus2", "northeurope", "westus2", "westus2" ]
+def total_tests = HOTFIX_PERFROMANCE_TESTS.size()
+
+def armImagesCentOS = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest", 
+				 "rhel_6.8": "OpenLogic CentOS 6.8 Latest", "rhel_6.9": "OpenLogic CentOS 6.9 Latest", "rhel_6.10": "OpenLogic CentOS 6.10 Latest", 
+				 "rhel_7.0": "OpenLogic CentOS 7.0 Latest", "rhel_7.1": "OpenLogic CentOS 7.1 Latest", "rhel_7.2": "OpenLogic CentOS 7.2 Latest", 
+				 "rhel_7.3": "OpenLogic CentOS 7.3 Latest", "rhel_7.4": "OpenLogic CentOS 7.4 Latest", "rhel_7.5": "OpenLogic CentOS 7.5 Latest", 
+				 "rhel_7.6": "OpenLogic CentOS 7.6 Latest"]
+def armImagesRHEL = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "RedHat RHEL 6.7 Latest", 
+				 "rhel_6.8": "RedHat RHEL 6.8 Latest", "rhel_6.9": "RedHat RHEL 6.9 Latest", "rhel_6.10": "RedHat RHEL 6.10 Latest", 
+				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "RedHat RHEL 7.2 Latest", 
+				 "rhel_7.3": "RedHat RHEL 7.3 Latest", "rhel_7.4": "RedHat RHEL 7.4 Latest", "rhel_7.5": "RedHat RHEL 7.5 Latest", 
+				 "rhel_7.6": "RedHat RHEL 7-RAW 7.6.2018103108"]
+def armImagesOracle = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "NA", 
+				 "rhel_6.8": "Oracle Oracle-Linux 6.8 Latest", "rhel_6.9": "Oracle Oracle-Linux 6.9 Latest", "rhel_6.10": "Oracle Oracle-Linux 6.10 Latest", 
+				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "NA", 
+				 "rhel_7.3": "Oracle Oracle-Linux 7.3 Latest", "rhel_7.4": "Oracle Oracle-Linux 7.4 Latest", "rhel_7.5": "Oracle Oracle-Linux 7.5 Latest", 
+				 "rhel_7.6": "Oracle Oracle-Linux 7.6 Latest"]
+def DistroList = [ armImagesCentOS[testDistro], armImagesRHEL[testDistro] ]
+def total_test_images = DistroList.size()
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+    //println "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+def CleanWorkspace() {
+    retry(5) {
+        cleanWs()
+    }
+}
+
+def Prepare() {
+    retry(5) {
+        cleanWs()
+        unstash 'LISAv2'
+    }
+}
+
+currentStage = "Prerequisites"
+stage ("${currentStage}") {
+     node ("meta_slave") {
+         cleanWs()
+         git branch: env.GIT_BRANCH, url: env.GIT_REPO
+         stash includes: '**', name: 'LISAv2'
+         cleanWs()
+     }
+}
+
+currentStage = "Capture Image for Performance Test"
+stage ("${currentStage}") {
+	def parellel_jobs = [:]
+	def delay = 0
+	println "DistroList ${DistroList}"
+	for (i = 0; i < total_test_images; i++)	{
+		currentTest = "CaptureVHD_${DistroList[i]}"
+		def currentDistro = DistroList[i]
+		println "currentTest ${currentTest}"
+		if(currentDistro != 'NA') {
+			parellel_jobs ["${currentTest}"] =
+			{
+				println "running parallel jobs"
+				stage ("${currentTest}") {
+					try {
+						delay += 5
+						println "Sleeping ${delay} seconds..."
+						sleep "${delay}"
+						println "Running ${currentTest}..."
+						node('azure') {
+							CleanWorkspace()
+							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+								def currentVHD = "${currentDistro}"
+								Prepare()
+								println "CAPTURE-VHD-BEFORE-TEST"
+								def Command = ".\\Run-LisaV2.ps1"
+								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+								Command += " -TestPlatform 'Azure'"
+								Command += " -TestLocation 'northeurope'"
+								Command += " -RGIdentifier 'CAPTURE${BUILD_NUMBER}'"
+								Command += " -ResourceCleanup Delete"
+								Command += " -TestIterations 1"
+								Command += " -ExitWithZero"
+								Command += " -StorageAccount 'ExistingStorage_Standard'"
+								Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
+								Command += " -OverrideVMSize 'Standard_DS2_v2'"
+								Command += " -ARMImageName '${currentVHD}'"
+								//Get the Custom Kernel
+								if ( CUSTOM_KERNEL != "" ) {
+									Command += " -CustomKernel '${CUSTOM_KERNEL}'"
+								}
+								//Get the Custom LIS
+								Command += " -CustomLIS '${rpmURL}'"
+								println "Set customLIS as ${rpmURL}"
+								Command += " -CustomParameters 'DiskType=Unmanaged'"
+								println Command
+								RunPowershellCommand(Command)
+								junit "Report\\*-junit.xml"
+								println "Archieving the report of CAPTURE_VHD"
+								archiveArtifacts('Report\\*-junit.xml')
+								archiveArtifacts '*-TestLogs.zip'
+								def CapturedVHD = readFile 'CapturedVHD.azure.env'
+								RunPowershellCommand(".\\Utilities\\CopyVHDtoOtherStorageAccount.ps1" + 
+									" -sourceLocation northeurope " +
+									" -destinationLocations 'westus2,northeurope,southcentralus'" +
+									" -sourceVHDName '${CapturedVHD}'" +
+									" -destinationVHDName '${CapturedVHD}'"
+								)
+								def StashName = currentVHD.replace(" ","_")
+								writeFile file: "PERF-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
+								stash includes: "PERF-${StashName}-CapturedVHD.azure.env", name: "PERF-${StashName}-CapturedVHD.azure.env"
+								println("Captured VHD : ${CapturedVHD}")
+							}
+						}
+					}
+					catch (exc) {
+						currentBuild.result = 'FAILURE'
+						println "${currentStage}: STAGE_FAILED_EXCEPTION."
+					}
+					finally	{
+						//println "${it}: ${currentBuild.result}"
+					}
+				}
+			}
+		}
+	}
+	parallel parellel_jobs
+}
+
+node ("azure") {
+	currentStage = "PerformanceTests"
+	def parellel_jobs = [:]
+	stage ("${currentStage}") {
+	println "DistroList ${DistroList}"
+	for (j = 0; j < total_test_images; j++) {
+		def currentVHD = DistroList[j]
+		for (i=0; i < total_tests; i++) {
+			def currentTestCounter = i
+			def currentTest = HOTFIX_PERFROMANCE_TESTS[currentTestCounter]
+			def perfTest = PERFORMANCE_TESTS[currentTestCounter]
+			def testLocation = TEST_REGIONS[currentTestCounter]
+			println currentTest + "+++++++++++++++++"
+			if (currentTest != null && currentTest != "" ) {
+				def delay = 0
+				currentTest = "${currentTest}-${DistroList[j]}"
+				parellel_jobs ["${currentTest}"] =
+				{
+					stage ("${currentTest}") {
+						try {
+							node ("azure") {
+								delay += 5
+								println "Sleeping ${delay} seconds..."
+								sleep "${delay}"
+								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+									println "Current Performance Test ${currentTest} "
+									println "Test to run  ${perfTest} "
+									Prepare()
+									def Command = ".\\Run-LisaV2.ps1"
+									Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+									Command += " -TestPlatform 'Azure'"
+									Command += " -RGIdentifier 'RPMBUILD-${BUILD_NUMBER}'"
+									Command += " -TestCategory 'Performance'"
+									Command += " -TestNames '${perfTest}'"
+									Command += " -StorageAccount 'ExistingStorage_Standard'"
+									Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+									Command += " -ResultDBTestTag '${ExecutionTag}'"
+									Command += " -DeployVMPerEachTest 1"
+									Command += " -ExitWithZero"
+									Command += " -EnableTelemetry"
+									Command += " -TestIterations 3"
+									//Get the captured VHD name from stash file
+									def StashName = currentVHD.replace(" ","_")
+									unstash "PERF-${StashName}-CapturedVHD.azure.env"
+									def CapturedVHD = readFile "PERF-${StashName}-CapturedVHD.azure.env"
+									Command += " -OsVHD '${CapturedVHD}'"
+									println "Test Location: ${testLocation}"
+									Command += " -TestLocation '${testLocation}'"
+									println Command
+									RunPowershellCommand(Command)
+									junit "Report\\*-junit.xml"
+									println "Archieving the report of Performance Tests"
+									archiveArtifacts('Report\\*-junit.xml')
+									archiveArtifacts '*-TestLogs.zip'
+								}
+							}
+						}
+						catch (exc) {
+							currentBuild.result = 'SUCCESS'
+							println exc
+						} finally {
+							cleanWs()
+						}
+					}
+				}
+			}
+		}
+	}
+	parallel parellel_jobs
+	}
+}
