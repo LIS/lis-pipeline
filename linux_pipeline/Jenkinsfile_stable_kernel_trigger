@@ -35,7 +35,7 @@ node ("meta_slave") {
                     testDistros.each {
                         def distro = it
                         runs["${distro}-${tag}"] = {
-                            build (job: "upstream-kernel-pipeline/master",
+                            build (job: "Linux-Kernels-MSFT-and-Linux-Upstream/upstream-kernel-pipeline/master",
                                 parameters: [
                                     string(name: 'KERNEL_GIT_URL', value: "${env.KERNEL_TREE}"),
                                     string(name: 'KERNEL_GIT_BRANCH', value: "${tag}"),
