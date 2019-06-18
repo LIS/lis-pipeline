@@ -1,6 +1,7 @@
 #!/usr/bin/env groovy
 
 properties ([
+    overrideIndexTriggers(false),
     pipelineTriggers([cron('H */4 * * *')])
 ])
 
