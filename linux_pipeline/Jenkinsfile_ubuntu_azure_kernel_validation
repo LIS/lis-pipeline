@@ -6,7 +6,11 @@ def RunPowershellCommand(psCmd) {
 
 def GetTestResults(type) {
     withEnv(["Type=${type}"]) {
-        def returnValues = powershell returnStdout: true, script: '''$file = Get-Item ".\\Report\\*-junit.xml" | Sort-Object LastWriteTimeUtc | select -Last 1
+        def returnValues = powershell returnStdout: true, script: '''
+            $file = Get-Item ".\\Report\\*-junit.xml" -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc | select -Last 1
+            if (!$file) {
+                return 0
+            }
             $content = [xml](Get-Content $file)
             $failCase = [int]($content.testsuites.testsuite.failures)
             $allCase = [int]($content.testsuites.testsuite.tests)
@@ -34,11 +38,11 @@ def reportPipelineStatus(status) {
     println "Pipeline report for status: ${status}"
 
     env.COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
-    withCredentials(bindings: [file(credentialsId: 'KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS',
-        variable: 'KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS')]) {
-        dir('kernel_pipeline_report' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+    withCredentials(bindings: [file(credentialsId: 'KERNEL_PIPELINE_EXECUTION_DB_CREDS',
+        variable: 'KERNEL_PIPELINE_EXECUTION_DB_CREDS')]) {
+        dir('ker_pi_rep' + env.BUILD_NUMBER + env.BRANCH_NAME) {
             sh '''#!/bin/bash
-                cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows.json"
+                cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json"
 [{  "StartDate": "${START_DATE}",
     "EndDate": "${END_DATE}",
     "PipelineName": "${JOB_NAME}",
@@ -49,35 +53,65 @@ def reportPipelineStatus(status) {
     "SignedOffResult": "${SIGNED_OFF_RESULT}",
     "DistroVersion": "${Distro}"  }]
 EOF
-                python "${WORKSPACE}/scripts/reporting/report_pipeline_status.py" \
-                --db_rows "${WORKSPACE}/scripts/reporting/db_rows.json" \
+                python "${WORKSPACE}/scripts/reporting/report_pipeline_stage_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json" \
                 --composite_keys "${COMPOSITE_KEYS}" \
-                --db_config "${KERNEL_PIPELINE_STAGE_REPORT_DB_CREDS}"
+                --db_config "${KERNEL_PIPELINE_EXECUTION_DB_CREDS}"
             '''
         }
     }
 }
 
-def reportStageStatus(stageInfo) {
-        println "Reporting pipeline status for stage: " + stageInfo["name"]
-        println "Stage platform: " + stageInfo["platform"]
-        println "Stage start date: " + stageInfo["StartDate"]
-        println "Stage end date: " + stageInfo["EndDate"]
+def reportStageStatus(stageInfo, useTestResults) {
+    env.stageName = stageInfo["Name"]
+    env.currentPlatform = stageInfo["Platform"]
+    env.startDate = stageInfo["StartDate"]
+    env.endDate = stageInfo["EndDate"]
 
-        println "PipelineName: ${JOB_NAME}"
-        println "PipelineBuildNumber: ${BUILD_NUMBER}"
+    env.passCount = ''
+    env.abortCount = ''
+    env.failCount = ''
+    env.skippedCount = ''
+    if (useTestResults) {
+        env.passCount = GetTestResults("pass").trim()
+        env.abortCount = GetTestResults("abort").trim()
+        env.failCount = GetTestResults("fail").trim()
+        env.skippedCount = GetTestResults("skipped").trim()
+    }
 
-        def passCount = GetTestResults("pass")
-        def abortCount = GetTestResults("abort")
-        def failCount = GetTestResults("fail")
-        def skippedCount = GetTestResults("skipped")
+    env.MASTER_COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
+    env.COMPOSITE_KEYS = "StageName"
+    env.FOREIGN_KEY = "PipelineExecutionId"
+    stage ("report_stage") {
+        node ("meta_slave") {
 
-        println("PASS: ${passCount}")
-        println("ABORT: ${abortCount}")
-        println("FAIL: ${failCount}")
-        println("SKIP: ${skippedCount}")
+            withCredentials(bindings: [file(credentialsId: 'KERNEL_PIPELINE_EXECUTION_STAGE_DB_CREDS',
+                variable: 'KERNEL_PIPELINE_EXECUTION_STAGE_DB_CREDS')]) {
+                checkout scm
+                sh '''#!/bin/bash
+        cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows${stageName}${BUILD_NUMBER}${BRANCH_NAME}.json"
+[{  "StageName": "${stageName}",
+"StartDate": "${startDate}",
+"EndDate": "${endDate}",
+"TestsPassed": "${passCount}",
+"TestsAborted": "${abortCount}",
+"TestsFailed": "${failCount}",
+"TestsSkipped": "${skippedCount}",
+"PipelineName": "${JOB_NAME}",
+"PipelineBuildNumber": ${BUILD_NUMBER},
+"Platform": "${currentPlatform}"  }]
+EOF
+            python "${WORKSPACE}/scripts/reporting/report_pipeline_stage_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows${stageName}${BUILD_NUMBER}${BRANCH_NAME}.json" \
+                --composite_keys "${COMPOSITE_KEYS}" \
+                --foreign_key "${FOREIGN_KEY}" \
+                --master_composite_keys "${MASTER_COMPOSITE_KEYS}" \
+                --db_config "${KERNEL_PIPELINE_EXECUTION_STAGE_DB_CREDS}"
+            '''
+            }
+        }
+    }
 }
-
 
 properties ([
     overrideIndexTriggers(false),
@@ -147,10 +181,14 @@ env.END_DATE = ""
 env.SIGNED_OFF_BY = ""
 env.SIGNED_OFF_RESULT = ""
 
-stage ("report_status_initial") {
+stage ("report_status_init") {
     node ("meta_slave") {
         checkout scm
-        reportPipelineStatus("start")
+        try {
+            reportPipelineStatus("start")
+        } catch (exc) {
+            println exc
+        }
     }
 }
 
@@ -168,7 +206,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                     } else {
                         AZURE_LOCATION = AZURE_LOCATION_DEFAULT
                     }
-                    node ("azure"){
+                    node ("azure") {
                         try {
                             timeout (time: 48, unit: 'HOURS')  {
                                 withCredentials(bindings: [
@@ -176,7 +214,20 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
+
+                                        def stageInfo = [:]
+                                        stageInfo["Name"] = "Azure-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        stageInfo["EndDate"] = ''
+                                        stageInfo["Platform"] = "Azure"
+                                        try {
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, false)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
+
                                         echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION}'" +
@@ -189,15 +240,17 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
-                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
-                                        archiveArtifacts '*-TestLogs.zip'
-                                        junit "Report\\*-junit.xml"
-                                        def stageInfo = [:]
-                                        stageInfo["name"] = "Azure-Validation-${env.distro}-${env.kernel}-${test_type}"
-                                        stageInfo["StartDate"] = stageStartedDate.toString()
-                                        stageInfo["EndDate"] = stageEndedDate.toString()
-                                        stageInfo["Platform"] = "Azure"
-                                        reportStageStatus(stageInfo)
+                                        archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
+                                        junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
+
+                                        stageInfo["EndDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        try {
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, true)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
                                         deleteDir()
                                     }
                                 }
@@ -246,7 +299,21 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             test_location = "localhost"
                                         }
                                         HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
-                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
+
+                                        def stageInfo = [:]
+                                        stageInfo["Name"] = "HyperV-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        stageInfo["EndDate"] = ''
+                                        stageInfo["Platform"] = "HyperV"
+                                        try {
+                                            
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, false)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
+
                                         echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${test_location}'" +
@@ -259,15 +326,17 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                             " -ExitWithZero" +
                                             " ${test_cmd}"
                                         )
-                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
-                                        archiveArtifacts '*-TestLogs.zip'
-                                        junit "Report\\*-junit.xml"
-                                        def stageInfo = [:]
-                                        stageInfo["name"] = "HyperV-Validation-${env.distro}-${env.kernel}-${test_type}"
-                                        stageInfo["StartDate"] = stageStartedDate.toString()
-                                        stageInfo["EndDate"] = stageEndedDate.toString()
-                                        stageInfo["Platform"] = "HyperV"
-                                        reportStageStatus(stageInfo)
+                                        archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
+                                        junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
+
+                                        stageInfo["EndDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        try {
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, true)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
                                         deleteDir()
                                     }
                                 }
@@ -303,7 +372,20 @@ if (env.performance == "yes") {
                                     dir ("${distro}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        def stageStartedDate = new java.sql.Timestamp(new Date().getTime())
+
+                                        def stageInfo = [:]
+                                        stageInfo["Name"] = "Performance-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        stageInfo["EndDate"] = ''
+                                        stageInfo["Platform"] = "Azure"
+                                        try {
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, false)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
+
                                         echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
@@ -317,15 +399,17 @@ if (env.performance == "yes") {
                                             " -ResultDBTestTag '${env.distro}_${env.kernel}_${env.BUILD_NUMBER}'" +
                                             " ${test_cmd}"
                                         )
-                                        def stageEndedDate = new java.sql.Timestamp(new Date().getTime())
-                                        archiveArtifacts '*-TestLogs.zip'
-                                        junit "Report\\*-junit.xml"
-                                        def stageInfo = [:]
-                                        stageInfo["name"] = "Performance-Validation-${env.distro}-${env.kernel}-${test_type}"
-                                        stageInfo["StartDate"] = stageStartedDate.toString()
-                                        stageInfo["EndDate"] = stageEndedDate.toString()
-                                        stageInfo["Platform"] = "Azure"
-                                        reportStageStatus(stageInfo)
+                                        archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
+                                        junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
+
+                                        stageInfo["EndDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                                        try {
+                                            lock ('db_reporting') {
+                                                reportStageStatus(stageInfo, true)
+                                            }
+                                        } catch (exc) {
+                                            println exc
+                                        }
                                         deleteDir()
                                     }
                                 }
@@ -421,10 +505,14 @@ if (env.sendMail == "yes"){
     }
 }
 
-stage ("report_status_final") {
+stage ("report_status_end") {
     node ("meta_slave") {
         checkout scm
         env.END_DATE = new java.sql.Timestamp(new Date().getTime())
-        reportPipelineStatus("finish")
+        try {
+            reportPipelineStatus("finish")
+        } catch (exc) {
+            println exc
+        }
     }
 }
