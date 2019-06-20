@@ -5,6 +5,7 @@ def RunPowershellCommand(psCmd) {
 }
 
 properties ([
+    overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
