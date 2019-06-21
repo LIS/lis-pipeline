@@ -253,7 +253,7 @@ get_stable_branches() {
     git_dir="$1"
 
     pushd "$git_dir"
-    branches=$(git branch -r | sort | grep "skype-msft-4.19.y")
+    branches=$(git branch -r | sort | grep "origin/linux-msft.*y" | grep -v "staging" | grep -v "proposed")
     for branch in $branches;do
         small_branch="${branch/origin\//}"
         tag=$(get_git_tag "." $branch)
