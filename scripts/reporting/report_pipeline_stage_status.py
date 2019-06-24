@@ -27,7 +27,11 @@ def get_params():
     parser.add_argument("--db_rows",
                         help="'--db_rows <database_rows_json_path>")
     parser.add_argument("--composite_keys",
-                        help="'--composite_keys <results path>")
+                        help="'--composite_keys composite_keys")
+    parser.add_argument("--foreign_key",
+                        help="'--foreign_key foreign_key")
+    parser.add_argument("--master_composite_keys",
+                        help="'--master_composite_keys master_composite_keys")
     params = parser.parse_args()
 
     if not os.path.isfile(params.db_rows):
@@ -87,7 +91,7 @@ def create_sql_query(values_dict, composite_keys):
         END
     """
     )
-    logger.debug('Line to be update %s', values_dict)
+    logger.debug('Line to be updated %s', values_dict)
     insert_values = ''
     update_values = ''
     composite_conditions = ''
@@ -109,6 +113,69 @@ def create_sql_query(values_dict, composite_keys):
         insertValues=insert_values[1:],
         updateValues=update_values[1:],
         compositeConditions=composite_conditions[5:]
+        )
+
+    logger.debug('SQL Query created:')
+    logger.debug(sql_query)
+    return sql_query
+
+
+def create_sql_query_master_slave(values_dict, composite_keys, foreign_key,
+                                  master_table, master_composite_keys):
+    """Creates an insert or update command from a template
+
+     Provided with a dictionary that is structured so the keys match the
+     column names and the values are represented by the items that are to be
+     inserted the function composes the sql command from a template.
+    """
+    sql_query_template = Template(
+        """
+        declare @ID bigint
+
+        SET @ID = (SELECT ID FROM $masterTableName WHERE $masterCompositeConditions)
+
+        IF (NOT EXISTS(SELECT * FROM $tableName WHERE $foreignKey = @ID AND $compositeConditions))
+        BEGIN
+          INSERT INTO $tableName($foreignKey, $columns) VALUES(@ID, $insertValues)
+        END
+        ELSE
+        BEGIN
+          UPDATE TOP(1) $tableName SET $updateValues WHERE $foreignKey = @ID AND $compositeConditions
+        END
+    """
+    )
+    logger.debug('Line to be updated %s', values_dict)
+    insert_values = ''
+    update_values = ''
+    composite_conditions = ''
+    master_composite_conditions = ''
+    table_name = '"' + env.str('TableName') + '"'
+    valid_keys = []
+    for k, v in values_dict.items():
+        if k in master_composite_keys:
+            master_composite_conditions = (' AND '.join([str(master_composite_conditions),
+                                           str(k) + " = " + "'" + str(v) + "'"]))
+            continue
+
+        if (str(v)):
+            insert_values = ', '.join([str(insert_values), "'" + str(v) + "'"])
+            update_values = ', '.join([str(update_values),
+                                      str(k) + " = " + "'" + str(v) + "'"])
+            valid_keys.append(k)
+
+        if k in composite_keys:
+            composite_conditions = (' AND '.join([str(composite_conditions),
+                                    str(k) + " = " + "'" + str(v) + "'"]))
+
+    sql_query = sql_query_template.substitute(
+        tableName=table_name,
+        columns=', '.join(valid_keys),
+        insertValues=insert_values[1:],
+        updateValues=update_values[1:],
+        compositeConditions=composite_conditions[5:],
+        masterTableName=master_table,
+        foreignKey=foreign_key,
+        masterCompositeConditions=master_composite_conditions[5:]
         )
 
     logger.debug('SQL Query created:')
@@ -142,7 +209,15 @@ def main():
     composite_keys = params.composite_keys.split(",")
 
     for row in data:
-        sql_query = create_sql_query(row, composite_keys)
+        sql_query = ''
+        if (params.foreign_key and params.master_composite_keys):
+            sql_query = create_sql_query_master_slave(
+                row, composite_keys,
+                params.foreign_key,
+                env.str('MasterTableName'),
+                params.master_composite_keys.split(","))
+        else:
+            sql_query = create_sql_query(row, composite_keys)
         execute_sql_query(sql_query, db_cursor)
 
     logger.debug('Executing db commands')
