@@ -10,11 +10,11 @@ properties ([
             description: 'Distros to be tested (default all)'],
         [$class: 'StringParameterDefinition',
             name: 'LIS_ARCHIVE_LINK',
-            defaultValue: 'http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.2.8.tar.gz',
+            defaultValue: 'LatestLIS',
             description: 'Link to the lis archive to be tested'],
         [$class: 'StringParameterDefinition',
             name: 'LIS_OLD_ARCHIVE_LINK',
-            defaultValue: "http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.2.7.tar.gz",
+            defaultValue: "http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.3.2.tar.gz",
             description: 'Link to the previous lis version'],
         [$class: 'ChoiceParameterDefinition', choices: 'no\nyes',
             name: 'FULL_PERF_RUN',
@@ -220,6 +220,7 @@ node("meta_slave") {
                                                                         " -Delay '${sleepTime}'"
                                                                     )
                                                                     junit "Report\\*-junit.xml"
+                                                                    archiveArtifacts "Report\\*-junit.xml"
                                                                     archiveArtifacts '*-TestLogs.zip'
                                                                 }
                                                             }

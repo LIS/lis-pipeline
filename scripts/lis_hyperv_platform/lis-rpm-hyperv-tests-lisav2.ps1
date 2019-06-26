@@ -25,11 +25,6 @@ foreach ($key in $MyInvocation.BoundParameters.keys) {
 }
 
 function Main {
-    if (!$TestCategory) { $TestCategory = "All" }
-    if (!$TestArea)     { $TestArea = "All" }
-    if (!$TestNames)    { $TestNames = "All" }
-    if (!$TestTag)      { $TestTag = "All" }
-    if (!$TestPriority) { $TestPriority = "All" }
 
     Write-Output "Sleeping $Delay seconds..."
     Start-Sleep $Delay
@@ -88,8 +83,9 @@ function Main {
         }
     }
     catch {
-        $ErrorMessage =  $_.Exception.Message
-		Write-Output "EXCEPTION : $ErrorMessage"
+        $ErrorMessage = $_.Exception.Message
+        $ErrorLine = $_.InvocationInfo.ScriptLineNumber
+        Write-Output "EXCEPTION : $ErrorMessage at line: $ErrorLine"
     }
 }
 
