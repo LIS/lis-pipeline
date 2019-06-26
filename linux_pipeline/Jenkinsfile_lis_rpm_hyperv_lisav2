@@ -220,6 +220,7 @@ node("meta_slave") {
                                                                         " -Delay '${sleepTime}'"
                                                                     )
                                                                     junit "Report\\*-junit.xml"
+                                                                    archiveArtifacts "Report\\*-junit.xml"
                                                                     archiveArtifacts '*-TestLogs.zip'
                                                                 }
                                                             }
