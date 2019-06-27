@@ -121,7 +121,7 @@ properties ([
                 description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> cosmic - 18.10 validation <br> disco - 19.04 validation'),
         choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
-        string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the version will not be present in the database reports.'),
+        string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the latest kernel version for the selected distro/kernel type will be used.'),
         choice (name: 'ValidationAzure', choices: 'yes\nno',
                 description: 'yes - will do Azure validation testing <br> no - Azure validation testing will be skipped'),
         choice (name: 'ValidationHyperV', choices: 'yes\nno',
@@ -129,7 +129,7 @@ properties ([
         choice (name: 'PerformanceAzure', choices: 'yes\nno',
                 description: 'yes - will do Azure Performance testing <br> no - Azure Performance testing will be skipped'),
         choice (name: 'sendMail', choices: 'no\nyes',
-                description: 'no - will not send mail <br> yes - will send mail')
+                description: 'no - will send email notification only to the person who started the pipeline run. <br> yes - will send email notification to all the pipeline owners.')
     ])
 ])
 
@@ -430,89 +430,106 @@ if (env.PerformanceAzure == "yes") {
     echo "Skipping Azure Performance"
 }
 
-if (env.sendMail == "yes"){
-    node ("meta_slave") {
-        echo "Send email with kernel validation results link"
-        if (env.KernelType == "linux-azure") {
-            version_identifier = "_azure"
-        } else {
-            version_identifier = "_edge"
-        }
-        try {
-            kernels_info = readFile (LATEST_VERSION_LOCATION)
-        } catch (exc) {
-            echo "${LATEST_VERSION_LOCATION} could not be found on the server!"
-            return
-        }
-        kernels_info = kernels_info.split("\n")
-        def latest_kernel_version = ""
-        kernels_info.each {
-            if (it.contains("${env.distro}${version_identifier}")) {
-                latest_kernel_version = it.split("=")[1]
-            }
-        }
 
-        def warningMessage = ""
-        if (env.KernelVersion && latest_kernel_version && env.KernelVersion.trim() != latest_kernel_version.trim()) {
-            warningMessage = "Warning: ${env.KernelVersion} superseded by ${latest_kernel_version}!"
+node ("meta_slave") {
+    echo "Send email with kernel validation results link"
+    if (env.KernelType == "linux-azure") {
+        version_identifier = "_azure"
+    } else {
+        version_identifier = "_edge"
+    }
+    def kernels_info = ""
+    try {
+        kernels_info = readFile (LATEST_VERSION_LOCATION)
+    } catch (exc) {
+        echo "${LATEST_VERSION_LOCATION} could not be found on the server!"
+        return
+    }
+    kernels_info = kernels_info.split("\n")
+    def latest_kernel_version = ""
+    kernels_info.each {
+        if (it.contains("${env.distro}${version_identifier}")) {
+            latest_kernel_version = it.split("=")[1]
         }
-        stage('Send-email') {
-            withCredentials([string(credentialsId: 'MAIL_LIST_OWNER', variable: 'MAIL_LIST_OWNER')]) {
-                emailext (
-                    subject: "Please sign off ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro}. ${warningMessage}",
-                    to: "${env.MAIL_LIST_OWNER}",
-                    mimeType : "text/html",
-                    body: '${SCRIPT, template="ubuntu.template"}'
-                )
+    }
+
+    def warningMessage = ""
+
+    if (!env.KernelVersion) {
+        env.KernelVersion = latest_kernel_version
+    }
+
+    if (env.KernelVersion && latest_kernel_version && env.KernelVersion.trim() != latest_kernel_version.trim()) {
+        warningMessage = "Warning: kernel ${env.KernelVersion} superseded by ${latest_kernel_version}!"
+    }
+    stage('Send-email') {
+        withCredentials([string(credentialsId: 'MAIL_LIST_OWNER', variable: 'MAIL_LIST_OWNER')]) {
+            def emailList = ""
+            if (env.sendMail == "yes") {
+                emailList = env.MAIL_LIST_OWNER
             }
+            emailext (
+                subject: "Please sign off ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro}. ${warningMessage}",
+                to: emailList,
+                mimeType : "text/html",
+                body: '${SCRIPT, template="ubuntu.template"}',
+                recipientProviders: [[$class: 'RequesterRecipientProvider']],
+            )
         }
-        stage('Kernel-Sign-Off') {
-            def owner
-            withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
-                try {
-                    checkout scm
-                    echo "Ask for manual sign-off from the owner"
-                    timeout(time: 72, unit: 'HOURS') {
-                        signoff = input(message: "Are you sure you want to sign off ${env.distro} ${env.KernelVersion} ${env.KernelType} kernel? ${warningMessage}",
-                            parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
-                            submitterParameter: "USER")
-                        owner = signoff["USER"]
-                    }
-                    env.SIGNED_OFF_BY = owner
-                    env.SIGNED_OFF_RESULT = "true"
-                    emailext (
-                        subject: "${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} can be signed off. ${owner}",
-                        to:"${env.MAIL_LIST_SIGNOFF}",
-                        mimeType : "text/html",
-                        body: """
-                            Hello,<br/><br/>
-                            ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} is OK and was signed off by ${owner}.<br/>
-                            ${warningMessage}><br/>
-                            URL: ${env.BUILD_URL}<br/><br/>
-                            Thank you,<br/>Jenkins CI
-                        """
-                    )
-                } catch (exc) {
-                    owner = exc.getCauses()[0].getUser().toString()
-                    env.SIGNED_OFF_BY = owner
-                    env.SIGNED_OFF_RESULT = "false"
-                    emailext (
-                        subject: "${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} can't be signed off. ${owner}",
-                        to: "${env.MAIL_LIST_SIGNOFF}",
-                        mimeType : "text/html",
-                        body: """
-                            Hello,<br/><br/>
-                            ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} is not good/was not signed off in time - ${owner}<br/>
-                            ${warningMessage}><br/>
-                            URL: ${env.BUILD_URL}<br/><br/>
-                            Thank you,<br/>Jenkins CI
-                        """
-                    )
+    }
+    stage('Kernel-Sign-Off') {
+        def owner
+        withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
+            def emailList = ""
+            if (env.sendMail == "yes") {
+                emailList = env.MAIL_LIST_OWNER
+            }
+            try {
+                checkout scm
+                echo "Ask for manual sign-off from the owner"
+                timeout(time: 72, unit: 'HOURS') {
+                    signoff = input(message: "Are you sure you want to sign off ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}",
+                        parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
+                        submitterParameter: "USER")
+                    owner = signoff["USER"].toString()
                 }
+                env.SIGNED_OFF_BY = owner
+                env.SIGNED_OFF_RESULT = "true"
+                emailext (
+                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was signed off by ${env.SIGNED_OFF_BY}",
+                    to: emailList,
+                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                    mimeType : "text/html",
+                    body: """
+                        Hello,<br/><br/>
+                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} is OK and was signed off by ${env.SIGNED_OFF_BY}.<br/>
+                        ${warningMessage}<br/>
+                        URL: ${env.BUILD_URL}<br/><br/>
+                        Thank you,<br/>Jenkins CI
+                    """
+                )
+            } catch (exc) {
+                env.SIGNED_OFF_BY = exc.getCauses()[0].getUser().getId().toString()
+                env.SIGNED_OFF_RESULT = "false"
+
+                emailext (
+                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} can't be signed off. ${env.SIGNED_OFF_BY}",
+                    to: emailList,
+                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                    mimeType : "text/html",
+                    body: """
+                        Hello,<br/><br/>
+                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} is not good/was not signed off in time - ${env.SIGNED_OFF_BY}<br/>
+                        ${warningMessage}<br/>
+                        URL: ${env.BUILD_URL}<br/><br/>
+                        Thank you,<br/>Jenkins CI
+                    """
+                )
             }
         }
     }
 }
+
 
 stage ("report_status_end") {
     node ("meta_slave") {
