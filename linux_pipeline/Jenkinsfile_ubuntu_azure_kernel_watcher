@@ -45,7 +45,6 @@ node ("meta_slave") {
                             string(name: 'Distro', value: "${distro}"),
                             string(name: 'KernelType', value: "${kernel}"),
                             string(name: 'KernelVersion', value: "${latest_kernel_version}"),
-                            string(name: 'Kernel', value: "${kernel}"),
                             string(name: 'ValidationAzure', value: "yes"),
                             string(name: 'ValidationHyperV', value: "yes"),
                             string(name: 'PerformanceAzure', value: "yes"),

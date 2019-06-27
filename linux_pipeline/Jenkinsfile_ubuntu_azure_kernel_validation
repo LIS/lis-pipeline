@@ -48,7 +48,7 @@ def reportPipelineStatus(status) {
     "PipelineName": "${JOB_NAME}",
     "PipelineBuildNumber": ${BUILD_NUMBER},
     "PipelineBuildUrl": "${BUILD_URL}",
-    "KernelVersion": "${KERNEL_VERSION}",
+    "KernelVersion": "${KernelVersion}",
     "KernelType": "${KERNEL_TYPE}",
     "SignedOffBy": "${SIGNED_OFF_BY}",
     "SignedOffResult": "${SIGNED_OFF_RESULT}",
@@ -445,15 +445,21 @@ if (env.sendMail == "yes"){
             return
         }
         kernels_info = kernels_info.split("\n")
+        def latest_kernel_version = ""
         kernels_info.each {
             if (it.contains("${env.distro}${version_identifier}")) {
                 latest_kernel_version = it.split("=")[1]
             }
         }
+
+        def warningMessage = ""
+        if (env.KernelVersion && latest_kernel_version && env.KernelVersion.trim() != latest_kernel_version.trim()) {
+            warningMessage = "Warning: ${env.KernelVersion} superseded by ${latest_kernel_version}!"
+        }
         stage('Send-email') {
             withCredentials([string(credentialsId: 'MAIL_LIST_OWNER', variable: 'MAIL_LIST_OWNER')]) {
                 emailext (
-                    subject: "Please sign off ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro}",
+                    subject: "Please sign off ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro}. ${warningMessage}",
                     to: "${env.MAIL_LIST_OWNER}",
                     mimeType : "text/html",
                     body: '${SCRIPT, template="ubuntu.template"}'
@@ -467,7 +473,7 @@ if (env.sendMail == "yes"){
                     checkout scm
                     echo "Ask for manual sign-off from the owner"
                     timeout(time: 72, unit: 'HOURS') {
-                        signoff = input(message: "Are you sure you want to sign off ${env.distro} ${latest_kernel_version} ${env.KernelType} kernel?",
+                        signoff = input(message: "Are you sure you want to sign off ${env.distro} ${env.KernelVersion} ${env.KernelType} kernel? ${warningMessage}",
                             parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
                             submitterParameter: "USER")
                         owner = signoff["USER"]
@@ -475,12 +481,13 @@ if (env.sendMail == "yes"){
                     env.SIGNED_OFF_BY = owner
                     env.SIGNED_OFF_RESULT = "true"
                     emailext (
-                        subject: "${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} can be signed off. ${owner}",
+                        subject: "${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} can be signed off. ${owner}",
                         to:"${env.MAIL_LIST_SIGNOFF}",
                         mimeType : "text/html",
                         body: """
                             Hello,<br/><br/>
-                            ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} is OK and was signed off by ${owner}<br/>
+                            ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} is OK and was signed off by ${owner}.<br/>
+                            ${warningMessage}><br/>
                             URL: ${env.BUILD_URL}<br/><br/>
                             Thank you,<br/>Jenkins CI
                         """
@@ -490,12 +497,13 @@ if (env.sendMail == "yes"){
                     env.SIGNED_OFF_BY = owner
                     env.SIGNED_OFF_RESULT = "false"
                     emailext (
-                        subject: "${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} can't be signed off. ${owner}",
+                        subject: "${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} can't be signed off. ${owner}",
                         to: "${env.MAIL_LIST_SIGNOFF}",
                         mimeType : "text/html",
                         body: """
                             Hello,<br/><br/>
-                            ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} is not good/was not signed off in time - ${owner}<br/>
+                            ${env.KernelVersion} ${env.KernelType} kernel for ${env.distro} is not good/was not signed off in time - ${owner}<br/>
+                            ${warningMessage}><br/>
                             URL: ${env.BUILD_URL}<br/><br/>
                             Thank you,<br/>Jenkins CI
                         """
