@@ -48,7 +48,8 @@ def reportPipelineStatus(status) {
     "PipelineName": "${JOB_NAME}",
     "PipelineBuildNumber": ${BUILD_NUMBER},
     "PipelineBuildUrl": "${BUILD_URL}",
-    "KernelVersion": "${KERNEL_TYPE}",
+    "KernelVersion": "${KERNEL_VERSION}",
+    "KernelType": "${KERNEL_TYPE}",
     "SignedOffBy": "${SIGNED_OFF_BY}",
     "SignedOffResult": "${SIGNED_OFF_RESULT}",
     "DistroVersion": "${Distro}"  }]
@@ -118,8 +119,9 @@ properties ([
     parameters([
         choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\ncosmic\ndisco',
                 description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> cosmic - 18.10 validation <br> disco - 19.04 validation'),
-        choice (name: 'Kernel', choices: 'linux-azure\nlinux-azure-edge',
+        choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
+        string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the version will not be present in the database reports.'),
         choice (name: 'Platform', choices: 'azure\nhyperv\nall',
                 description: 'azure - only Azure validation <br> all - all platforms validation <br> hyperv - only Hyper-V validation'),
         choice (name: 'Performance', choices: 'yes\nno',
@@ -169,10 +171,10 @@ AZURE_ID = "ubuntuAz"
 def ARM_DISTRO = ARM_DISTRO_HASH.find{it.key == env.distro}.value
 def HYPERV_VHD = HYPERV_VHD_HASH.find{it.key == env.distro}.value
 
-if (env.kernel == "linux-azure") {
+if (env.KernelType == "linux-azure") {
     env.KERNEL_TYPE = "proposed-azure"
 }
-if (env.kernel == "linux-azure-edge"){
+if (env.KernelType == "linux-azure-edge"){
     env.KERNEL_TYPE = "proposed-edge"
 }
 
@@ -193,7 +195,7 @@ stage ("report_status_init") {
 }
 
 if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
-    stage ("Azure-Validation-${env.distro}-${env.kernel}") {
+    stage ("Azure-Validation-${env.distro}-${env.KernelType}") {
         def runs = [:]
         AZURE_VALIDATION_TESTS_HASH.each() {
             def test_type = it.key
@@ -216,7 +218,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
 
                                         def stageInfo = [:]
-                                        stageInfo["Name"] = "Azure-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["Name"] = "Azure-Validation-${env.distro}-${env.KernelType}-${test_type}"
                                         stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
                                         stageInfo["EndDate"] = ''
                                         stageInfo["Platform"] = "Azure"
@@ -271,7 +273,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
 }
 
 if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
-    stage ("HyperV-Validation-${env.distro}-${env.kernel}") {
+    stage ("HyperV-Validation-${env.distro}-${env.KernelType}") {
         def runs = [:]
         HYPERV_VALIDATION_TESTS_HASH.each() {
             def test_type = it.key
@@ -301,7 +303,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
                                         HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
 
                                         def stageInfo = [:]
-                                        stageInfo["Name"] = "HyperV-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["Name"] = "HyperV-Validation-${env.distro}-${env.KernelType}-${test_type}"
                                         stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
                                         stageInfo["EndDate"] = ''
                                         stageInfo["Platform"] = "HyperV"
@@ -357,7 +359,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
 }
 
 if (env.performance == "yes") {
-    stage ("Performance-${env.distro}-${env.kernel}") {
+    stage ("Performance-${env.distro}-${env.KernelType}") {
         def runs = [:]
         AZURE_PERFORMANCE_TESTS_HASH.each() {
             def test_type = it.key
@@ -374,7 +376,7 @@ if (env.performance == "yes") {
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
 
                                         def stageInfo = [:]
-                                        stageInfo["Name"] = "Performance-Validation-${env.distro}-${env.kernel}-${test_type}"
+                                        stageInfo["Name"] = "Performance-Validation-${env.distro}-${env.KernelType}-${test_type}"
                                         stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
                                         stageInfo["EndDate"] = ''
                                         stageInfo["Platform"] = "Azure"
@@ -396,7 +398,7 @@ if (env.performance == "yes") {
                                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -EnableTelemetry" +
                                             " -ExitWithZero" +
-                                            " -ResultDBTestTag '${env.distro}_${env.kernel}_${env.BUILD_NUMBER}'" +
+                                            " -ResultDBTestTag '${env.distro}_${env.KernelType}_${env.BUILD_NUMBER}'" +
                                             " ${test_cmd}"
                                         )
                                         archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
@@ -432,7 +434,7 @@ if (env.performance == "yes") {
 if (env.sendMail == "yes"){
     node ("meta_slave") {
         echo "Send email with kernel validation results link"
-        if (env.kernel == "linux-azure") {
+        if (env.KernelType == "linux-azure") {
             version_identifier = "_azure"
         } else {
             version_identifier = "_edge"
@@ -452,7 +454,7 @@ if (env.sendMail == "yes"){
         stage('Send-email') {
             withCredentials([string(credentialsId: 'MAIL_LIST_OWNER', variable: 'MAIL_LIST_OWNER')]) {
                 emailext (
-                    subject: "Please sign off ${latest_kernel_version} ${env.kernel} kernel for ${env.distro}",
+                    subject: "Please sign off ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro}",
                     to: "${env.MAIL_LIST_OWNER}",
                     mimeType : "text/html",
                     body: '${SCRIPT, template="ubuntu.template"}'
@@ -466,7 +468,7 @@ if (env.sendMail == "yes"){
                     checkout scm
                     echo "Ask for manual sign-off from the owner"
                     timeout(time: 72, unit: 'HOURS') {
-                        signoff = input(message: "Are you sure you want to sign off ${env.distro} ${latest_kernel_version} ${env.kernel} kernel?",
+                        signoff = input(message: "Are you sure you want to sign off ${env.distro} ${latest_kernel_version} ${env.KernelType} kernel?",
                             parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
                             submitterParameter: "USER")
                         owner = signoff["USER"]
@@ -474,12 +476,12 @@ if (env.sendMail == "yes"){
                     env.SIGNED_OFF_BY = owner
                     env.SIGNED_OFF_RESULT = "true"
                     emailext (
-                        subject: "${latest_kernel_version} ${env.kernel} kernel for ${env.distro} can be signed off. ${owner}",
+                        subject: "${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} can be signed off. ${owner}",
                         to:"${env.MAIL_LIST_SIGNOFF}",
                         mimeType : "text/html",
                         body: """
                             Hello,<br/><br/>
-                            ${latest_kernel_version} ${env.kernel} kernel for ${env.distro} is OK and was signed off by ${owner}<br/>
+                            ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} is OK and was signed off by ${owner}<br/>
                             URL: ${env.BUILD_URL}<br/><br/>
                             Thank you,<br/>Jenkins CI
                         """
@@ -489,12 +491,12 @@ if (env.sendMail == "yes"){
                     env.SIGNED_OFF_BY = owner
                     env.SIGNED_OFF_RESULT = "false"
                     emailext (
-                        subject: "${latest_kernel_version} ${env.kernel} kernel for ${env.distro} can't be signed off. ${owner}",
+                        subject: "${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} can't be signed off. ${owner}",
                         to: "${env.MAIL_LIST_SIGNOFF}",
                         mimeType : "text/html",
                         body: """
                             Hello,<br/><br/>
-                            ${latest_kernel_version} ${env.kernel} kernel for ${env.distro} is not good/was not signed off in time - ${owner}<br/>
+                            ${latest_kernel_version} ${env.KernelType} kernel for ${env.distro} is not good/was not signed off in time - ${owner}<br/>
                             URL: ${env.BUILD_URL}<br/><br/>
                             Thank you,<br/>Jenkins CI
                         """

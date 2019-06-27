@@ -43,7 +43,8 @@ node ("meta_slave") {
                     build (job: "${env.PIPELINE_NAME}/master",
                         parameters: [
                             string(name: 'Distro', value: "${distro}"),
-                            string(name: 'Kernel', value: "${kernel}"),
+                            string(name: 'KernelType', value: "${kernel}"),
+                            string(name: 'KernelVersion', value: "${latest_kernel_version}"),
                             string(name: 'Platform', value: "all"),
                             string(name: 'Performance', value: "yes"),
                             string(name: 'sendMail', value: "yes"),
