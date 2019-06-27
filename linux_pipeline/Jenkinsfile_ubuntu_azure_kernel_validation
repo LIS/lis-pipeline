@@ -120,9 +120,11 @@ properties ([
                 description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> cosmic - 18.10 validation <br> disco - 19.04 validation'),
         choice (name: 'Kernel', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
-        choice (name: 'Platform', choices: 'azure\nhyperv\nall',
-                description: 'azure - only Azure validation <br> all - all platforms validation <br> hyperv - only Hyper-V validation'),
-        choice (name: 'Performance', choices: 'yes\nno',
+        choice (name: 'ValidationAzure', choices: 'yes\nno',
+                description: 'yes - will do Azure validation testing <br> no - Azure validation testing will be skipped'),
+        choice (name: 'ValidationHyperV', choices: 'yes\nno',
+                description: 'yes - will do HyperV validation testing <br> no - HyperV validation testing will be skipped'),
+        choice (name: 'PerformanceAzure', choices: 'yes\nno',
                 description: 'yes - will do Azure Performance testing <br> no - Azure Performance testing will be skipped'),
         choice (name: 'sendMail', choices: 'no\nyes',
                 description: 'no - will not send mail <br> yes - will send mail')
@@ -155,9 +157,6 @@ def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-TH
     PERF_LATENCY:"-TestNames 'PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV' -ResultDBTable 'Perf_Network_Latency_Azure_DefaultKernel'",
     PERF_STORAGE_4K:"-TestNames 'PERF-STORAGE-4K-IO' -StorageAccount 'ExistingStorage_Premium' -ResultDBTable 'Perf_Storage_Azure_DefaultKernel'"]
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
-PLATFORM_HYPERV = "hyperv"
-PLATFORM_AZURE = "azure"
-PLATFORM_ALL = "all"
 LABEL_SRIOV = "sriov_mlnx"
 LABEL_WS2016 = "ubuntu_azure_kernel_validation"
 LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
@@ -192,7 +191,7 @@ stage ("report_status_init") {
     }
 }
 
-if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
+if (env.ValidationAzure == 'yes') {
     stage ("Azure-Validation-${env.distro}-${env.kernel}") {
         def runs = [:]
         AZURE_VALIDATION_TESTS_HASH.each() {
@@ -270,7 +269,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_AZURE)) {
     echo "Skipping Azure validation"
 }
 
-if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
+if (env.ValidationHyperV == 'yes') {
     stage ("HyperV-Validation-${env.distro}-${env.kernel}") {
         def runs = [:]
         HYPERV_VALIDATION_TESTS_HASH.each() {
@@ -356,7 +355,7 @@ if ((env.platform == PLATFORM_ALL) || (env.platform == PLATFORM_HYPERV)) {
     echo "Skipping Hyper-V validation"
 }
 
-if (env.performance == "yes") {
+if (env.PerformanceAzure == "yes") {
     stage ("Performance-${env.distro}-${env.kernel}") {
         def runs = [:]
         AZURE_PERFORMANCE_TESTS_HASH.each() {
