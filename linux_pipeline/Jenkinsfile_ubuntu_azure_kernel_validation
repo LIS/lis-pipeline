@@ -485,7 +485,7 @@ if (env.sendMail == "yes"){
                         """
                     )
                 } catch (exc) {
-                    owner = exc.getCauses()[0].getUser()
+                    owner = exc.getCauses()[0].getUser().toString()
                     env.SIGNED_OFF_BY = owner
                     env.SIGNED_OFF_RESULT = "false"
                     emailext (
