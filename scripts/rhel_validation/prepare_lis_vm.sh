@@ -21,6 +21,8 @@ function prepare_vm {
     kernel_version="$3"
     rhel_username="$4"
     rhel_password="$5"
+    storage_account="$6"
+    storage_sas_token="$7"
 
     subscription-manager register --force --username "${rhel_username}" --password "${rhel_password}"
     subscription-manager attach --auto
@@ -37,6 +39,18 @@ function prepare_vm {
 	    printf "\n kernel-${kernel_version} installation failed \n"
     fi
     yum -y install kernel-devel-${kernel_version}
+
+    mkdir "${kernel_version}"
+    pushd "${kernel_version}"
+
+    yum -y install yum-utils
+    yumdownloader -y kernel-${kernel_version} kernel-devel-${kernel_version} --resolve
+
+    popd
+
+    wget https://aka.ms/downloadazcopy-v10-linux
+    tar xvf downloadazcopy-v10-linux
+    ./azcopy_linux_amd64_10.1.2/azcopy cp "${kernel_version}" "https://${storage_account}.blob.core.windows.net/kernel/${storage_sas_token}" --recursive
 }
 
 function install_modules {
@@ -90,6 +104,8 @@ function main {
     RHEL_USERNAME="$rhel_user"
     RHEL_PASSWORD="$rhel_pass"
     LIS_PATH="$lis_path"
+    STORAGE_ACCOUNT="$storage_account"
+    STORAGE_SAS_TOKEN="$storage_token"
 
     mkdir -p "$WORK_DIR"
     pushd "$WORK_DIR"
@@ -97,7 +113,7 @@ function main {
     
     if [[ "$SECTION" == "install_kernel" ]];then        
         MAJOR_VERSION="${OS_VERSION%.*}"
-        prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD"
+        prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD" "$STORAGE_ACCOUNT" "$STORAGE_SAS_TOKEN"
     elif [[ "$SECTION" == "install_lis" ]];then
         MODULES_DIR="$(get_lis_os RPMS "${OS_VERSION}")"
         install_modules "${LIS_PATH}/${MODULES_DIR}" "$KERNEL_VERSION"
