@@ -1,21 +1,5 @@
 #!/usr/bin/env groovy
 
-def RunPowershellCommand(psCmd) {
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
-}
-
-def isJobCronTriggered() {
-    for (cause in currentBuild.rawBuild.getCauses()) {
-        if (cause != null) {
-            def causeDescription = cause.getShortDescription()
-            if (causeDescription && causeDescription.contains("Started by timer")) {
-                return true
-            }
-        }
-    }
-    return false
-}
-
 properties ([
     pipelineTriggers([cron('H 1 * * *')]),
     [$class: 'ParametersDefinitionProperty',
@@ -55,6 +39,7 @@ env.DPDK_REMOTE_URL = "git://git.dpdk.org/dpdk"
 env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
 env.BUILD_TAGS_LATEST = ""
 env.BUILD_TAGS_STABLE = ""
+env.UTILS_PATH = "linux_pipeline/utils/pipeline_utils.groovy"
 
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegion = env.AZURE_REGION.trim()
@@ -138,12 +123,14 @@ if (dpdkSource.size()) {
                     timeout (3600) {
 
                         node('azure') {
+                            checkout scm
+                            def utils = load(env.UTILS_PATH)
                             withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                                              variable: 'Azure_Secrets_File')]) {
                                 echo "Current Image: ${currentImage}, Current Region: ${azureRegion}"
                                 cleanWs()
                                 git branch: lisav2BranchName, url: lisav2RemoteUrl
-                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                utils.RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                 " -TestLocation '${azureRegion}'" +
                                 " -RGIdentifier 'dpdkp${currentTagAzureId}'" +
                                 " -TestPlatform  'Azure'" +
@@ -184,13 +171,14 @@ if (dpdkSource.size()) {
 
     node('meta_slave') {
         stage("send_mail") {
+            checkout scm
             withCredentials([string(credentialsId: 'DPDK_MAILING_LIST',
                                   variable: 'DPDK_MAILING_LIST')]) {
                 def mailList = null
-                if (isJobCronTriggered()) {
+                def utils = load(env.UTILS_PATH)
+                if (utils.isJobCronTriggered()) {
                     mailList = DPDK_MAILING_LIST
                 }
-                checkout scm
                 def emailBody = readFile "./scripts/dpdk/dpdk-email-groovy-text.template"
                 emailBody = emailBody.replace("DPDK_VERSION", dpdkTags)
                 emailBody = emailBody.replace("AZURE_IMAGE", azureImages.join(", "))
