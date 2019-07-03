@@ -38,6 +38,21 @@ def Prepare() {
     }
 }
 
+def ReportException(stagename, exc) {
+	def body = "<pre>"
+	body += "\nStage Name        : ${stagename}\n"
+	body += "\nException Message : ${exc}\n"
+	body += "\nBuild URL         : ${env.BUILD_URL}\n"
+	withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+	emailext (
+		subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
+		to: "${env.HOTFIX_DEV_MAIL}",
+		mimeType : "text/html",
+		body: body
+		)
+	}
+}
+
 stage ("Prerequisite") {
     node ("meta_slave") {
         cleanWs()
@@ -47,6 +62,7 @@ stage ("Prerequisite") {
     }
 }
 
+def stageTimeout = 90
 currentStage = "Capture Image for Deploy Test"
 stage ("${currentStage}") {
 	def parellel_jobs = [:]
@@ -66,9 +82,10 @@ stage ("${currentStage}") {
 						println "Sleeping ${delay} seconds..."
 						sleep "${delay}"
 						println "Running ${currentTest}..."
-						node('azure') {
-							CleanWorkspace()
-							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+						timeout(time: stageTimeout, unit: 'MINUTES') {
+							node('azure') {
+								CleanWorkspace()
+								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
 								def currentVHD = "${currentDistro}"
 								Prepare()
 								println "CAPTURE-VHD-BEFORE-TEST input distro ${currentVHD}"
@@ -100,15 +117,14 @@ stage ("${currentStage}") {
 								writeFile file: "BASE-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
 								stash includes: "BASE-${StashName}-CapturedVHD.azure.env", name: "BASE-${StashName}-CapturedVHD.azure.env"
 								println("Captured VHD : ${CapturedVHD}")
+								}
 							}
 						}
 					}
 					catch (exc) {
 						currentBuild.result = 'FAILURE'
 						println "${currentStage}: STAGE_FAILED_EXCEPTION."
-					}
-					finally {
-						//println "${it}: ${currentBuild.result}"
+						ReportException("${currentTest}", "${exc}")
 					}
 				}
 			}
@@ -117,6 +133,7 @@ stage ("${currentStage}") {
 	parallel parellel_jobs
 }
 
+stageTimeout = 240
 currentStage = "Deploy Tests"
 stage ("${currentStage}") {
 	def parellel_jobs = [:]
@@ -132,10 +149,11 @@ stage ("${currentStage}") {
 				println "running parallel jobs"
 				stage ("${currentTest}") {
 					try {
-						println "Running Install Upgrade Scenarios..."
-						node('azure') {
-							CleanWorkspace()
-							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+						timeout(time: stageTimeout, unit: 'MINUTES') {
+							println "Running Install Upgrade Scenarios..."
+							node('azure') {
+								CleanWorkspace()
+								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
 								Prepare()
 								println "LIS-DEPLOY_SCENARIOS"
 								def Command = ".\\Run-LisaV2.ps1"
@@ -164,15 +182,14 @@ stage ("${currentStage}") {
 								archiveArtifacts '*-TestLogs.zip'
 								println "Archieving the report of LIS_DEPLOY"
 								archiveArtifacts('Report\\*-junit.xml')
+								}
 							}
 						}
 					}
 					catch (exc) {
 						currentBuild.result = 'FAILURE'
 						println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
-					}
-					finally {
-						//println "${it}: ${currentBuild.result}"
+						ReportException("${currentTest}", "${exc}")
 					}
 				}
 			}
@@ -181,6 +198,7 @@ stage ("${currentStage}") {
 	parallel parellel_jobs
 }
 
+stageTimeout = 90
 currentStage = "Capture Image for Functional Test"
 stage ("${currentStage}") {
 	def parellel_jobs = [:]
@@ -200,9 +218,10 @@ stage ("${currentStage}") {
 						println "Sleeping ${delay} seconds..."
 						sleep "${delay}"
 						println "Running ${currentTest}..."
-						node('azure') {
-							CleanWorkspace()
-							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+						timeout(time: stageTimeout, unit: 'MINUTES') {
+							node('azure') {
+								CleanWorkspace()
+								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
 								println "Calling captureVHD_FunctionalTest ${currentDistro}.."
 								def currentVHD = "${currentDistro}"
 								Prepare()
@@ -238,15 +257,14 @@ stage ("${currentStage}") {
 								writeFile file: "TEST-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
 								stash includes: "TEST-${StashName}-CapturedVHD.azure.env", name: "TEST-${StashName}-CapturedVHD.azure.env"
 								println("Captured VHD : ${CapturedVHD}")
+								}
 							}
 						}
 					}
 					catch (exc) {
 						currentBuild.result = 'FAILURE'
 						println "${currentStage}: STAGE_FAILED_EXCEPTION."
-					}
-					finally {
-						//println "${it}: ${currentBuild.result}"
+						ReportException("${currentTest}", "${exc}")
 					}
 				}
 			}
@@ -255,6 +273,7 @@ stage ("${currentStage}") {
 	parallel parellel_jobs
 }
 
+stageTimeout = 300
 currentStage = "FunctionalTests"
 stage ("${currentStage}") {
 	def parellel_jobs = [:]
@@ -270,8 +289,9 @@ stage ("${currentStage}") {
 				println "running parallel jobs"
 				stage ("${currentTest}")  {
 					try {
-						println "Running Functional Test Scenarios..."
-						node('azure') {
+						timeout(time: stageTimeout, unit: 'MINUTES') {
+							println "Running Functional Test Scenarios..."
+							node('azure') {
 							CleanWorkspace()
 							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
 								Prepare()
@@ -325,12 +345,14 @@ stage ("${currentStage}") {
 								archiveArtifacts '*-TestLogs.zip'
 								println "Archieving the report for FUNCTIONAL TEST"
 								archiveArtifacts('Report\\*-junit.xml')
+								}
 							}
 						}
 					}
 					catch (exc) {
 						currentBuild.result = 'FAILURE'
 						println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
+						ReportException("${currentStage}", "${exc}")
 					}
 					finally {
 						//println "${it}: ${currentBuild.result}"

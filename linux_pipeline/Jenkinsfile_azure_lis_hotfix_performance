@@ -6,7 +6,7 @@ def TCPNetwork1Tests = "PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Syntheti
 def TCPNetwork2Tests = "PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV"
 def UDPNetworkTests = "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV"
 def PERFORMANCE_TESTS = ["${TCPNetwork1Tests}", "${TCPNetwork2Tests}","PERF-STORAGE-4K-IO","PERF-STORAGE-1024K-IO", "PERF-NVME-4K-IO", "${UDPNetworkTests}", "PERF-SYSCALL-BENCHMARK" ]
-def TEST_REGIONS = ["westus2", "westus2", "westus2", "northeurope", "westus2", "westus2" ]
+def TEST_REGIONS = ["westus2", "westus2", "westus2", "northeurope", "westus2", "westus2", "westus2" ]
 def total_tests = HOTFIX_PERFROMANCE_TESTS.size()
 
 def armImagesCentOS = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest", 
@@ -45,6 +45,21 @@ def Prepare() {
     }
 }
 
+def ReportException(stagename, exc) {
+	def body = "<pre>"
+	body += "\nStage Name        : ${stagename}\n"
+	body += "\nException Message : ${exc}\n"
+	body += "\nBuild URL         : ${env.BUILD_URL}\n"
+	withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+	emailext (
+		subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
+		to: "${env.HOTFIX_DEV_MAIL}",
+		mimeType : "text/html",
+		body: body
+		)
+	}
+}
+
 currentStage = "Prerequisites"
 stage ("${currentStage}") {
      node ("meta_slave") {
@@ -55,6 +70,7 @@ stage ("${currentStage}") {
      }
 }
 
+def stageTimeout = 90
 currentStage = "Capture Image for Performance Test"
 stage ("${currentStage}") {
 	def parellel_jobs = [:]
@@ -74,9 +90,10 @@ stage ("${currentStage}") {
 						println "Sleeping ${delay} seconds..."
 						sleep "${delay}"
 						println "Running ${currentTest}..."
-						node('azure') {
-							CleanWorkspace()
-							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+						timeout(time: stageTimeout, unit: 'MINUTES') {
+							node('azure') {
+								CleanWorkspace()
+								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
 								def currentVHD = "${currentDistro}"
 								Prepare()
 								println "CAPTURE-VHD-BEFORE-TEST"
@@ -117,15 +134,14 @@ stage ("${currentStage}") {
 								writeFile file: "PERF-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
 								stash includes: "PERF-${StashName}-CapturedVHD.azure.env", name: "PERF-${StashName}-CapturedVHD.azure.env"
 								println("Captured VHD : ${CapturedVHD}")
+								}
 							}
 						}
 					}
 					catch (exc) {
 						currentBuild.result = 'FAILURE'
 						println "${currentStage}: STAGE_FAILED_EXCEPTION."
-					}
-					finally	{
-						//println "${it}: ${currentBuild.result}"
+						ReportException("${currentTest}", "${exc}")
 					}
 				}
 			}
@@ -146,7 +162,6 @@ node ("azure") {
 			def currentTest = HOTFIX_PERFROMANCE_TESTS[currentTestCounter]
 			def perfTest = PERFORMANCE_TESTS[currentTestCounter]
 			def testLocation = TEST_REGIONS[currentTestCounter]
-			println currentTest + "+++++++++++++++++"
 			if (currentTest != null && currentTest != "" ) {
 				def delay = 0
 				currentTest = "${currentTest}-${DistroList[j]}"
@@ -194,8 +209,7 @@ node ("azure") {
 						catch (exc) {
 							currentBuild.result = 'SUCCESS'
 							println exc
-						} finally {
-							cleanWs()
+							ReportException("${currentTest}", "${exc}")
 						}
 					}
 				}
