@@ -170,6 +170,7 @@ if (dpdkSource.size()) {
     }
 
     node('meta_slave') {
+        def dpdkTagsFormatted = dpdkTags.replace(", "," ").trim()
         stage("send_mail") {
             checkout scm
             withCredentials([string(credentialsId: 'DPDK_MAILING_LIST',
@@ -180,7 +181,7 @@ if (dpdkSource.size()) {
                     mailList = DPDK_MAILING_LIST
                 }
                 def emailBody = readFile "./scripts/dpdk/dpdk-email-groovy-text.template"
-                emailBody = emailBody.replace("DPDK_VERSION", dpdkTags)
+                emailBody = emailBody.replace("DPDK_VERSION", dpdkTagsFormatted)
                 emailBody = emailBody.replace("AZURE_IMAGE", azureImages.join(", "))
                 def testResults = "\n DPDK job exited with status: ${currentBuild.currentResult} - ${env.BUILD_URL}. \n"
                 azureImages.each {
@@ -231,12 +232,63 @@ if (dpdkSource.size()) {
                 }
                 emailBody = emailBody.replace("TEST_RESULTS", testResults)
                 emailext (
-                    subject: "DPDK validation results for ${dpdkTags}",
+                    subject: "DPDK validation results for ${dpdkTagsFormatted}",
                     body: emailBody,
                     recipientProviders: [[$class: 'RequesterRecipientProvider']],
                     mimeType : "text/plain",
                     to: mailList
                 )
+            }
+        }
+
+        stage("signoff_dpdk") {
+            def owner = ''
+            checkout scm
+            withCredentials([string(credentialsId: 'DPDK_MAIL_LIST_SIGNOFF', variable: 'DPDK_MAIL_LIST_SIGNOFF')]) {
+                def mailList = ""
+                def utils = load(env.UTILS_PATH)
+                if (utils.isJobCronTriggered()) {
+                    mailList = DPDK_MAIL_LIST_SIGNOFF
+                }
+                try {
+                    echo "Ask for manual sign-off from the owner"
+                    timeout(time: 72, unit: 'HOURS') {
+                        signoff = input(message: "Are you sure you want to sign off DPDK ${dpdkTagsFormatted}?",
+                            parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
+                            submitterParameter: "USER")
+                        owner = signoff["USER"].toString()
+                    }
+                    env.SIGNED_OFF_BY = owner
+                    env.SIGNED_OFF_RESULT = "true"
+                    emailext (
+                        subject: "DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}",
+                        to: mailList,
+                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                        mimeType : "text/html",
+                        body: """
+                            Hello,<br/><br/>
+                            DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}.<br/>
+                            URL: ${env.BUILD_URL}<br/><br/>
+                            Thank you,<br/>Jenkins CI
+                        """
+                    )
+                } catch (exc) {
+                    env.SIGNED_OFF_BY = exc.getCauses()[0].getUser().getId().toString()
+                    env.SIGNED_OFF_RESULT = "false"
+
+                    emailext (
+                        subject: "DPDK ${dpdkTagsFormatted} can't be signed off. ${env.SIGNED_OFF_BY}",
+                        to: mailList,
+                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                        mimeType : "text/html",
+                        body: """
+                            Hello,<br/><br/>
+                            DPDK ${dpdkTagsFormatted} not signed off - ${env.SIGNED_OFF_BY}<br/>
+                            URL: ${env.BUILD_URL}<br/><br/>
+                            Thank you,<br/>Jenkins CI
+                        """
+                    )
+                }
             }
         }
     }
