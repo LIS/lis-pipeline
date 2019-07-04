@@ -484,7 +484,7 @@ node ("meta_slave") {
         withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
             def emailList = ""
             if (env.sendMail == "yes") {
-                emailList = env.MAIL_LIST_OWNER
+                emailList = env.MAIL_LIST_SIGNOFF
             }
             try {
                 checkout scm
