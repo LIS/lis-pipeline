@@ -23,6 +23,7 @@ function prepare_vm {
     rhel_password="$5"
     storage_account="$6"
     storage_sas_token="$7"
+    azcopy_downloadlink="$8"
 
     subscription-manager register --force --username "${rhel_username}" --password "${rhel_password}"
     subscription-manager attach --auto
@@ -48,9 +49,13 @@ function prepare_vm {
 
     popd
 
-    wget https://aka.ms/downloadazcopy-v10-linux
-    tar xvf downloadazcopy-v10-linux
-    ./azcopy_linux_amd64_10.1.2/azcopy cp "${kernel_version}" "https://${storage_account}.blob.core.windows.net/kernel/${storage_sas_token}" --recursive
+    storage_account=$(echo $storage_account|sed -e 's/[\r\n]//g')
+    storage_sas_token=$(echo $storage_sas_token|sed -e 's/[\r\n]//g')
+    azcopy_downloadlink=$(echo $azcopy_downloadlink|sed -e 's/[\r\n]//g')
+
+    wget -O azcopy.tar.gz ${azcopy_downloadlink}
+    tar xf azcopy.tar.gz
+    ./azcopy_linux_amd64*/azcopy cp "${kernel_version}" "https://${storage_account}.blob.core.windows.net/kernel/${storage_sas_token}" --recursive
 }
 
 function install_modules {
@@ -106,6 +111,7 @@ function main {
     LIS_PATH="$lis_path"
     STORAGE_ACCOUNT="$storage_account"
     STORAGE_SAS_TOKEN="$storage_token"
+    AZCOPY_DOWNLOAD_LINK="$azcopy_download_link"
 
     mkdir -p "$WORK_DIR"
     pushd "$WORK_DIR"
@@ -113,7 +119,7 @@ function main {
     
     if [[ "$SECTION" == "install_kernel" ]];then        
         MAJOR_VERSION="${OS_VERSION%.*}"
-        prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD" "$STORAGE_ACCOUNT" "$STORAGE_SAS_TOKEN"
+        prepare_vm "$OS_VERSION" "$KERNEL_REPO" "$KERNEL_VERSION" "$RHEL_USERNAME" "$RHEL_PASSWORD" "$STORAGE_ACCOUNT" "$STORAGE_SAS_TOKEN" "$AZCOPY_DOWNLOAD_LINK"
     elif [[ "$SECTION" == "install_lis" ]];then
         MODULES_DIR="$(get_lis_os RPMS "${OS_VERSION}")"
         install_modules "${LIS_PATH}/${MODULES_DIR}" "$KERNEL_VERSION"
