@@ -114,6 +114,42 @@ EOF
     }
 }
 
+def sendSignOffMail(mailType,warningMessage) {
+    def kernelAndDistroID = "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro}"
+    def SIGNOFF_EMAIL_SUBJECT_HASH = [
+        'true' : "was reviewed by ${env.SIGNED_OFF_BY}",
+        'false' : "was reviewed by ${env.SIGNED_OFF_BY}",
+        'Superseded' : "was reviewed by ${env.SIGNED_OFF_BY}",
+        'timeout' : "was not signed off in time"]
+    def SIGNOFF_EMAIL_MESSAGE_HASH = [
+        'true' : "is OK and was signed off by ${env.SIGNED_OFF_BY}",
+        'false' : "is not ok / cannot be signed off. Reviewed by ${env.SIGNED_OFF_BY}",
+        'Superseded' : "was superseded during testing. Reviewed by ${env.SIGNED_OFF_BY}",
+        'timeout' : "was not signed off in time."]
+    mailText = kernelAndDistroID + " " + SIGNOFF_EMAIL_MESSAGE_HASH[mailType]
+    mailSubject = kernelAndDistroID + " " + SIGNOFF_EMAIL_SUBJECT_HASH[mailType]
+
+    withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
+        def emailList = ""
+        if (env.sendMail == "yes") {
+            emailList = env.MAIL_LIST_SIGNOFF
+        }
+        emailext (
+            subject: "${mailSubject}",
+            to: emailList,
+            recipientProviders: [[$class: 'RequesterRecipientProvider']],
+            mimeType : "text/html",
+            body: """
+                Hello,<br/><br/>
+                ${mailText}.<br/>
+                ${warningMessage}<br/>
+                URL: ${env.BUILD_URL}<br/><br/>
+                Thank you,<br/>Jenkins CI
+            """
+        )
+    }
+}
+
 properties ([
     overrideIndexTriggers(false),
     parameters([
@@ -479,11 +515,10 @@ node ("meta_slave") {
             )
         }
     }
-    stage ('kernel-review') {
-        def owner
+    stage('Kernel-Sign-Off') {
         try {
             timeout(time: 72, unit: 'HOURS') {
-                reviewer = input(message: "Start review for ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}", submitterParameter: "USER")
+                reviewer = input(message: "Start review for ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel?\n${warningMessage}", submitterParameter: "USER")
                 env.SIGNED_OFF_BY = reviewer.toString()
                 env.SIGNED_OFF_RESULT = "UnderReview"
             }
@@ -491,68 +526,31 @@ node ("meta_slave") {
         } catch (exc) {
             println exc
         }
-    }
-
-    stage('Kernel-Sign-Off') {
         def owner
-        withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
-            def emailList = ""
-            if (env.sendMail == "yes") {
-                emailList = env.MAIL_LIST_SIGNOFF
-            }
-            try {
-                checkout scm
-                echo "Ask for manual sign-off from the owner"
-                timeout(time: 36, unit: 'HOURS') {
-                    signoff = input (
-                        parameters: [choice (
-                            name: 'SignOff',
-                            choices: 'Yes\nNo\nSuperseded',
-                            description: "Are you sure you want to sign off ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}")],
-                        submitterParameter: "USER")
-                    owner = signoff["USER"].toString()
-                    signoffStatus = signoff['SignOff']
+        try {
+            checkout scm
+            echo "Ask for manual sign-off from the owner"
+            timeout(time: 36, unit: 'HOURS') {
+                signoff = input (
+                    parameters: [choice (
+                        name: 'SignOff',
+                        choices: 'Yes\nNo\nSuperseded',
+                        description: "Are you sure you want to sign off ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel?\n${warningMessage}")],
+                    submitterParameter: "USER")
+                owner = signoff["USER"].toString()
+                signoffStatus = signoff['SignOff']
 
-                    def DB_COMPATIBILITY_HASH = [ "Yes":"true", "No":"false"]
-                    if (DB_COMPATIBILITY_HASH.containsKey(signoffStatus)) {
-                        signoffStatus = DB_COMPATIBILITY_HASH[signoffStatus]
-                    }
+                def DB_COMPATIBILITY_HASH = [ "Yes":"true", "No":"false"]
+                if (DB_COMPATIBILITY_HASH.containsKey(signoffStatus)) {
+                    signoffStatus = DB_COMPATIBILITY_HASH[signoffStatus]
                 }
-                env.SIGNED_OFF_BY = owner
-                env.SIGNED_OFF_RESULT = signoffStatus
-                def SIGNOFF_EMAIL_MESSAGE_HASH = ['true' : "is OK and was signed off by",
-                    'false' : "can't signed off",
-                    'Superseded' : "was superseded during tesing."]
-                mailText = SIGNOFF_EMAIL_MESSAGE_HASH[signoffStatus]
-                emailext (
-                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was reviewed by ${env.SIGNED_OFF_BY}",
-                    to: emailList,
-                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                    mimeType : "text/html",
-                    body: """
-                        Hello,<br/><br/>
-                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} ${mailText} - ${env.SIGNED_OFF_BY}.<br/>
-                        ${warningMessage}<br/>
-                        URL: ${env.BUILD_URL}<br/><br/>
-                        Thank you,<br/>Jenkins CI
-                    """
-                )
-            } catch (exc) {
-                env.SIGNED_OFF_RESULT = "false"
-                emailext (
-                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was not signed off in time.",
-                    to: emailList,
-                    recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                    mimeType : "text/html",
-                    body: """
-                        Hello,<br/><br/>
-                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was not signed off in time.<br/>
-                        ${warningMessage}<br/>
-                        URL: ${env.BUILD_URL}<br/><br/>
-                        Thank you,<br/>Jenkins CI
-                    """
-                )
             }
+            env.SIGNED_OFF_BY = owner
+            env.SIGNED_OFF_RESULT = signoffStatus
+            sendSignOffMail(signoffStatus,warningMessage)
+        } catch (exc) {
+            env.SIGNED_OFF_RESULT = "false"
+            sendSignOffMail('timeout',warningMessage)
         }
     }
 }
