@@ -133,6 +133,7 @@ properties ([
             description: 'What Azure Performance tests to run. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """4k
+                    4k-NVME
                     1024k""",
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
@@ -427,6 +428,7 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
     def netIperfSyntBufferLengthParam = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC-BUFFER-LENGTHS"
 
     def storIo4KTestCase = "PERF-STORAGE-4K-IO"
+    def storIo4KNVMETestCase = "PERF-NVME-4K-IO"
     def storIo1024KTestCase = "PERF-STORAGE-1024K-IO"
     def storIo4kParam = "PERF-STORAGE-4K-IO-MODES"
     def storIo1024kParam = "PERF-STORAGE-1024K-IO-MODES"
@@ -445,6 +447,10 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
             switch (storIoSize) {
                 case "4k":
                     perfTestInfo["test_case_name"] = storIo4KTestCase
+                    storIoParam = storIo4kParam
+                    break;
+                case "4k-NVME":
+                    perfTestInfo["test_case_name"] = storIo4KNVMETestCase
                     storIoParam = storIo4kParam
                     break;
                 case "1024k":

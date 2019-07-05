@@ -76,6 +76,7 @@ properties ([
             description: 'What Azure Performance tests to run. Applies only if the bisect type is performance. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """4k
+                    4k-NVME
                     1024k""",
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
