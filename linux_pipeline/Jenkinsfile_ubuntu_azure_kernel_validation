@@ -479,6 +479,20 @@ node ("meta_slave") {
             )
         }
     }
+    stage ('kernel-review') {
+        def owner
+        try {
+            timeout(time: 72, unit: 'HOURS') {
+                reviewer = input(message: "Start review for ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}", submitterParameter: "USER")
+                env.SIGNED_OFF_BY = reviewer.toString()
+                env.SIGNED_OFF_RESULT = "UnderReview"
+            }
+            reportPipelineStatus("kernel-review")
+        } catch (exc) {
+            println exc
+        }
+    }
+
     stage('Kernel-Sign-Off') {
         def owner
         withCredentials([string(credentialsId: 'MAIL_LIST_SIGNOFF', variable: 'MAIL_LIST_SIGNOFF')]) {
@@ -489,39 +503,50 @@ node ("meta_slave") {
             try {
                 checkout scm
                 echo "Ask for manual sign-off from the owner"
-                timeout(time: 72, unit: 'HOURS') {
-                    signoff = input(message: "Are you sure you want to sign off ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}",
-                        parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
+                timeout(time: 36, unit: 'HOURS') {
+                    signoff = input (
+                        parameters: [choice (
+                            name: 'SignOff',
+                            choices: 'Yes\nNo\nSuperseded',
+                            description: "Are you sure you want to sign off ${env.distro} ${env.KernelType} ${env.KernelVersion} kernel? ${warningMessage}")],
                         submitterParameter: "USER")
                     owner = signoff["USER"].toString()
+                    signoffStatus = signoff['SignOff']
+
+                    def DB_COMPATIBILITY_HASH = [ "Yes":"true", "No":"false"]
+                    if (DB_COMPATIBILITY_HASH.containsKey(signoffStatus)) {
+                        signoffStatus = DB_COMPATIBILITY_HASH[signoffStatus]
+                    }
                 }
                 env.SIGNED_OFF_BY = owner
-                env.SIGNED_OFF_RESULT = "true"
+                env.SIGNED_OFF_RESULT = signoffStatus
+                def SIGNOFF_EMAIL_MESSAGE_HASH = ['true' : "is OK and was signed off by",
+                    'false' : "can't signed off",
+                    'Superseded' : "was superseded during tesing."]
+                mailText = SIGNOFF_EMAIL_MESSAGE_HASH[signoffStatus]
                 emailext (
-                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was signed off by ${env.SIGNED_OFF_BY}",
+                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was reviewed by ${env.SIGNED_OFF_BY}",
                     to: emailList,
                     recipientProviders: [[$class: 'RequesterRecipientProvider']],
                     mimeType : "text/html",
                     body: """
                         Hello,<br/><br/>
-                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} is OK and was signed off by ${env.SIGNED_OFF_BY}.<br/>
+                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} ${mailText} - ${env.SIGNED_OFF_BY}.<br/>
                         ${warningMessage}<br/>
                         URL: ${env.BUILD_URL}<br/><br/>
                         Thank you,<br/>Jenkins CI
                     """
                 )
             } catch (exc) {
-                env.SIGNED_OFF_BY = exc.getCauses()[0].getUser().getId().toString()
                 env.SIGNED_OFF_RESULT = "false"
-
                 emailext (
-                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} can't be signed off. ${env.SIGNED_OFF_BY}",
+                    subject: "${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was not signed off in time.",
                     to: emailList,
                     recipientProviders: [[$class: 'RequesterRecipientProvider']],
                     mimeType : "text/html",
                     body: """
                         Hello,<br/><br/>
-                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} is not good/was not signed off in time - ${env.SIGNED_OFF_BY}<br/>
+                        ${env.KernelType} ${env.KernelVersion} kernel for ${env.distro} was not signed off in time.<br/>
                         ${warningMessage}<br/>
                         URL: ${env.BUILD_URL}<br/><br/>
                         Thank you,<br/>Jenkins CI
