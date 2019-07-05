@@ -76,9 +76,9 @@ properties ([
             name: 'RUN_AZURE_BOOT_TEST',
             description: 'Whether to run Azure Boot test'],
         [$class: 'StringParameterDefinition',
-            name: 'AZURE_BOOT_VM_SIZE',
-            defaultValue: "Standard_A2",
-            description: 'Azure Boot vm size. Make sure that the vm size exists and that the region supports it.'],
+            name: 'LISAV2_VM_SIZE',
+            defaultValue: "",
+            description: 'LISAv2 VM size. If set, all the boot/functional/performance tests will use that VM size. If not set, the default test case VM size will be used. Make sure that the vm size exists and that the region supports it. '],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE BOOT STRESS TEST CONFIGURATION",
@@ -95,10 +95,6 @@ properties ([
             name: 'AZURE_BOOT_STRESS_REBOOT_NUMBER',
             defaultValue: "10",
             description: 'Azure VM reboot number for each provisioning iteration. The total reboot number will be: AZURE_BOOT_STRESS_PROVISIONING_NUMBER * AZURE_BOOT_STRESS_REBOOT_NUMBER.'],
-        [$class: 'ChoiceParameterDefinition',
-            name: 'AZURE_BOOT_STRESS_VM_SIZE',
-            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
-            description: 'Azure Boot Stress vm size'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
@@ -304,11 +300,8 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         echo "No stash ${env.KERNEL_ARTIFACTS_PATH} found"
     }
 
-    if (testName.equals(env.LISAV2_AZURE_STRESS_TEST)) {
-        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_STRESS_VM_SIZE}'"
-    }
-    if (testName.equals(env.LISAV2_FUNCTIONAL_BOOT_TEST)) {
-        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_VM_SIZE}'"
+    if (params.LISAV2_VM_SIZE) {
+        vmSize = "-OverrideVMSize '${params.LISAV2_VM_SIZE}'"
     }
     if (platform.equals('HyperV')) {
         region = "localhost"
