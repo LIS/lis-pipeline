@@ -54,9 +54,9 @@ properties ([
             name: 'LISAV2_AZURE_REGION',
             description: 'Azure Region to be used for all tests'],
         [$class: 'StringParameterDefinition',
-            name: 'AZURE_BOOT_VM_SIZE',
-            defaultValue: "Standard_A2",
-            description: 'Azure Boot vm size. Make sure that the vm size exists and that the region supports it.'],
+            name: 'LISAV2_VM_SIZE',
+            defaultValue: "",
+            description: 'LISAv2 VM size. If set, all the boot/functional/performance tests will use that VM size. If not set, the default test case VM size will be used. Make sure that the vm size exists and that the region supports it. '],
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE_NAME',
             defaultValue: '',
@@ -76,6 +76,7 @@ properties ([
             description: 'What Azure Performance tests to run. Applies only if the bisect type is performance. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """4k
+                    4k-NVME
                     1024k""",
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
@@ -194,30 +195,36 @@ def validateCommit(String commit) {
             def perfResultsRaw = readFile("aggregate_results_" + commit + "/bisect_run/Report/perf_results.json")
             def jsonSlurper = new JsonSlurper()
             def perfResults = jsonSlurper.parseText(perfResultsRaw)
-            def isPerfValid = false
             println("Raw performance results for commit " + commit + " are: " + perfResults)
-            for (key in currentPerfResults.keySet()) {
-                def perfValue = perfResults[key]
-                if (perfValue) {
-                    try {
-                        perfValue = Float.valueOf(perfValue)
-                    } catch (Exception e) {}
-                    if (perfValue > 0.0000001) {
-                        currentPerfResults[key] = perfValue
-                        isPerfValid = true
+            if (perfResults) {
+                for (perfResult in perfResults) {
+                    def isPerfValid = false
+                    for (key in currentPerfResults.keySet()) {
+                        def perfValue = perfResult[key]
+                        if (perfValue) {
+                            try {
+                                perfValue = Float.valueOf(perfValue)
+                            } catch (Exception e) {}
+                            if (perfValue > 0.0000001) {
+                                currentPerfResults[key] = perfValue
+                                isPerfValid = true
+                            }
+                        }
+                    }
+                    println("Parsed performance results for commit " + commit + " are: " + currentPerfResults)
+                    if (isPerfValid) {
+                        def isPerfBetter = compareGoodAndCurrentPerfResults(currentPerfResults)
+                        if (isPerfBetter) {
+                            validationResult = "SUCCESS"
+                        } else {
+                            validationResult = "FAILURE"
+                            break
+                        }
+                    } else {
+                        validationResult = "INVALID_PERF_RESULTS"
+                        break
                     }
                 }
-            }
-            println("Parsed performance results for commit " + commit + " are: " + currentPerfResults)
-            if (isPerfValid) {
-                def isPerfBetter = compareGoodAndCurrentPerfResults(currentPerfResults)
-                if (isPerfBetter) {
-                    validationResult = "SUCCESS"
-                } else {
-                    validationResult = "FAILURE"
-                }
-            } else {
-                validationResult = "INVALID_PERF_RESULTS"
             }
         } catch (Exception e) {
             echo e.toString()
@@ -317,7 +324,7 @@ def getCommonParams(buildTag, commit) {
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: commit),
         string(name: 'DISTRO_VERSION', value: params.DISTRO_VERSION),
-        string(name: 'AZURE_BOOT_VM_SIZE', value: params.AZURE_BOOT_VM_SIZE),
+        string(name: 'LISAV2_VM_SIZE', value: params.LISAV2_VM_SIZE),
         string(name: 'LISAV2_AZURE_REGION', value: params.LISAV2_AZURE_REGION),
         string(name: 'FUNCTIONAL_TESTS_PLATFORM', value: getFunctionalTestsPlatform()),
         string(name: 'FUNCTIONAL_TESTS_NAME', value: params.TEST_CASE_NAME),
