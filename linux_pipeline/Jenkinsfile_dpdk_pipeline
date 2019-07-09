@@ -32,6 +32,35 @@ properties ([
     ]
 ])
 
+def reportPipelineStatus(status) {
+    println "Pipeline report for status: ${status}"
+
+    env.COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
+    withCredentials(bindings: [file(credentialsId: 'DPDK_PIPELINE_EXECUTION_DB_CREDS',
+        variable: 'DPDK_PIPELINE_EXECUTION_DB_CREDS')]) {
+        dir('dpdk_pi_rep' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            sh '''#!/bin/bash
+                cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json"
+[{  "StartDate": "${START_DATE}",
+    "EndDate": "${END_DATE}",
+    "PipelineName": "${JOB_NAME}",
+    "PipelineBuildNumber": ${BUILD_NUMBER},
+    "PipelineBuildUrl": "${BUILD_URL}",
+    "DpdkVersions": "${DPDK_VERSIONS}",
+    "LisVersion": "${CUSTOM_LIS_SOURCE}",
+    "SignedOffBy": "${SIGNED_OFF_BY}",
+    "SignedOffResult": "${SIGNED_OFF_RESULT}"
+}]
+EOF
+                python "${WORKSPACE}/scripts/reporting/report_pipeline_stage_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json" \
+                --composite_keys "${COMPOSITE_KEYS}" \
+                --db_config "${DPDK_PIPELINE_EXECUTION_DB_CREDS}"
+            '''
+        }
+    }
+}
+
 def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
 def lisav2BranchName = "master"
 
@@ -40,6 +69,11 @@ env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
 env.BUILD_TAGS_LATEST = ""
 env.BUILD_TAGS_STABLE = ""
 env.UTILS_PATH = "linux_pipeline/utils/pipeline_utils.groovy"
+env.DPDK_VERSIONS = ""
+env.START_DATE = new java.sql.Timestamp(new Date().getTime())
+env.END_DATE = ""
+env.SIGNED_OFF_BY = ""
+env.SIGNED_OFF_RESULT = ""
 
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegion = env.AZURE_REGION.trim()
@@ -116,12 +150,12 @@ if (dpdkSource.size()) {
         }
 
         dpdkTags += "${currentTag}, "
+        env.DPDK_VERSIONS = dpdkTags.replace(", "," ").trim()
         azureImages.each {
             def currentImage = it
             stages["${stageName}${currentImage}"] = {
                 try {
                     timeout (3600) {
-
                         node('azure') {
                             checkout scm
                             def utils = load(env.UTILS_PATH)
@@ -162,6 +196,16 @@ if (dpdkSource.size()) {
                 } finally {
                     echo "Cleaning up environment"
                 }
+            }
+        }
+    }
+    stage ("report_status_init") {
+        node ("meta_slave") {
+            checkout scm
+            try {
+                reportPipelineStatus("init")
+            } catch (exc) {
+                println exc
             }
         }
     }
@@ -288,6 +332,17 @@ if (dpdkSource.size()) {
                             Thank you,<br/>Jenkins CI
                         """
                     )
+                }
+            }
+        }
+        stage ("report_status_end") {
+            node ("meta_slave") {
+                checkout scm
+                env.END_DATE = new java.sql.Timestamp(new Date().getTime())
+                try {
+                    reportPipelineStatus("end")
+                } catch (exc) {
+                    println exc
                 }
             }
         }
