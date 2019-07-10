@@ -533,13 +533,10 @@ pipeline {
 										LABEL_NAME = "sriov_pipelines"
 									} else if (test_cmd.contains("-TestArea NVME")) {
 										LABEL_NAME = 'hy_nvme'
-										LOCATION = "localhost"
 									} else if (test_cmd.contains("-TestArea MIGRATION")) {
 										LABEL_NAME = 'live_migration'
-										LOCATION = "localhost"
 									} else {
 										LABEL_NAME = 'hyper-v'
-										LOCATION = "localhost"
 									}
 									node("${LABEL_NAME}") {
 										try {
@@ -559,6 +556,8 @@ pipeline {
 														script {
 															if (test_cmd.contains("-TestArea SRIOV")){
 																LOCATION = "${SRIOV_TEST_LOCATION}"
+															} else {
+																LOCATION = "localhost"
 															}
 															env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DISTRO_VERSION)
 														}
@@ -709,13 +708,10 @@ pipeline {
 								LABEL_NAME = "sriov_pipelines"
 							} else if (test_cmd.contains("-TestArea NVME")) {
 								LABEL_NAME = 'hy_nvme'
-								LOCATION = "localhost"
 							} else if (test_cmd.contains("-TestArea MIGRATION")) {
 								LABEL_NAME = 'live_migration'
-								LOCATION = "localhost"
 							} else {
 								LABEL_NAME = 'hyper-v'
-								LOCATION = "localhost"
 							}
 							node("${LABEL_NAME}") {
 								try {
@@ -735,6 +731,8 @@ pipeline {
 												script {
 													if (test_cmd.contains("-TestArea SRIOV")){
 														LOCATION = "${SRIOV_TEST_LOCATION}"
+													} else {
+														LOCATION = "localhost"
 													}
 													env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DEBIAN_DISTRO)
 												}
