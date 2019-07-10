@@ -91,8 +91,7 @@ stage ("Test kernel") {
                 stage ("${distro}-${version}") {
                 withCredentials(bindings: [usernamePassword(credentialsId: 'RHEL_ACCOUNT',passwordVariable: 'PASSWORD',usernameVariable: 'USERNAME'),
                     string(credentialsId: 'AZURE_SAS', variable: 'AZURE_SAS'),
-                    string(credentialsId: 'LIS_HOTFIX_STORAGE_ACCOUNT', variable: 'STORAGE_ACCOUNT'),
-                    string(credentialsId: 'LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY', variable: 'STORAGE_SAS_KEY')]) {
+                    file(credentialsId: 'LIS_HOTFIX_CONFIGURE_FILE', variable: 'LIS_HOTFIX_CONFIGURE_FILE')]) {
                     dir ("r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                         def vmNumber = runNumber
                         runNumber = runNumber + 1
@@ -107,6 +106,7 @@ stage ("Test kernel") {
                             }
                         }
                         def exitCode = sh (returnStatus: true, script: """
+                            . ${LIS_HOTFIX_CONFIGURE_FILE}
                             bash scripts/rhel_validation/validate_rhel_vm.sh \
                                 --workdir "r-${distro}-${version}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}" \
                                 --build_name "rpm-lis" --build_number "${BUILD_NUMBER}${BRANCH_NAME}${vmNumber}" \
@@ -117,8 +117,9 @@ stage ("Test kernel") {
                                 --rhel_password '${PASSWORD}' \
                                 --sku "${azureSku[distro]}" \
                                 --kernelrepolist "${kernelrepolist}" \
-                                --storage_account "${STORAGE_ACCOUNT}" \
-                                --storage_token "${STORAGE_SAS_KEY}" \
+                                --storage_account "\${LIS_HOTFIX_STORAGE_ACCOUNT}" \
+                                --storage_token "\${LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY}" \
+                                --azcopy_download_link "\${AZCOPY_DOWNLOAD_LINK}" \
                                 --azure_token '${AZURE_SAS}'
                         """)
                         archiveArtifacts artifacts: "${distro}_lis_install.log"
