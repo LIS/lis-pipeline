@@ -28,45 +28,10 @@ properties ([
             defaultValue: true, 
             description: 'Test kernel boot speed in VM', 
             name: 'Boot_Test'],
-        // Functional
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true, 
-            description: 'Run full linuxkit test suite', 
-            name: 'linuxkit'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Test docker using wsl scripts',
-            name: 'WSL_Docker'],
-		[$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Run full hyper-v docker test',
-            name: 'docker_test'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Test kernel in Hyper-V VM',
-            name: 'kernel_hyperv_test'],
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run ltp tests in docker container',
             name: 'LTP'],
-        // Stress
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Run docker-stress test', 
-            name: 'docker_stress'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Build latest opengcs from github', 
-            name: 'opengcs_build'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Build kernel in docker container', 
-            name: 'kernel_builder'],
-        // Performace
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Run lkp tests in docker container', 
-            name: 'LKP'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -104,8 +69,7 @@ HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 STAGES_RESULTS = [:]
 STAGES_SUMMARY = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
-           "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP"]
+testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"LTP"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
 skipBuild = false
