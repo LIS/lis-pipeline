@@ -378,7 +378,7 @@ def getPerfTests() {
 
 node ("bisect_kernel_builder") {
     def currentCommitId = ""
-    def passed = ""
+    def result = ""
 
     if (!params.GOOD_COMMIT) {
         throw new Exception("GOOD_COMMIT must be set.")
@@ -441,17 +441,17 @@ node ("bisect_kernel_builder") {
             if (commitStatus.status == 'SUCCESS') {
                 env.LAST_GOOD_COMMIT = currentCommitId
                 println "The following commit is good: " + currentCommitId
-                passed = env.BISECT_RESULT_TYPE_GOOD
+                result = env.BISECT_RESULT_TYPE_GOOD
             } else if (commitStatus.status == 'FAILURE') {
                 println "The following commit is bad: " + currentCommitId
-                passed = env.BISECT_RESULT_TYPE_BAD
+                result = env.BISECT_RESULT_TYPE_BAD
             } else {
                 println "Bisect has been aborted because slave build result is not FAILURE or SUCCESS"
                 println "Slave build result is: " + commitStatus.status
                 break
             }
         }
-        currentCommitId = getCommit(passed)
+        currentCommitId = getCommit(result)
         if (currentCommitId.equals(false)) {
             break
         }
