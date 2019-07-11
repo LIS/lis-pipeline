@@ -17,6 +17,11 @@ env.BISECT_CLONE_KERNEL_REPO = "true"
 env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "true"
 env.GOOD_COMMIT_PERF_RESULTS = ""
 
+env.BISECT_RESULT_TYPE = 'bad'
+env.BISECT_RESULT_TYPE_GOOD = 'good'
+env.BISECT_RESULT_TYPE_BAD = 'bad'
+env.LAST_GOOD_COMMIT = params.GOOD_COMMIT
+
 properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
@@ -299,7 +304,10 @@ String getCommit(String passed) {
         returnStdout: true
     )
     if (commit.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + commit.split(" ")[0])
+        if (params.REVERSE_BISECT) {
+            commit = env.LAST_GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit.split(" ")[0])
         currentBuild.displayName = "$BUILD_NUMBER-" + commit.substring(0,7)
         return false
     }
@@ -394,6 +402,12 @@ node ("bisect_kernel_builder") {
         }
     }
 
+    if (params.REVERSE_BISECT) {
+        env.BISECT_RESULT_TYPE = 'good'
+        env.BISECT_RESULT_TYPE_GOOD = 'bad'
+        env.BISECT_RESULT_TYPE_BAD = 'good'
+    }
+
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
         println "Validate initial good and bad commits."
         validateInitialCommits()
@@ -406,8 +420,12 @@ node ("bisect_kernel_builder") {
 
     currentCommitId = getCurrentCommitId()
     if (currentCommitId.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + currentCommitId.split(" ")[0])
-        currentBuild.displayName = "$BUILD_NUMBER-" + currentCommitId.substring(0,7)
+        def commit_id_result = currentCommitId.split(" ")[0]
+        if (params.REVERSE_BISECT) {
+            commit_id_result = params.GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit_id_result)
+        currentBuild.displayName = "$BUILD_NUMBER-" + commit_id_result.substring(0,7)
         return
     }
     println("Initial bisection commit is " + currentCommitId)
@@ -418,11 +436,12 @@ node ("bisect_kernel_builder") {
             println "Check if the following commit is good or bad: " + currentCommitId
             def commitStatus = validateCommit(currentCommitId)
             if (commitStatus.status == 'SUCCESS') {
+                env.LAST_GOOD_COMMIT = currentCommitId
                 println "The following commit is good: " + currentCommitId
-                passed = 'good'
+                passed = env.BISECT_RESULT_TYPE_GOOD
             } else if (commitStatus.status == 'FAILURE') {
                 println "The following commit is bad: " + currentCommitId
-                passed = 'bad'
+                passed = env.BISECT_RESULT_TYPE_BAD
             } else {
                 println "Bisect has been aborted because slave build result is not FAILURE or SUCCESS"
                 println "Slave build result is: " + commitStatus.status
