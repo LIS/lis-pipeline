@@ -403,9 +403,12 @@ node ("bisect_kernel_builder") {
     }
 
     if (params.REVERSE_BISECT.equals("True")) {
+        println "Performing reverse bisect. The quest for the first good commmit begins."
         env.BISECT_RESULT_TYPE = 'good'
         env.BISECT_RESULT_TYPE_GOOD = 'bad'
         env.BISECT_RESULT_TYPE_BAD = 'good'
+    } else {
+        println "Performing bisect. The quest for the first bad commmit begins."
     }
 
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
@@ -454,6 +457,7 @@ node ("bisect_kernel_builder") {
         }
     }
 
+    println "The quest for the ${env.BISECT_RESULT_TYPE} has ended."
     if (env.BISECT_RUNS.equals(env.BISECT_MAX_RUNS)) {
         throw new Exception("Failed to finish bisection in the maximum allowed retries.")
     }
