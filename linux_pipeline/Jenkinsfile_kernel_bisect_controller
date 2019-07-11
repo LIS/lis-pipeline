@@ -402,7 +402,7 @@ node ("bisect_kernel_builder") {
         }
     }
 
-    if (params.REVERSE_BISECT) {
+    if (params.REVERSE_BISECT.equals("True")) {
         env.BISECT_RESULT_TYPE = 'good'
         env.BISECT_RESULT_TYPE_GOOD = 'bad'
         env.BISECT_RESULT_TYPE_BAD = 'good'
@@ -421,7 +421,7 @@ node ("bisect_kernel_builder") {
     currentCommitId = getCurrentCommitId()
     if (currentCommitId.contains("first bad commit")) {
         def commit_id_result = currentCommitId.split(" ")[0]
-        if (params.REVERSE_BISECT) {
+        if (params.REVERSE_BISECT.equals("True")) {
             commit_id_result = params.GOOD_COMMIT
         }
         println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit_id_result)
