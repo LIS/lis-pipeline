@@ -457,7 +457,8 @@ node ("bisect_kernel_builder") {
         }
     }
 
-    println "The quest for the ${env.BISECT_RESULT_TYPE} has ended."
+    println "The quest for the first ${env.BISECT_RESULT_TYPE} commit has ended."
+
     if (env.BISECT_RUNS.equals(env.BISECT_MAX_RUNS)) {
         throw new Exception("Failed to finish bisection in the maximum allowed retries.")
     }
