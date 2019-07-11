@@ -20,7 +20,9 @@ env.GOOD_COMMIT_PERF_RESULTS = ""
 env.BISECT_RESULT_TYPE = 'bad'
 env.BISECT_RESULT_TYPE_GOOD = 'good'
 env.BISECT_RESULT_TYPE_BAD = 'bad'
-env.LAST_GOOD_COMMIT = params.GOOD_COMMIT
+env.LAST_GOOD_COMMIT = ""
+env.ANCESTOR_COMMIT = ""
+env.DESCENDANT_COMMIT = ""
 
 properties ([
     overrideIndexTriggers(false),
@@ -320,7 +322,7 @@ def getCurrentCommitId() {
            set -e
            pushd "$BISECT_BUILD_DIR/$BISECT_CLONE_DIR" 2>&1 > /dev/null
            unwanted_output=$(git bisect reset)
-           output=$(git bisect start "$BAD_COMMIT" "$GOOD_COMMIT")
+           output=$(git bisect start "$DESCENDANT_COMMIT" "$ANCESTOR_COMMIT")
            output=${output%%]*}
            output=${output##*[}
            echo $output
@@ -404,11 +406,16 @@ node ("bisect_kernel_builder") {
 
     if (params.REVERSE_BISECT.equals("True")) {
         println "Performing reverse bisect. The quest for the first good commmit begins."
+        env.LAST_GOOD_COMMIT = params.GOOD_COMMIT
+        env.ANCESTOR_COMMIT = params.BAD_COMMIT
+        env.DESCENDANT_COMMIT = params.GOOD_COMMIT
         env.BISECT_RESULT_TYPE = 'good'
         env.BISECT_RESULT_TYPE_GOOD = 'bad'
         env.BISECT_RESULT_TYPE_BAD = 'good'
     } else {
         println "Performing bisect. The quest for the first bad commmit begins."
+        env.ANCESTOR_COMMIT = params.GOOD_COMMIT
+        env.DESCENDANT_COMMIT = params.BAD_COMMIT
     }
 
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
