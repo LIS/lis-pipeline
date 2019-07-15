@@ -48,6 +48,10 @@ properties ([
             choices: 'Ubuntu_18.04.1\nCentOS_7.5',
             name: 'DISTRO_VERSION',
             description: 'Distro version to be tested.'],
+        [$class: 'StringParameterDefinition',
+            name: 'GOOD_TRIES',
+            defaultValue: '1',
+            description: 'How many times to try to test a good commit. If set to 2, then it will check a commit, if it is a good commit, it will try a second time to see if it is a good commit and return the second run result.'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'False\nTrue',
             name: 'REVERSE_BISECT',
@@ -163,7 +167,7 @@ def cloneKernelRepo() {
 
 def validateInitialCommits() {
     stage("validate_commits") {
-        def commitStatusGood = validateCommit(params.GOOD_COMMIT)
+        def commitStatusGood = validateCommit(params.GOOD_COMMIT, 0)
         if (commitStatusGood.status != "SUCCESS") {
             throw new Exception("Commit " + params.GOOD_COMMIT + " was expected to be " + "SUCCESS" + " instead of " + commitStatusGood.status)
         }
@@ -171,7 +175,7 @@ def validateInitialCommits() {
         def jsonPerfResults = new JsonBuilder(commitStatusGood.perf_results)
         env.GOOD_COMMIT_PERF_RESULTS = jsonPerfResults.toString()
 
-        def commitStatusBad = validateCommit(params.BAD_COMMIT)
+        def commitStatusBad = validateCommit(params.BAD_COMMIT, 0)
         if (commitStatusBad.status != "FAILURE") {
             throw new Exception("Commit " + params.BAD_COMMIT + " was expected to be " + "FAILURE" + " instead of " + commitStatusBad.status)
         }
@@ -179,7 +183,27 @@ def validateInitialCommits() {
     }
 }
 
-def validateCommit(String commit) {
+def validateCommit(commit, retries) {
+    def commitStatus = validateCommitIndependent(commit)
+    // if the commit is not good, do not retry.
+    // we retry only good commits to make sure
+    if (!commitStatus["status"].equals("SUCCESS")) {
+        return commitStatus
+    }
+    // if the retries are equal to 1, we should return immediately
+    if (retries == 1 || GOOD_TRIES.equals("1") || !GOOD_TRIES) {
+        return commitStatus
+    }
+    if (retries == 0) {
+        // it is our first time, initialize retries with GOOD_TRIES
+        retries = Integer.parseInt(GOOD_TRIES)
+    }
+    retries -= 1
+
+    return validateCommit(commit, retries - 1)
+}
+
+def validateCommitIndependent(String commit) {
     if (!commit) {
         throw new Exception("Commit " + commit + " is not valid.")
     }
@@ -392,6 +416,10 @@ node ("bisect_kernel_builder") {
         throw new Exception("BAD_COMMIT cannot be GOOD_COMMIT.")
     }
 
+    if (Integer.parseInt(GOOD_TRIES) < 1) {
+        throw new Exception("GOOD_TRIES have to be set and greater than 0")
+    }
+
     if (params.BISECT_TYPE.equals('Functional')) {
         if (!params.TEST_CASE_NAME) {
             throw new Exception("You need to specify a test case name for Functional bisect.")
@@ -444,7 +472,7 @@ node ("bisect_kernel_builder") {
         env.BISECT_RUNS = env.BISECT_RUNS.toInteger() + 1
         stage("bisect_" + currentCommitId.substring(0,7)) {
             println "Check if the following commit is good or bad: " + currentCommitId
-            def commitStatus = validateCommit(currentCommitId)
+            def commitStatus = validateCommit(currentCommitId, 0)
             if (commitStatus.status == 'SUCCESS') {
                 env.LAST_GOOD_COMMIT = currentCommitId
                 println "The following commit is good: " + currentCommitId
