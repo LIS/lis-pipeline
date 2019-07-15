@@ -587,7 +587,7 @@ if (params.FUNCTIONAL_TESTS_PLATFORM && !params.FUNCTIONAL_TESTS_PLATFORM.equals
                       string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
                              variable: 'LISAV2_IMAGES_SHARE_URL')
                     ]) {
-                        runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '')
+                        runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', 3)
                     }
                 } catch (Exception e) {
                     echo e.toString()
