@@ -29,7 +29,7 @@ properties ([
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
             name: 'KERNEL_GIT_URL',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel\nhttps://github.com/openSUSE/kernel-source""",
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\ngit://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel\nhttps://github.com/openSUSE/kernel-source""",
             description: 'Kernel tree repo'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
