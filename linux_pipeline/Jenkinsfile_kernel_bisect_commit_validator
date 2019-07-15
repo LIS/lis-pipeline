@@ -111,7 +111,7 @@ properties ([
             description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
-            defaultValue: "FUNCTIONAL",
+            defaultValue: "",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_AREA',
