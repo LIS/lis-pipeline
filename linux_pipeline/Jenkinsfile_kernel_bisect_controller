@@ -14,7 +14,7 @@ env.BISECT_RUNS = 0
 env.BISECT_BUILD_DIR = "/mnt/tmp/bisect"
 env.BISECT_CLONE_DIR = "kernel_tree"
 env.BISECT_CLONE_KERNEL_REPO = "true"
-env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "true"
+env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "false"
 env.GOOD_COMMIT_PERF_RESULTS = ""
 
 env.BISECT_RESULT_TYPE = 'bad'
