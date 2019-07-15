@@ -17,25 +17,23 @@ def armImagesOracle = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "NA",
 				 "rhel_7.6": "Oracle Oracle-Linux 7.6 Latest"]
 def FunctionalTests = "NVIDIA-CUDA-DRIVER-VALIDATION-MAX-GPU,NVIDIA-GRID-DRIVER-VALIDATION-MAX-GPU,INFINIBAND-OPEN-MPI-2VM,NVME-MAX-DISK-VALIDATION,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-RELOAD-MODULE,STORAGE-HOT-ADD-DISK-SERIAL,STORAGE-HOT-ADD-DISK-PARALLEL,VMBUS_VERIFY_INTERRUPTS,LIS-PREINSTALL-DISK-SIZE-VERIFICATION,VERIFY-DPDK-BUILD-AND-TESTPMD-TEST,INFINIBAND-INTEL-MPI-2VM"
 def DeployTests = "LIS-DRIVER-VERSION-CHECK,LIS-DEPLOY-SCENARIO-1,LIS-DEPLOY-SCENARIO-2,LIS-DEPLOY-SCENARIO-3,LIS-DEPLOY-SCENARIO-4,LIS-DEPLOY-SCENARIO-5,LIS-DEPLOY-SCENARIO-6,LIS-DEPLOY-SCENARIO-7,LIS-DEPLOY-SCENARIO-8"
-def DistroList = [ armImagesCentOS[testDistro], armImagesRHEL[testDistro] ]
-def total_test_images = DistroList.size()
 
 def RunPowershellCommand(psCmd) {
-    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
-    //println "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+	bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+	//println "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
 def CleanWorkspace() {
-    retry(5) {
-        cleanWs()
-    }
+	retry(5) {
+		cleanWs()
+	}
 }
 
 def Prepare() {
-    retry(5) {
-        cleanWs()
-        unstash 'LISAv2'
-    }
+	retry(5) {
+		cleanWs()
+		unstash 'LISAv2'
+	}
 }
 
 def ReportException(stagename, exc) {
@@ -54,312 +52,130 @@ def ReportException(stagename, exc) {
 }
 
 stage ("Prerequisite") {
-    node ("meta_slave") {
-        cleanWs()
-        git branch: env.GIT_BRANCH, url: env.GIT_REPO
-        stash includes: '**', name: 'LISAv2'
-        cleanWs()
-    }
-}
-
-def stageTimeout = 90
-currentStage = "Capture Image for Deploy Test"
-stage ("${currentStage}") {
-	def parellel_jobs = [:]
-	def delay = 0
-	println "DistroList ${DistroList}"
-	for (i = 0; i < total_test_images; i++) {
-		currentTest = "CaptureVHD_${DistroList[i]}"
-		def currentDistro = DistroList[i]
-		println "currentTest ${currentTest}"
-		if(currentDistro != 'NA') {
-			parellel_jobs ["${currentTest}"] = 
-			{
-				println "running parallel jobs"
-				stage ("${currentTest}") {
-					try {
-						delay += 5
-						println "Sleeping ${delay} seconds..."
-						sleep "${delay}"
-						println "Running ${currentTest}..."
-						timeout(time: stageTimeout, unit: 'MINUTES') {
-							node('azure') {
-								CleanWorkspace()
-								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-								def currentVHD = "${currentDistro}"
-								Prepare()
-								println "CAPTURE-VHD-BEFORE-TEST input distro ${currentVHD}"
-								def Command = ".\\Run-LisaV2.ps1"
-								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-								Command += " -TestPlatform 'Azure'"
-								Command += " -TestLocation ${TEST_LOCATION}"
-								Command += " -RGIdentifier 'CAPTURE${BUILD_NUMBER}'"
-								Command += " -ResourceCleanup Delete"
-								Command += " -TestIterations 1"
-								Command += " -ExitWithZero"
-								Command += " -StorageAccount 'ExistingStorage_Standard'"
-								Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
-								Command += " -OverrideVMSize 'Standard_DS2_v2'"
-								Command += " -ARMImageName '${currentVHD}'"
-								//Get the Custom Kernel
-								if ( CUSTOM_KERNEL != "" ) {
-									Command += " -CustomKernel '${CUSTOM_KERNEL}'"
-								}
-								Command += " -CustomParameters 'DiskType=Unmanaged'"
-								println Command
-								RunPowershellCommand(Command)
-								junit "Report\\*-junit.xml"
-								println "Archieving the report of CAPTURE_VHD"
-								archiveArtifacts('Report\\*-junit.xml')
-								archiveArtifacts '*-TestLogs.zip'
-								def CapturedVHD = readFile 'CapturedVHD.azure.env'
-								def StashName = currentVHD.replace(" ","_")
-								writeFile file: "BASE-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
-								stash includes: "BASE-${StashName}-CapturedVHD.azure.env", name: "BASE-${StashName}-CapturedVHD.azure.env"
-								println("Captured VHD : ${CapturedVHD}")
-								}
-							}
-						}
-					}
-					catch (exc) {
-						currentBuild.result = 'FAILURE'
-						println "${currentStage}: STAGE_FAILED_EXCEPTION."
-						ReportException("${currentTest}", "${exc}")
-					}
-				}
-			}
-		}
+	node ("meta_slave") {
+		cleanWs()
+		git branch: env.GIT_BRANCH, url: env.GIT_REPO
+		stash includes: '**', name: 'LISAv2'
+		cleanWs()
 	}
-	parallel parellel_jobs
 }
 
 stageTimeout = 240
 currentStage = "Deploy Tests"
 stage ("${currentStage}") {
-	def parellel_jobs = [:]
-	def delay = 0
-	println "DistroList ${DistroList}"
-	for (i = 0; i < total_test_images; i++)	{
-		currentTest = "InstallUpgrade_${DistroList[i]}"
-		def currentVHD = DistroList[i]
-		println "currentTest ${currentTest}"
-		if(currentVHD != 'NA') {
-			parellel_jobs ["${currentTest}"] = 
-			{
-				println "running parallel jobs"
-				stage ("${currentTest}") {
-					try {
-						timeout(time: stageTimeout, unit: 'MINUTES') {
-							println "Running Install Upgrade Scenarios..."
-							node('azure') {
-								CleanWorkspace()
-								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-								Prepare()
-								println "LIS-DEPLOY_SCENARIOS"
-								def Command = ".\\Run-LisaV2.ps1"
-								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-								Command += " -TestPlatform 'Azure'"
-								Command += " -TestLocation '${TEST_LOCATION}'"
-								Command += " -RGIdentifier ${BUILD_ID}"
-								Command += " -TestCategory 'Functional'"
-								Command += " -TestArea 'LIS_DEPLOY'"
-								Command += " -OverrideVMSize 'Standard_D2_v2'"
-								Command += " -StorageAccount 'ExistingStorage_Standard'"
-								Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-								Command += " -ResultDBTestTag '${ExecutionTag}'"
-								Command += " -DeployVMPerEachTest"
-								Command += " -TestIterations 1"
-								Command += " -ExitWithZero"
-								Command += " -EnableTelemetry"
-								//Get the captured VHD name from stash file
-								def StashName = currentVHD.replace(" ","_")
-								unstash "BASE-${StashName}-CapturedVHD.azure.env"
-								def CapturedVHD = readFile "BASE-${StashName}-CapturedVHD.azure.env"
-								Command += " -OsVHD '${CapturedVHD}'"
-								println Command
-								RunPowershellCommand(Command)
-								junit "Report\\*-junit.xml"
-								archiveArtifacts '*-TestLogs.zip'
-								println "Archieving the report of LIS_DEPLOY"
-								archiveArtifacts('Report\\*-junit.xml')
-								}
-							}
-						}
-					}
-					catch (exc) {
-						currentBuild.result = 'FAILURE'
-						println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
-						ReportException("${currentTest}", "${exc}")
-					}
+	def currentVHD = "${BASE_VHD}"
+	currentTest = "InstallUpgrade_${currentVHD}"
+	println "currentTest ${currentTest}"
+	try {
+		timeout(time: stageTimeout, unit: 'MINUTES') {
+			println "Running Install Upgrade Scenarios..."
+			node('azure') {
+				CleanWorkspace()
+				withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+				Prepare()
+				println "LIS-DEPLOY_SCENARIOS"
+				def Command = ".\\Run-LisaV2.ps1"
+				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+				Command += " -TestPlatform 'Azure'"
+				Command += " -TestLocation '${TEST_LOCATION}'"
+				Command += " -RGIdentifier ${BUILD_ID}"
+				Command += " -TestCategory 'Functional'"
+				Command += " -TestArea 'LIS_DEPLOY'"
+				Command += " -OverrideVMSize 'Standard_D2_v2'"
+				Command += " -StorageAccount 'ExistingStorage_Standard'"
+				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+				Command += " -ResultDBTestTag '${ExecutionTag}'"
+				Command += " -DeployVMPerEachTest"
+				Command += " -TestIterations 1"
+				Command += " -ExitWithZero"
+				Command += " -EnableTelemetry"
+				Command += " -OsVHD '${currentVHD}'"
+				println Command
+				RunPowershellCommand(Command)
+				junit "Report\\*-junit.xml"
+				archiveArtifacts '*-TestLogs.zip'
+				println "Archieving the report of LIS_DEPLOY"
+				archiveArtifacts('Report\\*-junit.xml')
 				}
 			}
 		}
 	}
-	parallel parellel_jobs
+	catch (exc) {
+		currentBuild.result = 'FAILURE'
+		println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
+		ReportException("${currentStage}", "${exc}")
+	}
+	finally {
+		//println "${it}: ${currentBuild.result}"
+	}
 }
 
-stageTimeout = 90
-currentStage = "Capture Image for Functional Test"
-stage ("${currentStage}") {
-	def parellel_jobs = [:]
-	def delay = 0
-	println "DistroList ${DistroList}"
-	for (i = 0; i < total_test_images; i++)	{
-		currentTest = "CaptureVHD_${DistroList[i]}"
-		def currentDistro = DistroList[i]
-		println "currentTest ${currentTest}"
-		if(currentDistro != 'NA') {
-			parellel_jobs ["${currentTest}"] =
-			{
-				println "running parallel jobs"
-				stage ("${currentTest}") {
-					try {
-						delay += 5
-						println "Sleeping ${delay} seconds..."
-						sleep "${delay}"
-						println "Running ${currentTest}..."
-						timeout(time: stageTimeout, unit: 'MINUTES') {
-							node('azure') {
-								CleanWorkspace()
-								withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-								println "Calling captureVHD_FunctionalTest ${currentDistro}.."
-								def currentVHD = "${currentDistro}"
-								Prepare()
-								println "CAPTURE-VHD-BEFORE-TEST"
-								def Command = ".\\Run-LisaV2.ps1"
-								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-								Command += " -TestPlatform 'Azure'"
-								Command += " -TestLocation '${TEST_LOCATION}'"
-								Command += " -RGIdentifier 'CAPTURE${BUILD_NUMBER}'"
-								Command += " -ResourceCleanup Delete"
-								Command += " -TestIterations 1"
-								Command += " -ExitWithZero"
-								Command += " -StorageAccount 'ExistingStorage_Standard'"
-								Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
-								Command += " -OverrideVMSize 'Standard_DS2_v2'"
-								Command += " -ARMImageName '${currentVHD}'"
-								//Get the Custom Kernel
-								if ( CUSTOM_KERNEL != "" ) {
-									Command += " -CustomKernel '${CUSTOM_KERNEL}'"
-								}
-								//Get the Custom LIS
-								Command += " -CustomLIS '${rpmURL}'"
-								println "Set customLIS as ${rpmURL}"
-								Command += " -CustomParameters 'DiskType=Unmanaged'"
-								println Command
-								RunPowershellCommand(Command)
-								junit "Report\\*-junit.xml"
-								println "Archieving the report of CAPTURE_VHD for functional test"
-								archiveArtifacts('Report\\*-junit.xml')
-								archiveArtifacts '*-TestLogs.zip'
-								def CapturedVHD = readFile 'CapturedVHD.azure.env'
-								def StashName = currentVHD.replace(" ","_")
-								writeFile file: "TEST-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
-								stash includes: "TEST-${StashName}-CapturedVHD.azure.env", name: "TEST-${StashName}-CapturedVHD.azure.env"
-								println("Captured VHD : ${CapturedVHD}")
-								}
-							}
-						}
-					}
-					catch (exc) {
-						currentBuild.result = 'FAILURE'
-						println "${currentStage}: STAGE_FAILED_EXCEPTION."
-						ReportException("${currentTest}", "${exc}")
-					}
-				}
-			}
-		}
-	}
-	parallel parellel_jobs
-}
 
 stageTimeout = 300
 currentStage = "FunctionalTests"
 stage ("${currentStage}") {
-	def parellel_jobs = [:]
-	def delay = 0
-	println "DistroList ${DistroList}"
-	for (i = 0; i < total_test_images; i++) {
-		currentTest = "Functional Tests for Distro: ${DistroList[i]}"
-		def currentVHD = DistroList[i]
-		println "currentTest ${currentTest}"
-		if(currentVHD != 'NA') {
-			parellel_jobs ["${currentTest}"] =
-			{
-				println "running parallel jobs"
-				stage ("${currentTest}")  {
-					try {
-						timeout(time: stageTimeout, unit: 'MINUTES') {
-							println "Running Functional Test Scenarios..."
-							node('azure') {
-							CleanWorkspace()
-							withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-								Prepare()
-								println "Functional Test Priority-0 SCENARIOS"
-								def Command = ".\\Run-LisaV2.ps1"
-								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-								Command += " -TestPlatform 'Azure'"
-								Command += " -TestLocation '${TEST_LOCATION}'"
-								Command += " -RGIdentifier ${BUILD_ID}"
-								Command += " -TestCategory 'Functional'"
-								Command += " -TestPriority '0'"
-								Command += " -StorageAccount 'ExistingStorage_Standard'"
-								Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-								Command += " -ResultDBTestTag '${ExecutionTag}'"
-								Command += " -DeployVMPerEachTest"
-								Command += " -TestIterations 1"
-								Command += " -ExitWithZero"
-								Command += " -EnableTelemetry"
-								Command += " -ExcludeTests '${DeployTests}'" 
-								//Get the captured VHD name from stash file
-								def StashName = currentVHD.replace(" ","_")
-								unstash "TEST-${StashName}-CapturedVHD.azure.env"
-								def CapturedVHD = readFile "TEST-${StashName}-CapturedVHD.azure.env"
-								Command += " -OsVHD '${CapturedVHD}'"
-								println Command
-								RunPowershellCommand(Command)
+		def currentVHD = "${LIS_VHD}"
+		println "currentVHD ${currentVHD}"
+		try {
+		timeout(time: stageTimeout, unit: 'MINUTES') {
+			println "Running Functional Test Scenarios..."
+			node('azure') {
+			CleanWorkspace()
+			withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+				Prepare()
+				println "Functional Test Priority-0 SCENARIOS"
+				def Command = ".\\Run-LisaV2.ps1"
+				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+				Command += " -TestPlatform 'Azure'"
+				Command += " -TestLocation '${TEST_LOCATION}'"
+				Command += " -RGIdentifier ${BUILD_ID}"
+				Command += " -TestCategory 'Functional'"
+				Command += " -TestPriority '0'"
+				Command += " -StorageAccount 'ExistingStorage_Standard'"
+				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+				Command += " -ResultDBTestTag '${ExecutionTag}'"
+				Command += " -DeployVMPerEachTest"
+				Command += " -TestIterations 1"
+				Command += " -ExitWithZero"
+				Command += " -EnableTelemetry"
+				Command += " -ExcludeTests '${DeployTests}'"
+				Command += " -OsVHD '${currentVHD}'"
+				println Command
+				RunPowershellCommand(Command)
 
-								println "Functional Test SCENARIOS"
-								Command = ".\\Run-LisaV2.ps1"
-								Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-								Command += " -TestPlatform 'Azure'"
-								Command += " -TestLocation '${TEST_LOCATION}'"
-								Command += " -RGIdentifier ${BUILD_ID}"
-								Command += " -TestCategory 'Functional'"
-								Command += " -TestNames '${FunctionalTests}'"
-								Command += " -StorageAccount 'ExistingStorage_Standard'"
-								Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-								Command += " -ResultDBTestTag '${ExecutionTag}'"
-								Command += " -DeployVMPerEachTest"
-								Command += " -TestIterations 1"
-								Command += " -ExitWithZero"
-								Command += " -EnableTelemetry"
-								//Get the captured VHD name from stash file
-								StashName = currentVHD.replace(" ","_")
-								unstash "TEST-${StashName}-CapturedVHD.azure.env"
-								CapturedVHD = readFile "TEST-${StashName}-CapturedVHD.azure.env"
-								Command += " -OsVHD '${CapturedVHD}'"
-								println Command
-								RunPowershellCommand(Command)
-								junit "Report\\*-junit.xml"
-								archiveArtifacts '*-TestLogs.zip'
-								println "Archieving the report for FUNCTIONAL TEST"
-								archiveArtifacts('Report\\*-junit.xml')
-								}
-							}
-						}
-					}
-					catch (exc) {
-						currentBuild.result = 'FAILURE'
-						println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
-						ReportException("${currentStage}", "${exc}")
-					}
-					finally {
-						//println "${it}: ${currentBuild.result}"
-					}
+				println "Functional Test SCENARIOS"
+				Command = ".\\Run-LisaV2.ps1"
+				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+				Command += " -TestPlatform 'Azure'"
+				Command += " -TestLocation '${TEST_LOCATION}'"
+				Command += " -RGIdentifier ${BUILD_ID}"
+				Command += " -TestCategory 'Functional'"
+				Command += " -TestNames '${FunctionalTests}'"
+				Command += " -StorageAccount 'ExistingStorage_Standard'"
+				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+				Command += " -ResultDBTestTag '${ExecutionTag}'"
+				Command += " -DeployVMPerEachTest"
+				Command += " -TestIterations 1"
+				Command += " -ExitWithZero"
+				Command += " -EnableTelemetry"
+
+				Command += " -OsVHD '${currentVHD}'"
+				println Command
+				RunPowershellCommand(Command)
+				junit "Report\\*-junit.xml"
+				archiveArtifacts '*-TestLogs.zip'
+				println "Archieving the report for FUNCTIONAL TEST"
+				archiveArtifacts('Report\\*-junit.xml')
 				}
 			}
 		}
 	}
-	parallel parellel_jobs
+	catch (exc) {
+		currentBuild.result = 'FAILURE'
+		println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
+		ReportException("${currentStage}", "${exc}")
+	}
+	finally {
+		//println "${it}: ${currentBuild.result}"
+	}
 }
