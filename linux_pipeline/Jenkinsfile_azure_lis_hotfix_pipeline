@@ -7,27 +7,32 @@ println "Input ${TARGET_LIST}"
 def total_hotfix_errata = HOTFIX_LIST.length
 println "Length ${total_hotfix_errata}"
 
-String[] ARM_IMAGES = [ "RedHat RHEL 6.7 Latest", "RedHat RHEL 6.8 Latest", "RedHat RHEL 6.9 Latest",
-			"RedHat RHEL 6.10 Latest", "RedHat RHEL 7.2 Latest", "RedHat RHEL 7.3 Latest",
-			"RedHat RHEL 7.4 Latest", "RedHat RHEL 7.5 Latest", "RedHat RHEL 7-RAW 7.6.2018103108",
-			"OpenLogic CentOS 6.5 Latest", "OpenLogic CentOS 6.6 Latest", "OpenLogic CentOS 6.7 Latest",
-			"OpenLogic CentOS 6.8 Latest", "OpenLogic CentOS 6.9 Latest", "OpenLogic CentOS 6.10 Latest", 
-			"OpenLogic CentOS 7.0 Latest", "OpenLogic CentOS 7.1 Latest", "OpenLogic CentOS 7.2 Latest",
-			"OpenLogic CentOS 7.3 Latest", "OpenLogic CentOS 7.4 Latest", "OpenLogic CentOS 7.5 Latest",
-			"OpenLogic CentOS 7.6 Latest", "Oracle Oracle-Linux 6.8 Latest", "Oracle Oracle-Linux 6.9 Latest",
-			"Oracle Oracle-Linux 6.10 Latest", "Oracle Oracle-Linux 7.3 Latest", "Oracle Oracle-Linux 7.4 Latest",
-			"Oracle Oracle-Linux 7.5 Latest", "Oracle Oracle-Linux 7.6 Latest" ]
-
 def armImages = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest", 
 		 "rhel_6.8": "OpenLogic CentOS 6.8 Latest", "rhel_6.9": "OpenLogic CentOS 6.9 Latest", "rhel_6.10": "OpenLogic CentOS 6.10 Latest", 
 		 "rhel_7.0": "OpenLogic CentOS 7.0 Latest", "rhel_7.1": "OpenLogic CentOS 7.1 Latest", "rhel_7.2": "OpenLogic CentOS 7.2 Latest", 
 		 "rhel_7.3": "OpenLogic CentOS 7.3 Latest", "rhel_7.4": "OpenLogic CentOS 7.4 Latest", "rhel_7.5": "OpenLogic CentOS 7.5 Latest", 
 		 "rhel_7.6": "OpenLogic CentOS 7.6 Latest"]
 
-def HyperVImages = ["rhel_6.5": "rhel_6.5", "rhel_6.6": "rhel_6.6_x64", "rhel_6.7": "NA", 
-			"rhel_6.8": "rhel_6.8_x64", "rhel_6.9": "rhel_6.9_x64", "rhel_6.10": "rhel_6.10_x64", 
-			 "rhel_7.0": "rhel_7.0", "rhel_7.1": "rhel_7.1", "rhel_7.2": "rhel_7.2", 
-			 "rhel_7.3": "rhel_7.3", "rhel_7.4": "rhel_7.4", "rhel_7.5": "rhel_7.5", 
+def armImagesCentOS = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest",
+				 "rhel_6.8": "OpenLogic CentOS 6.8 Latest", "rhel_6.9": "OpenLogic CentOS 6.9 Latest", "rhel_6.10": "OpenLogic CentOS 6.10 Latest",
+				 "rhel_7.0": "OpenLogic CentOS 7.0 Latest", "rhel_7.1": "OpenLogic CentOS 7.1 Latest", "rhel_7.2": "OpenLogic CentOS 7.2 Latest",
+				 "rhel_7.3": "OpenLogic CentOS 7.3 Latest", "rhel_7.4": "OpenLogic CentOS 7.4 Latest", "rhel_7.5": "OpenLogic CentOS 7.5 Latest",
+				 "rhel_7.6": "OpenLogic CentOS 7.6 Latest"]
+def armImagesRHEL = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "RedHat RHEL 6.7 Latest",
+				 "rhel_6.8": "RedHat RHEL 6.8 Latest", "rhel_6.9": "RedHat RHEL 6.9 Latest", "rhel_6.10": "RedHat RHEL 6.10 Latest",
+				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "RedHat RHEL 7.2 Latest",
+				 "rhel_7.3": "RedHat RHEL 7.3 Latest", "rhel_7.4": "RedHat RHEL 7.4 Latest", "rhel_7.5": "RedHat RHEL 7.5 Latest",
+				 "rhel_7.6": "RedHat RHEL 7-RAW 7.6.2018103108"]
+def armImagesOracle = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "NA",
+				 "rhel_6.8": "Oracle Oracle-Linux 6.8 Latest", "rhel_6.9": "Oracle Oracle-Linux 6.9 Latest", "rhel_6.10": "Oracle Oracle-Linux 6.10 Latest",
+				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "NA",
+				 "rhel_7.3": "Oracle Oracle-Linux 7.3 Latest", "rhel_7.4": "Oracle Oracle-Linux 7.4 Latest", "rhel_7.5": "Oracle Oracle-Linux 7.5 Latest",
+				 "rhel_7.6": "Oracle Oracle-Linux 7.6 Latest"]
+
+def HyperVImages = ["rhel_6.5": "rhel_6.5", "rhel_6.6": "rhel_6.6_x64", "rhel_6.7": "NA",
+			"rhel_6.8": "rhel_6.8_x64", "rhel_6.9": "rhel_6.9_x64", "rhel_6.10": "rhel_6.10_x64",
+			 "rhel_7.0": "rhel_7.0", "rhel_7.1": "rhel_7.1", "rhel_7.2": "rhel_7.2",
+			 "rhel_7.3": "rhel_7.3", "rhel_7.4": "rhel_7.4", "rhel_7.5": "rhel_7.5",
 			 "rhel_7.6": "rhel_7.6"]
 
 def CUSTOM_KERNEL = null
@@ -36,9 +41,10 @@ def CUSTOM_LIS_ISO = null
 def execution_tag = null
 def hotfixlisVersion = null
 def lis_old_url = null
-def HYPERV_TESTS = "DYNAMIC-MEMORY-VERIFY-UDEV,DYNAMIC-MEMORY-HOT-ADD,FCOPY-BASIC,SQM-BASIC,KVP-INTRINSIC,KVP-KEY-VALUES-OPERATIONS,NET-EXTERNAL,NET-INTERNAL,NET-IP-INJECTION,NET-JUMBO-FRAMES,NET-VLAN-TAGGING,NET-VLAN-TRUNKING,NET-HOT-ADD-MULTINIC,NET-HOT-REMOVE-MULTINIC,ETHTOOL-CHECK-STATISTICS,PRODUCTION-CHECKPOINT,RUNTIME_MEM_HOTADD,RUNTIME_MEM_HOTREMOVE,STORAGE-VHDX-IDE-DYNAMIC,VHDX-RESIZE-GROW-FILESYSTEM-512,VHDX-RESIZE-GROW-FILESYSTEM-4096,VSS-BACKUPRESTORE-MULTIFS-VHDX,VERIFY-HEARTBEAT,VERIFY-VM-SHUTDOWN,TIMESYNC-HOST,MAX-VCPU,CHECK-NUMA,TIMESYNC-BASIC,VMBUS_VERIFY_PROTOCOL_VERSION,NMI_VERIFY_INTERRUPT,CHECK-NUMA-MAXIMUM"
+def HYPERV_TESTS = "DYNAMIC-MEMORY-VERIFY-UDEV,DYNAMIC-MEMORY-HOT-ADD,FCOPY-BASIC,SQM-BASIC,KVP-INTRINSIC,KVP-KEY-VALUES-OPERATIONS,NET-EXTERNAL,NET-INTERNAL,NET-IP-INJECTION,NET-JUMBO-FRAMES,NET-VLAN-TAGGING,NET-VLAN-TRUNKING,NET-HOT-ADD-MULTINIC,NET-HOT-REMOVE-MULTINIC,ETHTOOL-CHECK-STATISTICS,PRODUCTION-CHECKPOINT,RUNTIME_MEM_HOTADD,RUNTIME_MEM_HOTREMOVE,STORAGE-VHDX-IDE-DYNAMIC,VHDX-RESIZE-GROW-FILESYSTEM-512,VHDX-RESIZE-GROW-FILESYSTEM-4096,VSS-BACKUPRESTORE-MULTIFS-VHDX,VERIFY-HEARTBEAT,VERIFY-VM-SHUTDOWN,TIMESYNC-HOST,MAX-VCPU,CHECK-NUMA,TIMESYNC-BASIC,VMBUS_VERIFY_PROTOCOL_VERSION,NMI_VERIFY_INTERRUPT,CHECK-NUMA-MAXIMUM,KVP-BASIC-CHECKS,ETHTOOL-GET-SET-RINGBUFFER,ETHTOOL-GET-SET-GRO-LRO,ETHTOOL-GET-SET-CHANNEL,NET-IFUP-IFDOWN,NVME-DISK-VALIDATION,NVME-FSTRIM,NVME-BLKDISCARD,SRIOV-VERIFY-LSPCI,SRIOV-VERIFY-SINGLE-VF-CONNECTION,VERIFY-DEPLOYMENT-PROVISION,LIS-MODULES-CHECK,VERIFY-LIS-MODULES-VERSION,TIMESYNC-NTP,TIME-CLOCKSOURCE,RELOAD-MODULES-SMP,LSVMBUS,KDUMP-CRASH-SINGLE-CORE,KDUMP-CRASH-SMP,LIS-DEPLOY-SCENARIO-1,LIS-DEPLOY-SCENARIO-2,LIS-DEPLOY-SCENARIO-3,LIS-DEPLOY-SCENARIO-4,LIS-DEPLOY-SCENARIO-5,LIS-DEPLOY-SCENARIO-6,LIS-DEPLOY-SCENARIO-7,LIS-DEPLOY-SCENARIO-8,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-RELOAD-MODULE,VMBUS_VERIFY_INTERRUPTS,LIS-PREINSTALL-DISK-SIZE-VERIFICATION"
 def REDMOND_SHARE_PATH = '\\\\redmond\\wsscfs\\OSTC\\LIS\\LIS-Builds\\lisbuilds\\'
 env.STORAGE_ACCOUNT_NAME = null
+env.TEST_LOCATION = "westus2"
 
 def total = -1
 def failed = -1
@@ -48,6 +54,11 @@ def passed = -1
 def RunPowershellCommand(psCmd) {
 	bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 	//println "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+def CleanWorkspace() {
+    retry(5) {
+        cleanWs()
+    }
 }
 
 def Prepare() {
@@ -93,19 +104,8 @@ def ReportException(stagename, exc) {
 }
 
 def getErrataKernelLink(kernelversion) {
-	node ("jenkins-meta-slave") {
-		withCredentials([file(credentialsId: 'LIS_HOTFIX_CONFIGURE_FILE', variable: 'LIS_HOTFIX_CONFIGURE_FILE')]) {
-			sh (returnStatus: true, script: """
-				. ${LIS_HOTFIX_CONFIGURE_FILE}
-				echo "\$LIS_HOTFIX_STORAGE_ACCOUNT" > storageblob.tmp
-				""" )
-		}
-		def storageblob = readFile 'storageblob.tmp'
-		storageblob = storageblob.replaceAll("\r", "").replaceAll("\n", "");
-		env.STORAGE_ACCOUNT_NAME = storageblob
-		println "${storageblob}"
-		return "https://${storageblob}.blob.core.windows.net/kernel/${kernelversion}/kernel-${kernelversion}.x86_64.rpm"
-	}
+	println "storage account ${env.STORAGE_ACCOUNT_NAME} kernel version ${kernelversion}"
+	return "https://${env.STORAGE_ACCOUNT_NAME}.blob.core.windows.net/kernel/${kernelversion}/kernel-${kernelversion}.x86_64.rpm"
 }
 
 def checkerrataLink(errataLink) {
@@ -123,11 +123,11 @@ def uploadrpmsToRedmond(lisversion, custom_lis, custom_lis_iso, destination_path
 		println "input lisversion ${lisversion} custom_lis ${custom_lis} iso ${custom_lis_iso}"
 		RunPowershellCommand("\$WebClient = New-Object System.Net.WebClient;" +
 			 "\$WebClient.DownloadFile('${custom_lis}','lis-rpms-${lisversion}-HotfixDemo.tar.gz');" +
-			 "Copy-Item -Path lis-rpms-${lisversion}-HotfixDemo.tar.gz -Destination ${destination_path};"
+			 "Copy-Item -Path lis-rpms-${lisversion}.tar.gz -Destination ${destination_path};"
 			 )
 		RunPowershellCommand("\$WebClient = New-Object System.Net.WebClient;" +
 			 "\$WebClient.DownloadFile('${custom_lis_iso}','LinuxIC-${lisversion}-HotfixDemo.iso');" +
-			 "Copy-Item -Path LinuxIC-${lisversion}-HotfixDemo.iso -Destination ${destination_path};"
+			 "Copy-Item -Path LinuxIC-${lisversion}.iso -Destination ${destination_path};"
 		 )
 	}
 }
@@ -178,6 +178,73 @@ def GetMajorVersion(InVersion) {
 	return majorVersion
 }
 
+def CaptureImageWithCustomErrata(distro, errata) {
+	println "Capture Image for distro ${distro} and errata ${errata}"
+	withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+		def currentVHD = "${distro}"
+		Prepare()
+		def Command = ".\\Run-LisaV2.ps1"
+		Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+		Command += " -TestPlatform 'Azure'"
+		Command += " -TestLocation '${TEST_LOCATION}'"
+		Command += " -RGIdentifier 'ERRATA'"
+		Command += " -ResourceCleanup Delete"
+		Command += " -TestIterations 1"
+		Command += " -ExitWithZero"
+		Command += " -StorageAccount 'ExistingStorage_Standard'"
+		Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
+		Command += " -OverrideVMSize 'Standard_DS2_v2'"
+		Command += " -ARMImageName '${currentVHD}'"
+		//Get the Custom Kernel
+		Command += " -CustomKernel '${errata}'"
+		Command += " -CustomParameters 'DiskType=Unmanaged'"
+		println Command
+		RunPowershellCommand(Command)
+		junit "Report\\*-junit.xml"
+		println "Archieving the report of CAPTURE_VHD"
+		archiveArtifacts '*-TestLogs.zip'
+		def CapturedVHD = readFile 'CapturedVHD.azure.env'
+		def StashName = currentVHD.replace(" ","_")
+		writeFile file: "BASE-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
+		stash includes: "BASE-${StashName}-CapturedVHD.azure.env", name: "BASE-${StashName}-CapturedVHD.azure.env"
+		println("Captured VHD : ${CapturedVHD}")
+	}
+}
+
+def CaptureImageWithCustomLIS(distro, errata, rpmURL) {
+	println "Capture Image for distro ${distro}, errata ${errata} lis ${rpmURL}"
+	withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+		def currentVHD = "${distro}"
+		Prepare()
+		def Command = ".\\Run-LisaV2.ps1"
+		Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+		Command += " -TestPlatform 'Azure'"
+		Command += " -TestLocation '${TEST_LOCATION}'"
+		Command += " -RGIdentifier 'ERRATALIS'"
+		Command += " -ResourceCleanup Delete"
+		Command += " -TestIterations 1"
+		Command += " -ExitWithZero"
+		Command += " -StorageAccount 'ExistingStorage_Standard'"
+		Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
+		Command += " -OverrideVMSize 'Standard_DS2_v2'"
+		Command += " -ARMImageName '${currentVHD}'"
+		//Get the Custom Kernel
+		Command += " -CustomKernel '${errata}'"
+		Command += " -CustomLIS '${rpmURL}'"
+		Command += " -CustomParameters 'DiskType=Unmanaged'"
+		println Command
+		RunPowershellCommand(Command)
+		junit "Report\\*-junit.xml"
+		println "Archieving the report of CAPTURE_VHD"
+		archiveArtifacts '*-TestLogs.zip'
+		def CapturedVHD = readFile 'CapturedVHD.azure.env'
+		def StashName = currentVHD.replace(" ","_")
+		writeFile file: "LIS-${StashName}-CapturedVHD.azure.env", text: "${CapturedVHD}"
+		stash includes: "LIS-${StashName}-CapturedVHD.azure.env", name: "LIS-${StashName}-CapturedVHD.azure.env"
+		println("Captured VHD : ${CapturedVHD}")
+	}
+}
+
 //Hotfix timeout set to 24 hours
 def hotfixTimeout = 24
 node ("jenkins-meta-slave") {
@@ -186,6 +253,20 @@ node ("jenkins-meta-slave") {
 	timeout(time: hotfixTimeout, unit: 'HOURS') {
 		currentStage = "Prerequisite"
 		stage (currentStage) {
+			 withCredentials([file(credentialsId: 'LIS_HOTFIX_CONFIGURE_FILE', variable: 'LIS_HOTFIX_CONFIGURE_FILE')]) {
+				sh (returnStatus: true, script: """#!/bin/bash
+				. ${LIS_HOTFIX_CONFIGURE_FILE}
+				echo -n "\$LIS_HOTFIX_STORAGE_ACCOUNT" > LIS_HOTFIX_STORAGE_ACCOUNT.tmp
+				echo -n "\$LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT" > LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp
+				echo -n "\$LIS_BUILD_VM_USERNAME" > LIS_BUILD_VM_USERNAME.tmp
+				echo -n "\$LIS_BUILD_VM_PASSWORD" > LIS_BUILD_VM_PASSWORD.tmp
+				""" )
+			}
+			env.STORAGE_ACCOUNT_NAME = readFile 'LIS_HOTFIX_STORAGE_ACCOUNT.tmp'
+			env.LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT = readFile 'LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp'
+			env.LIS_BUILD_VM_USERNAME = readFile 'LIS_BUILD_VM_USERNAME.tmp'
+			env.LIS_BUILD_VM_PASSWORD = readFile 'LIS_BUILD_VM_PASSWORD.tmp'
+
 			cleanWs()
 			git branch: env.GIT_BRANCH, url: env.GIT_REPO
 			stash includes: '**', name: 'LISAv2'
@@ -225,24 +306,27 @@ node ("jenkins-meta-slave") {
 				distro = distro.replace(']', '')
 				distro = distro.replace(' ', '')
 				println "distro ${distro}"
+				def Username = "root"
+				def Password = "$env:LIS_BUILD_PASSWORD"
 				checkout scm
-				withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File'), string(credentialsId: 'LIS_BUILD_PASSWORD', variable: 'LIS_BUILD_PASSWORD')]) 
+				withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File'), string(credentialsId: 'LIS_BUILD_PASSWORD', variable: 'LIS_BUILD_PASSWORD')])
 				{
 					RunPowershellCommand(".\\scripts\\lis_hotfix_pipeline\\CreateBuildMachines.ps1"+
 						" -DistroKernelVersions '${distro}'" +
 						" -VHDSourceStorageAccount '${env.STORAGE_ACCOUNT_NAME}'" +
-						" -bootstorageName 'bootdiag000004'" +
-						" -secretsFile '${Azure_Secrets_File}' "
+						" -BootDiagnosticStorageAccount '${env.LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT}'" +
+						" -secretsFile '${Azure_Secrets_File}' " +
+						" -LinuxUsername '${env.LIS_BUILD_VM_USERNAME}'" +
+						" -LinuxPassword '${env.LIS_BUILD_VM_PASSWORD}'"
 					)
 				}
 				println "Build Environment created successfully"
 			}
 		}
 
-		currentStage = "Hotfix Build RPM"
+		currentStage = "Build RPM"
 		node ("azure") {
 			stage (currentStage) {
-				
 				try {
 					node ("azure") {
 						println "In this stage invoke Build pipeline"
@@ -260,7 +344,7 @@ node ("jenkins-meta-slave") {
 						def branchName = GetMajorVersion("${OldVersion}")
 						hotfixlisVersion = IncrementMinorRevision("${OldVersion}")
 						println "hotfixlisVersion ${hotfixlisVersion}"
-						println "pipeline-lis-rpm-build-demo is invoked .. "
+						println "pipeline-lis-rpm-build-azure is invoked .. "
 						JobBuildRPM = build job: 'LIS/pipeline-lis-rpm-build-azure', parameters: [
 						string(name: 'distro', value: "all"),
 						string(name: 'build_rpm_source', value: "https://github.com/lis/lis-rpm-build-pipeline.git"),
@@ -270,41 +354,126 @@ node ("jenkins-meta-slave") {
 						string(name: 'branch', value: "${branchName}"),
 						string(name: 'RESOURCE_GROUP_NAME', value: "ss-lis-build-4")
 						],
-						quietPeriod: 10, wait: true, propagate: false
-						
-						copyArtifacts(projectName: 'LIS/pipeline-lis-rpm-build-demo', selector: specific("${JobBuildRPM.id}"));
-						def customlisrpm = readFile 'LIS_RPM_URL.txt'
-						def customlisiso = readFile 'LIS_ISO_URL.txt'
-						println "customlisrpm ${customlisrpm} customlisiso ${customlisiso}"
-						CUSTOM_LIS = "${customlisrpm}"
-						CUSTOM_LIS_ISO = "${customlisiso}"
-						}
-					}catch (exc) {
-						currentBuild.result = 'FAILURE'
-						println exc
-						ReportException("${currentTest}", "${exc}")
-					} finally {
-						cleanWs()
-					}
+						quietPeriod: 10, wait: true, propagate: true
 
-					//Notify the Build stage successful
-					withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
-					emailext (
-						subject: "LIS-Hotfix-Pipeline: Notification",
-						to: "${env.HOTFIX_DEV_MAIL}",
-						mimeType : "text/html",
-						body: 'Notification: Build is successful and RPM is created for ${TARGET_LIST}'
-						)
+						try {
+							copyArtifacts(projectName: 'LIS/pipeline-lis-rpm-build-azure', selector: specific("${JobBuildRPM.id}"));
+							def customlisrpm = readFile 'LIS_RPM_URL.txt'
+							def customlisiso = readFile 'LIS_ISO_URL.txt'
+							println "customlisrpm ${customlisrpm} customlisiso ${customlisiso}"
+							CUSTOM_LIS = "${customlisrpm}"
+							CUSTOM_LIS_ISO = "${customlisiso}"
+						} catch (exc) {
+							println "Failed to unstash Build RPM files"
+						}
+
+						def body = ""
+						if (CUSTOM_LIS == null) {
+							body += 'Notification: RPM Build is failed for ${TARGET_LIST} \n'
+						} else {
+							body += 'Notification: Build is successful and RPM is created for ${TARGET_LIST} \n'
+						}
+
+						//Notify the Build RPM status
+						withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+						emailext (
+							subject: "LIS-Hotfix-Pipeline: Notification",
+							to: "${env.HOTFIX_DEV_MAIL}",
+							mimeType : "text/html",
+							body: body
+							)
+						}
+
 					}
+				}catch (exc) {
+					currentBuild.result = 'FAILURE'
+					println exc
+					ReportException("${currentStage}", "${exc}")
+					throw new Exception("BUILD RPM stage failed..exiting.")
+
+				} finally {
+					cleanWs()
+				}
+
 			}
 		}
 
+		currentStage = "Capture VHD"
+		stage ("${currentStage}") {
+			if (CUSTOM_LIS == null) {
+				return
+			}
+			def parellel_jobs = [:]
+			def delay = 0
+			CleanWorkspace()
+			for (count = 0; count < total_hotfix_errata; count++) {
+				def testDistro = HOTFIX_LIST[count].split('=')[0]
+				def version = HOTFIX_LIST[count].split('=')[1]
+				def errata_kernel = getErrataKernelLink("${version}")
+				def DistroList = [ armImagesCentOS[testDistro], armImagesRHEL[testDistro] ]
+				def total_test_images = DistroList.size()
+				for (i = 0; i < total_test_images; i++) {
+					def currentTest = "CaptureVHD_BASE_${DistroList[i]}"
+					def currentDistro = DistroList[i]
+					println "currentTest ${currentTest}"
+					if(currentDistro != 'NA') {
+						parellel_jobs ["${currentTest}"] =
+						{
+							println "running parallel jobs"
+							stage ("${currentTest}") {
+								try {
+									delay += 5
+									println "Sleeping ${delay} seconds..."
+									sleep "${delay}"
+									println "Running ${currentTest}..."
+									node('azure') {
+										CaptureImageWithCustomErrata("${currentDistro}", "${errata_kernel}")
+									}
+								}
+								catch (exc) {
+									currentBuild.result = 'FAILURE'
+									println "${currentStage}: STAGE_FAILED_EXCEPTION."
+									ReportException("${currentTest}", "${exc}")
+								}
+							}
+						}
+
+						currentTest = "CaptureVHD_LIS_${DistroList[i]}"
+						parellel_jobs ["${currentTest}"] =
+						{
+							println "running parallel jobs"
+							stage ("${currentTest}") {
+								try {
+									delay += 5
+									println "Sleeping ${delay} seconds..."
+									sleep "${delay}"
+									println "Running ${currentTest}..."
+									node('azure') {
+										CaptureImageWithCustomLIS("${currentDistro}", "${errata_kernel}", "${CUSTOM_LIS}")
+									}
+								}
+								catch (exc) {
+									currentBuild.result = 'FAILURE'
+									println "${currentStage}: STAGE_FAILED_EXCEPTION."
+									ReportException("${currentTest}", "${exc}")
+								}
+							}
+						}
+					}
+				}
+			}
+			parallel parellel_jobs
+		}
+
 		node ("azure") {
-			currentStage = "Hotfix LIS Test"
+			currentStage = "LIS Tests"
 			def parellel_jobs = [:]
 			def delay = 0
 			execution_tag = "${hotfixlisVersion}-Hotfix"
 			stage ("${currentStage}") {
+				if (CUSTOM_LIS == null) {
+					return
+				}
 				for (i=0; i < total_hotfix_errata; i++) {
 					println "In staging to run pipelines...."
 					def distro = HOTFIX_LIST[i].split('=')[0]
@@ -313,71 +482,89 @@ node ("jenkins-meta-slave") {
 					println version
 					def errata_kernel = getErrataKernelLink("${version}")
 					println errata_kernel
-					def currentTest = "FunctionalTest-${distro}-${version}"
-					parellel_jobs ["${currentTest}"] =
-					{
-						stage ("${currentTest}") {
-							try {
-								node ("azure") {
-									delay += 5
-									println "Sleeping ${delay} seconds..."
-									sleep "${delay}"
-									println "HotfixFunctionalTest pipeline is invoked for CUSTOM_LIS ${CUSTOM_LIS} , CUSTOM_KERNEL ${CUSTOM_KERNEL} "
-									println ("Entering TriggerLISHotfixFunctionalTestPipeline")
-									JobBuild = build job: 'LIS/pipeline-azure-lis-hotfix-functional-validation', parameters: [
-									string(name: 'rpmURL', value: "${CUSTOM_LIS}"),
-									string(name: 'testDistro', value: "${distro}"),
-									string(name: 'ExecutionTag', value: "${execution_tag}"),
-									string(name: 'LISoldurl', value: "LatestLIS"),
-									string(name: 'CUSTOM_KERNEL', value: "${errata_kernel}")
-									],
-									quietPeriod: 10, wait: true, propagate: false
-									println "Copy artifacts from hotfix-functional JobId ${JobBuild.id}"
-									copyArtifacts(projectName: 'LIS/pipeline-azure-lis-hotfix-functional-validation', selector: specific("${JobBuild.id}"));
-									println "junit final Report"
-									junit "Report\\*-junit.xml"
+					def DistroList = [ armImagesCentOS[distro], armImagesRHEL[distro] ]
+					def total_test_images = DistroList.size()
+					for (j = 0; j < total_test_images; j++) {
+						def testDistro = DistroList[j]
+						def currentTest = "FunctionalTest-${DistroList[j]}-${version}"
+						parellel_jobs ["${currentTest}"] =
+						{
+							stage ("${currentTest}") {
+								try {
+									node ("azure") {
+										delay += 5
+										println "Sleeping ${delay} seconds..."
+										sleep "${delay}"
+										def StashName = testDistro.replace(" ","_")
+										unstash "BASE-${StashName}-CapturedVHD.azure.env"
+										def BASE_VHD = readFile "BASE-${StashName}-CapturedVHD.azure.env"
+										println "Base VHD for functional test: ${BASE_VHD}"
+										unstash "LIS-${StashName}-CapturedVHD.azure.env"
+										def LIS_VHD = readFile "LIS-${StashName}-CapturedVHD.azure.env"
+										println "LIS VHD for functional test: ${LIS_VHD}"
+										println "HotfixFunctionalTest pipeline is invoked for CUSTOM_LIS ${CUSTOM_LIS} , KERNEL ${version} "
+										JobBuild = build job: 'LIS/pipeline-azure-lis-hotfix-functional-validation', parameters: [
+										string(name: 'rpmURL', value: "${CUSTOM_LIS}"),
+										string(name: 'testDistro', value: "${distro}"),
+										string(name: 'ExecutionTag', value: "${execution_tag}"),
+										string(name: 'LISoldurl', value: "LatestLIS"),
+										string(name: 'BASE_VHD', value: "${BASE_VHD}"),
+										string(name: 'LIS_VHD', value: "${LIS_VHD}")
+										],
+										quietPeriod: 10, wait: true, propagate: false
+										println "Copy artifacts from hotfix-functional JobId ${JobBuild.id}"
+										copyArtifacts(projectName: 'LIS/pipeline-azure-lis-hotfix-functional-validation', selector: specific("${JobBuild.id}"));
+										println "junit final Report"
+										junit "Report\\*-junit.xml"
+									}
+								}catch (exc) {
+									currentBuild.result = 'SUCCESS'
+									println exc
+									ReportException("${currentTest}", "${exc}")
+								} finally {
+									cleanWs()
 								}
-							}catch (exc) {
-								currentBuild.result = 'SUCCESS'
-								println exc
-								ReportException("${currentTest}", "${exc}")
-							} finally {
-								cleanWs()
+							}
+						}
+
+						currentTest = "PerformanceTest-${DistroList[j]}-${version}"
+						parellel_jobs ["${currentTest}"] =
+						{
+							stage ("${currentTest}") {
+								try {
+									node ("azure") {
+										delay += 5
+										println "Sleeping ${delay} seconds..."
+										sleep "${delay}"
+										def StashName = testDistro.replace(" ","_")
+										unstash "LIS-${StashName}-CapturedVHD.azure.env"
+										def LIS_VHD = readFile "LIS-${StashName}-CapturedVHD.azure.env"
+										println "LIS VHD for functional test: ${LIS_VHD}"
+										println "HotfixPerformanceTest pipeline is invoked:"
+										PerfJob = build job: 'LIS/pipeline-azure-lis-hotfix-performance-validation', parameters: [
+										string(name: 'rpmURL', value: "${CUSTOM_LIS}"),
+										string(name: 'testDistro', value: "${distro}"),
+										string(name: 'ExecutionTag', value: "${execution_tag}"),
+										string(name: 'LISoldurl', value: "LatestLIS"),
+										string(name: 'LIS_VHD', value: "${LIS_VHD}")
+										],
+										quietPeriod: 10, wait: true, propagate: false
+										println "Copy artifacts from hotfix-performance JobId ${PerfJob.id}"
+										copyArtifacts(projectName: 'LIS/pipeline-azure-lis-hotfix-performance-validation', selector: specific("${PerfJob.id}"));
+										println "junit final Report"
+										junit "Report\\*-junit.xml"
+									}
+								}catch (exc) {
+									currentBuild.result = 'SUCCESS'
+									println exc
+									ReportException("${currentTest}", "${exc}")
+								} finally {
+									cleanWs()
+								}
 							}
 						}
 					}
-					currentTest = "PerformanceTest-${distro}-${version}"
-					parellel_jobs ["${currentTest}"] =
-					{
-						stage ("${currentTest}") {
-							try {
-								node ("azure") {
-									delay += 5
-									println "Sleeping ${delay} seconds..."
-									sleep "${delay}"
-									println "HotfixPerformanceTest pipeline is invoked:"
-									PerfJob = build job: 'LIS/pipeline-azure-lis-hotfix-performance-validation', parameters: [
-									string(name: 'rpmURL', value: "${CUSTOM_LIS}"),
-									string(name: 'testDistro', value: "${distro}"),
-									string(name: 'ExecutionTag', value: "${execution_tag}"),
-									string(name: 'LISoldurl', value: "LatestLIS"),
-									string(name: 'CUSTOM_KERNEL', value: "${errata_kernel}")
-									],
-									quietPeriod: 10, wait: true, propagate: false
-									println "Copy artifacts from hotfix-performance JobId ${PerfJob.id}"
-									copyArtifacts(projectName: 'LIS/pipeline-azure-lis-hotfix-performance-validation', selector: specific("${PerfJob.id}"));
-									println "junit final Report"
-									junit "Report\\*-junit.xml"
-								}
-							}catch (exc) {
-								currentBuild.result = 'SUCCESS'
-								println exc
-								ReportException("${currentTest}", "${exc}")
-							} finally {
-								cleanWs()
-							}
-						}
-					}
+
 					currentTest = "HyperVTest-${distro}-${version}"
 					parellel_jobs ["${currentTest}"] =
 					{
@@ -415,8 +602,65 @@ node ("jenkins-meta-slave") {
 			}
 		}
 
-		currentStage = "Hotfix Result Extract"
+		currentStage = "Cleanup"
 		stage ("${currentStage}") {
+			if (CUSTOM_LIS == null) {
+				return
+			}
+			try {
+				node ("azure") {
+					def VHD_NAMES = ""
+					for (i=0; i < total_hotfix_errata; i++) {
+						println "Stage to cleanup the test VHD"
+						def distro = HOTFIX_LIST[i].split('=')[0]
+						println distro
+						def DistroList = [ armImagesCentOS[distro], armImagesRHEL[distro] ]
+						def total_test_images = DistroList.size()
+						for (j = 0; j < total_test_images; j++) {
+						def testDistro = DistroList[j]
+							def StashName = testDistro.replace(" ","_")
+							try {
+								unstash "BASE-${StashName}-CapturedVHD.azure.env"
+								def BASE_VHD = readFile "BASE-${StashName}-CapturedVHD.azure.env"
+								println "Base VHD for cleanup: ${BASE_VHD}"
+								VHD_NAMES += BASE_VHD + ","
+							} catch(exc) {
+								println "Skipping cleanup for VHD as unstash failed BASE-${StashName}-CapturedVHD.azure.env"
+							}
+
+							try {
+								unstash "LIS-${StashName}-CapturedVHD.azure.env"
+								def LIS_VHD = readFile "LIS-${StashName}-CapturedVHD.azure.env"
+								println "LIS VHD for cleanup: ${LIS_VHD}"
+								VHD_NAMES += LIS_VHD + ","
+							} catch(exc) {
+								println "Skipping cleanup for VHD as unstash failed LIS-${StashName}-CapturedVHD.azure.env"
+							}
+						}
+					}
+					//Remove the last comma from list of VHD names
+					VHD_NAMES = VHD_NAMES.substring(0, VHD_NAMES.lastIndexOf(","))
+					println "Delete the VHDs ${VHD_NAMES}"
+					withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+						RunPowershellCommand(".\\Utilities\\Cleanup-AzureStorageAccounts.ps1 -SecretFilePath ${Azure_Secrets_TESTONLY_File}" +
+										" -VHDNames '${VHD_NAMES}' -CleanupAgeInDays '-1'"
+								)
+					}
+				}
+			} catch(exc) {
+				currentBuild.result = 'FAILURE'
+				println exc
+				ReportException("${currentStage}", "${exc}")
+			} finally {
+				cleanWs()
+			}
+		}
+
+		currentStage = "Result Analysis"
+		stage ("${currentStage}") {
+			if (CUSTOM_LIS == null) {
+				return
+			}
 			try {
 				node ("azure") {
 					def testStatus = ""
@@ -440,8 +684,11 @@ node ("jenkins-meta-slave") {
 			}
 		}
 
-		currentStage = "Hotfix RPM Upload"
+		currentStage = "Upload Packages"
 		stage ("${currentStage}") {
+			if (CUSTOM_LIS == null) {
+				return
+			}
 			try {
 				if (failed == 0) {
 					println "Uploading the RPM to Redmond share"
