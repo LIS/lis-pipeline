@@ -61,7 +61,7 @@ properties ([
         [$class: 'BooleanParameterDefinition',
             defaultValue: false,
             name: 'RUN_AZURE_BOOT_STRESS_TEST',
-            description: 'Whether to run Azure Boot Stress test.']
+            description: 'Whether to run Azure Boot Stress test.'],
         [$class: 'StringParameterDefinition',
             name: 'AZURE_BOOT_STRESS_PROVISIONING_NUMBER',
             defaultValue: "3",
