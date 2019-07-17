@@ -72,7 +72,6 @@ try {
 
     # Poll and wait till VHD copy.
     Test-VHDCopyOperations -VHDCopyOperations $VHDCopyOperations -context $context -Container $SourceContainer
-
     # Create a new VM for each copied VHD.
     $CreatedVMs = @()
     foreach ($operation in $VHDCopyOperations) {
