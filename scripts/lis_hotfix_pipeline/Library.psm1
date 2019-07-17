@@ -51,8 +51,8 @@
             $VMConfig2 = Set-AzureRmVMOSDisk -Linux -ManagedDiskId $OSDiskID -CreateOption Attach -VM $VMConfig
             Write-LogInfo "Creating  VM Config (Setting NIC -Id '$($NIC.Id)')..."
             $VMConfig3=  Add-AzureRmVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
-            Write-LogInfo "Creating  VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticSourceStorageAccount')..."
-            $VMConfig4 = Set-AzureRmVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticSourceStorageAccount -ResourceGroupName $ResourceGroupName
+            Write-LogInfo "Creating  VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticStorageAccount')..."
+            $VMConfig4 = Set-AzureRmVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
             Write-LogInfo "Creating Virtual Machine : '$NAME' -Location '$Location'..."
             $VM = New-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VMConfig4 -Location $Location -Verbose
             Write-LogInfo "Virtual Machine '$NAME' is created. Check progress in resource group : '$ResourceGroupName'"

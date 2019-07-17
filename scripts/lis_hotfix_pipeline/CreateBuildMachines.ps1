@@ -36,7 +36,7 @@ try {
     #Set Global Variables.
     Set-Variable -Name ResourceGroupName -Value $ResourceGroupName -Scope Global
     Set-Variable -Name Location -Value $Location -Scope Global
-    Set-Variable -Name BootDiagnosticSourceStorageAccount -Value $BootDiagnosticSourceStorageAccount -Scope Global
+    Set-Variable -Name BootDiagnosticStorageAccount -Value $BootDiagnosticStorageAccount -Scope Global
     Set-Variable -Name context -Value $context -Scope Global
 
     Write-LogInfo "Get-AzStorageContainer..."
