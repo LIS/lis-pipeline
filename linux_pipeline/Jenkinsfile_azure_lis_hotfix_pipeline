@@ -254,12 +254,12 @@ node ("jenkins-meta-slave") {
 		currentStage = "Prerequisite"
 		stage (currentStage) {
 			 withCredentials([file(credentialsId: 'LIS_HOTFIX_CONFIGURE_FILE', variable: 'LIS_HOTFIX_CONFIGURE_FILE')]) {
-				sh (returnStatus: true, script: """
+				sh (returnStatus: true, script: """#!/bin/bash
 				. ${LIS_HOTFIX_CONFIGURE_FILE}
-				echo "\$LIS_HOTFIX_STORAGE_ACCOUNT" > LIS_HOTFIX_STORAGE_ACCOUNT.tmp
-				echo "\$LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT" > LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp
-				echo "\$LIS_BUILD_VM_USERNAME" > LIS_BUILD_VM_USERNAME.tmp
-				echo "\$LIS_BUILD_VM_PASSWORD" > LIS_BUILD_VM_PASSWORD.tmp
+				echo -n "\$LIS_HOTFIX_STORAGE_ACCOUNT" > LIS_HOTFIX_STORAGE_ACCOUNT.tmp
+				echo -n "\$LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT" > LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp
+				echo -n "\$LIS_BUILD_VM_USERNAME" > LIS_BUILD_VM_USERNAME.tmp
+				echo -n "\$LIS_BUILD_VM_PASSWORD" > LIS_BUILD_VM_PASSWORD.tmp
 				""" )
 			}
 			//def storageblob = readFile 'LIS_HOTFIX_STORAGE_ACCOUNT.tmp'
