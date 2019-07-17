@@ -41,9 +41,9 @@
             Write-LogInfo "Adding $NICName"
             $NIC = New-AzureRmNetworkInterface -Name $NICName -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $VNET.Subnets[0].ID -Force -Verbose -LoadBalancerInboundNatRuleId $NatRule.Id
             if ($Name -imatch "_73_" -or $Name -imatch "_74_") {
-                $VMsize = "Standard_F2s"
-            } else {
                 $VMsize = "Standard_F8s"
+            } else {
+                $VMsize = "Standard_F2s"
             }
             Write-LogInfo "Creating  VM Config (New-AzureRmVMConfig -VMName '$Name' -VMSize '$VMsize' -AvailabilitySetId '$($AvSet.Id)')..."
             $VMConfig = New-AzureRmVMConfig -VMName $Name -VMSize $VMsize -AvailabilitySetId $AvSet.Id
