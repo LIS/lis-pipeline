@@ -1,181 +1,155 @@
 #!/usr/bin/env groovy
-def currentStage = ""
-def armImagesCentOS = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest",
-				 "rhel_6.8": "OpenLogic CentOS 6.8 Latest", "rhel_6.9": "OpenLogic CentOS 6.9 Latest", "rhel_6.10": "OpenLogic CentOS 6.10 Latest",
-				 "rhel_7.0": "OpenLogic CentOS 7.0 Latest", "rhel_7.1": "OpenLogic CentOS 7.1 Latest", "rhel_7.2": "OpenLogic CentOS 7.2 Latest",
-				 "rhel_7.3": "OpenLogic CentOS 7.3 Latest", "rhel_7.4": "OpenLogic CentOS 7.4 Latest", "rhel_7.5": "OpenLogic CentOS 7.5 Latest",
-				 "rhel_7.6": "OpenLogic CentOS 7.6 Latest"]
-def armImagesRHEL = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "RedHat RHEL 6.7 Latest",
-				 "rhel_6.8": "RedHat RHEL 6.8 Latest", "rhel_6.9": "RedHat RHEL 6.9 Latest", "rhel_6.10": "RedHat RHEL 6.10 Latest",
-				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "RedHat RHEL 7.2 Latest",
-				 "rhel_7.3": "RedHat RHEL 7.3 Latest", "rhel_7.4": "RedHat RHEL 7.4 Latest", "rhel_7.5": "RedHat RHEL 7.5 Latest",
-				 "rhel_7.6": "RedHat RHEL 7-RAW 7.6.2018103108"]
-def armImagesOracle = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "NA",
-				 "rhel_6.8": "Oracle Oracle-Linux 6.8 Latest", "rhel_6.9": "Oracle Oracle-Linux 6.9 Latest", "rhel_6.10": "Oracle Oracle-Linux 6.10 Latest",
-				 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "NA",
-				 "rhel_7.3": "Oracle Oracle-Linux 7.3 Latest", "rhel_7.4": "Oracle Oracle-Linux 7.4 Latest", "rhel_7.5": "Oracle Oracle-Linux 7.5 Latest",
-				 "rhel_7.6": "Oracle Oracle-Linux 7.6 Latest"]
-def FunctionalTests = "NVIDIA-CUDA-DRIVER-VALIDATION-MAX-GPU,NVIDIA-GRID-DRIVER-VALIDATION-MAX-GPU,INFINIBAND-OPEN-MPI-2VM,NVME-MAX-DISK-VALIDATION,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-RELOAD-MODULE,STORAGE-HOT-ADD-DISK-SERIAL,STORAGE-HOT-ADD-DISK-PARALLEL,VMBUS_VERIFY_INTERRUPTS,LIS-PREINSTALL-DISK-SIZE-VERIFICATION,VERIFY-DPDK-BUILD-AND-TESTPMD-TEST,INFINIBAND-INTEL-MPI-2VM"
+def FunctionalTests = """
+NVIDIA-CUDA-DRIVER-VALIDATION-MAX-GPU,NVIDIA-GRID-DRIVER-VALIDATION-MAX-GPU,INFINIBAND-OPEN-MPI-2VM,NVME-MAX-DISK-VALIDATION,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,
+SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-RELOAD-MODULE,STORAGE-HOT-ADD-DISK-SERIAL,STORAGE-HOT-ADD-DISK-PARALLEL,VMBUS_VERIFY_INTERRUPTS,LIS-PREINSTALL-DISK-SIZE-VERIFICATION,
+VERIFY-DPDK-BUILD-AND-TESTPMD-TEST,INFINIBAND-INTEL-MPI-2VM"""
 def DeployTests = "LIS-DRIVER-VERSION-CHECK,LIS-DEPLOY-SCENARIO-1,LIS-DEPLOY-SCENARIO-2,LIS-DEPLOY-SCENARIO-3,LIS-DEPLOY-SCENARIO-4,LIS-DEPLOY-SCENARIO-5,LIS-DEPLOY-SCENARIO-6,LIS-DEPLOY-SCENARIO-7,LIS-DEPLOY-SCENARIO-8"
 
 def RunPowershellCommand(psCmd) {
-	bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
-	//println "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
 }
 
 def CleanWorkspace() {
-	retry(5) {
-		cleanWs()
-	}
+    retry(5) {
+        cleanWs()
+    }
 }
 
 def Prepare() {
-	retry(5) {
-		cleanWs()
-		unstash 'LISAv2'
-	}
+    retry(5) {
+        CleanWorkspace()
+        unstash 'LISAv2'
+    }
 }
 
 def ReportException(stagename, exc) {
-	def body = "<pre>"
-	body += "\nStage Name        : ${stagename}\n"
-	body += "\nException Message : ${exc}\n"
-	body += "\nBuild URL         : ${env.BUILD_URL}\n"
-	withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
-	emailext (
-		subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
-		to: "${env.HOTFIX_DEV_MAIL}",
-		mimeType : "text/html",
-		body: body
-		)
-	}
+    def body = "<pre>"
+    body += "\nStage Name        : ${stagename}\n"
+    body += "\nException Message : ${exc}\n"
+    body += "\nBuild URL         : ${env.BUILD_URL}\n"
+    withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+    emailext (
+        subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
+        to: "${env.HOTFIX_DEV_MAIL}",
+        mimeType : "text/html",
+        body: body
+        )
+    }
 }
 
 stage ("Prerequisite") {
-	node ("meta_slave") {
-		cleanWs()
-		git branch: env.GIT_BRANCH, url: env.GIT_REPO
-		stash includes: '**', name: 'LISAv2'
-		cleanWs()
-	}
+    node ("meta_slave") {
+        CleanWorkspace()
+        git branch: env.GIT_BRANCH, url: env.GIT_REPO
+        stash includes: '**', name: 'LISAv2'
+        CleanWorkspace()
+    }
 }
 
 stageTimeout = 240
-currentStage = "Deploy Tests"
+def currentStage = "Deploy Tests"
 stage ("${currentStage}") {
-	def currentVHD = "${BASE_VHD}"
-	currentTest = "InstallUpgrade_${currentVHD}"
-	println "currentTest ${currentTest}"
-	try {
-		timeout(time: stageTimeout, unit: 'MINUTES') {
-			println "Running Install Upgrade Scenarios..."
-			node('azure') {
-				CleanWorkspace()
-				withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-				Prepare()
-				println "LIS-DEPLOY_SCENARIOS"
-				def Command = ".\\Run-LisaV2.ps1"
-				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-				Command += " -TestPlatform 'Azure'"
-				Command += " -TestLocation '${TEST_LOCATION}'"
-				Command += " -RGIdentifier ${BUILD_ID}"
-				Command += " -TestCategory 'Functional'"
-				Command += " -TestArea 'LIS_DEPLOY'"
-				Command += " -OverrideVMSize 'Standard_D2_v2'"
-				Command += " -StorageAccount 'ExistingStorage_Standard'"
-				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-				Command += " -ResultDBTestTag '${ExecutionTag}'"
-				Command += " -DeployVMPerEachTest"
-				Command += " -TestIterations 1"
-				Command += " -ExitWithZero"
-				Command += " -EnableTelemetry"
-				Command += " -OsVHD '${currentVHD}'"
-				println Command
-				RunPowershellCommand(Command)
-				junit "Report\\*-junit.xml"
-				archiveArtifacts '*-TestLogs.zip'
-				println "Archieving the report of LIS_DEPLOY"
-				archiveArtifacts('Report\\*-junit.xml')
-				}
-			}
-		}
-	}
-	catch (exc) {
-		currentBuild.result = 'FAILURE'
-		println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
-		ReportException("${currentStage}", "${exc}")
-	}
-	finally {
-		//println "${it}: ${currentBuild.result}"
-	}
+    def currentVHD = "${BASE_VHD}"
+    println "VHD for Deploy tests ${currentVHD}"
+    try {
+        timeout(time: stageTimeout, unit: 'MINUTES') {
+            node('azure') {
+                CleanWorkspace()
+                withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+                Prepare()
+                def Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier 'LISDEPLOY${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                Command += " -TestArea 'LIS_DEPLOY'"
+                Command += " -OverrideVMSize 'Standard_D2_v2'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
+                junit "Report\\*-junit.xml"
+                archiveArtifacts '*-TestLogs.zip'
+                archiveArtifacts('Report\\*-junit.xml')
+                }
+            }
+        }
+    }
+    catch (exc) {
+        currentBuild.result = 'FAILURE'
+        println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
+        ReportException("${currentStage}", "${exc}")
+    }
 }
 
 
-stageTimeout = 300
+stageTimeout = 420
 currentStage = "FunctionalTests"
 stage ("${currentStage}") {
-		def currentVHD = "${LIS_VHD}"
-		println "currentVHD ${currentVHD}"
-		try {
-		timeout(time: stageTimeout, unit: 'MINUTES') {
-			println "Running Functional Test Scenarios..."
-			node('azure') {
-			CleanWorkspace()
-			withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-				Prepare()
-				println "Functional Test Priority-0 SCENARIOS"
-				def Command = ".\\Run-LisaV2.ps1"
-				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-				Command += " -TestPlatform 'Azure'"
-				Command += " -TestLocation '${TEST_LOCATION}'"
-				Command += " -RGIdentifier ${BUILD_ID}"
-				Command += " -TestCategory 'Functional'"
-				Command += " -TestPriority '0'"
-				Command += " -StorageAccount 'ExistingStorage_Standard'"
-				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-				Command += " -ResultDBTestTag '${ExecutionTag}'"
-				Command += " -DeployVMPerEachTest"
-				Command += " -TestIterations 1"
-				Command += " -ExitWithZero"
-				Command += " -EnableTelemetry"
-				Command += " -ExcludeTests '${DeployTests}'"
-				Command += " -OsVHD '${currentVHD}'"
-				println Command
-				RunPowershellCommand(Command)
+    def currentVHD = "${LIS_VHD}"
+    println "Run Functional Tests using VHD ${currentVHD}"
+    try {
+        timeout(time: stageTimeout, unit: 'MINUTES') {
+            node('azure') {
+                CleanWorkspace()
+                withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+                Prepare()
+                def Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier  'RPMTEST${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                Command += " -TestPriority '0'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -ExcludeTests '${DeployTests}'"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
 
-				println "Functional Test SCENARIOS"
-				Command = ".\\Run-LisaV2.ps1"
-				Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-				Command += " -TestPlatform 'Azure'"
-				Command += " -TestLocation '${TEST_LOCATION}'"
-				Command += " -RGIdentifier ${BUILD_ID}"
-				Command += " -TestCategory 'Functional'"
-				Command += " -TestNames '${FunctionalTests}'"
-				Command += " -StorageAccount 'ExistingStorage_Standard'"
-				Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-				Command += " -ResultDBTestTag '${ExecutionTag}'"
-				Command += " -DeployVMPerEachTest"
-				Command += " -TestIterations 1"
-				Command += " -ExitWithZero"
-				Command += " -EnableTelemetry"
+                println "Priority 0 tests finished, running remaining pre-defined tests"
+                Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier 'RPMTEST${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                def SelectedTests = FunctionalTests.replaceAll("[\n\r]", "");
+                Command += " -TestNames '${SelectedTests}'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
+                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
 
-				Command += " -OsVHD '${currentVHD}'"
-				println Command
-				RunPowershellCommand(Command)
-				junit "Report\\*-junit.xml"
-				archiveArtifacts '*-TestLogs.zip'
-				println "Archieving the report for FUNCTIONAL TEST"
-				archiveArtifacts('Report\\*-junit.xml')
-				}
-			}
-		}
-	}
-	catch (exc) {
-		currentBuild.result = 'FAILURE'
-		println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
-		ReportException("${currentStage}", "${exc}")
-	}
-	finally {
-		//println "${it}: ${currentBuild.result}"
-	}
+                junit "Report\\*-junit.xml"
+                archiveArtifacts '*-TestLogs.zip'
+                archiveArtifacts('Report\\*-junit.xml')
+                }
+            }
+        }
+    }
+    catch (exc) {
+        currentBuild.result = 'FAILURE'
+        println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
+        ReportException("${currentStage}", "${exc}")
+    }
 }
