@@ -32,6 +32,79 @@ properties ([
     ]
 ])
 
+def reportPipelineStatus(status) {
+    println "Pipeline report for status: ${status}"
+
+    env.COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
+    withCredentials(bindings: [file(credentialsId: 'DPDK_PIPELINE_EXECUTION_DB_CREDS',
+        variable: 'DPDK_PIPELINE_EXECUTION_DB_CREDS')]) {
+        dir('dpdk_pi_rep' + env.BUILD_NUMBER + env.BRANCH_NAME) {
+            sh '''#!/bin/bash
+                cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json"
+[{  "StartDate": "${START_DATE}",
+    "EndDate": "${END_DATE}",
+    "PipelineName": "${JOB_NAME}",
+    "PipelineBuildNumber": ${BUILD_NUMBER},
+    "PipelineBuildUrl": "${BUILD_URL}",
+    "DpdkVersions": "${DPDK_VERSIONS}",
+    "LisVersion": "${CUSTOM_LIS_SOURCE}",
+    "SignedOffBy": "${SIGNED_OFF_BY}",
+    "SignedOffResult": "${SIGNED_OFF_RESULT}"
+}]
+EOF
+                python "${WORKSPACE}/scripts/reporting/report_pipeline_stage_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows_${BRANCH_NAME}_${BUILD_NUMBER}.json" \
+                --composite_keys "${COMPOSITE_KEYS}" \
+                --db_config "${DPDK_PIPELINE_EXECUTION_DB_CREDS}"
+            '''
+        }
+    }
+}
+
+def reportStageStatus(stageInfo) {
+    env.stageName = stageInfo["Name"]
+    env.startDate = stageInfo["StartDate"]
+    env.endDate = stageInfo["EndDate"]
+    env.dpdkVersion = stageInfo["dpdkVersion"]
+    env.distroVersion = stageInfo["distroVersion"]
+
+    env.MASTER_COMPOSITE_KEYS = "PipelineName,PipelineBuildNumber"
+    env.COMPOSITE_KEYS = "StageName"
+    env.FOREIGN_KEY = "DpdkPipelineExecutionId"
+    stage ("report_stage") {
+        node ("meta_slave") {
+
+            withCredentials(bindings: [file(credentialsId: 'DPDK_PIPELINE_EXECUTION_STAGE_DB_CREDS',
+                variable: 'DPDK_PIPELINE_EXECUTION_STAGE_DB_CREDS')]) {
+                checkout scm
+                sh '''#!/bin/bash
+        cat << EOF > "${WORKSPACE}/scripts/reporting/db_rows${stageName}${BUILD_NUMBER}${BRANCH_NAME}.json"
+[{  "StageName": "${stageName}",
+"StartDate": "${startDate}",
+"EndDate": "${endDate}",
+"TestsPassed": "${passCount}",
+"TestsAborted": "${abortCount}",
+"TestsFailed": "${failCount}",
+"TestsSkipped": "${skippedCount}",
+"PipelineName": "${JOB_NAME}",
+"PipelineBuildNumber": ${BUILD_NUMBER},
+"DistroVersion": "${distroVersion}",
+"DpdkVersion": "${dpdkVersion}"
+}]
+EOF
+            python "${WORKSPACE}/scripts/reporting/report_pipeline_stage_status.py" \
+                --db_rows "${WORKSPACE}/scripts/reporting/db_rows${stageName}${BUILD_NUMBER}${BRANCH_NAME}.json" \
+                --composite_keys "${COMPOSITE_KEYS}" \
+                --foreign_key "${FOREIGN_KEY}" \
+                --master_composite_keys "${MASTER_COMPOSITE_KEYS}" \
+                --db_config "${DPDK_PIPELINE_EXECUTION_STAGE_DB_CREDS}"
+            '''
+            }
+        }
+    }
+}
+
+
 def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
 def lisav2BranchName = "master"
 
@@ -40,6 +113,11 @@ env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
 env.BUILD_TAGS_LATEST = ""
 env.BUILD_TAGS_STABLE = ""
 env.UTILS_PATH = "linux_pipeline/utils/pipeline_utils.groovy"
+env.DPDK_VERSIONS = ""
+env.START_DATE = new java.sql.Timestamp(new Date().getTime())
+env.END_DATE = ""
+env.SIGNED_OFF_BY = ""
+env.SIGNED_OFF_RESULT = ""
 
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegion = env.AZURE_REGION.trim()
@@ -102,13 +180,11 @@ if (dpdkSource.size()) {
     dpdkSource.each {
         def currentTag = it[0]
         def currentTagAzureId = ""
-        def stageName = ""
         def dpdkSourceUrl = it[0]
 
         if (!DPDK_SOURCE || DPDK_SOURCE == "") {
             currentTag = it[0].replace("refs/tags/", "")
             currentTagAzureId = "-" + currentTag.replace("-", "").replace(".","").replace("_","")
-            stageName = currentTag + "-"
             dpdkSourceUrl = "https://git.dpdk.org/dpdk/snapshot/dpdk-${currentTag}.tar.gz"
             if (it && it[1] && it[1] == "stable") {
                 dpdkSourceUrl = "https://git.dpdk.org/dpdk-stable/snapshot/dpdk-stable-${currentTag}.tar.gz"
@@ -116,19 +192,33 @@ if (dpdkSource.size()) {
         }
 
         dpdkTags += "${currentTag}, "
+        env.DPDK_VERSIONS = dpdkTags.replace(", "," ").trim()
         azureImages.each {
             def currentImage = it
-            stages["${stageName}${currentImage}"] = {
+            def stageName = "${currentImage}-${currentTag}"
+            stages[stageName] = {
                 try {
                     timeout (3600) {
-
                         node('azure') {
+                            def stageInfo = [:]
+                            stageInfo["Name"] = stageName
+                            stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                            stageInfo["EndDate"] = ''
+                            stageInfo["distroVersion"] = currentImage
+                            stageInfo["dpdkVersion"] = currentTag
+                            cleanWs()
                             checkout scm
+                            try {
+                                lock ('db_reporting') {
+                                    reportStageStatus(stageInfo)
+                                }
+                            } catch (exc) {
+                                println exc
+                            }
                             def utils = load(env.UTILS_PATH)
                             withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File',
                                              variable: 'Azure_Secrets_File')]) {
                                 echo "Current Image: ${currentImage}, Current Region: ${azureRegion}"
-                                cleanWs()
                                 git branch: lisav2BranchName, url: lisav2RemoteUrl
                                 utils.RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                 " -TestLocation '${azureRegion}'" +
@@ -153,6 +243,22 @@ if (dpdkSource.size()) {
                                 def stashName = (currentTag + currentImage).replace("/","").replace(":","").replace(".","")
                                 stash name: stashName, includes: "Report\\*-junit.xml", allowEmpty: true
                             }
+                            stageInfo["EndDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
+                            try {
+                                lock ('db_reporting') {
+                                    env.passCount = utils.GetTestResults("pass").trim()
+                                    env.abortCount = utils.GetTestResults("abort").trim()
+                                    env.failCount = utils.GetTestResults("fail").trim()
+                                    env.skippedCount = utils.GetTestResults("skipped").trim()
+                                    reportStageStatus(stageInfo)
+                                    env.passCount = ''
+                                    env.abortCount = ''
+                                    env.failCount = ''
+                                    env.skippedCount = ''
+                                }
+                            } catch (exc) {
+                                println exc
+                            }
                         }
                     }
                 } catch (exc) {
@@ -162,6 +268,16 @@ if (dpdkSource.size()) {
                 } finally {
                     echo "Cleaning up environment"
                 }
+            }
+        }
+    }
+    stage ("report_status_init") {
+        node ("meta_slave") {
+            checkout scm
+            try {
+                reportPipelineStatus("init")
+            } catch (exc) {
+                println exc
             }
         }
     }
@@ -288,6 +404,17 @@ if (dpdkSource.size()) {
                             Thank you,<br/>Jenkins CI
                         """
                     )
+                }
+            }
+        }
+        stage ("report_status_end") {
+            node ("meta_slave") {
+                checkout scm
+                env.END_DATE = new java.sql.Timestamp(new Date().getTime())
+                try {
+                    reportPipelineStatus("end")
+                } catch (exc) {
+                    println exc
                 }
             }
         }

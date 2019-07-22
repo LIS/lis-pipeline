@@ -258,7 +258,7 @@ def buildKernel() {
                   --debian_os_version "16" \\
                   --build_path "${KERNEL_BUILD_DIR}" \\
                   --kernel_config "Microsoft/config-azure" \\
-                  --clean_env "False" \\
+                  --clean_env "True" \\
                   --use_ccache "True" \\
                   --use_kernel_folder_prefix "True" \\
                   --patch_file "developer_patches" \\

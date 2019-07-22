@@ -108,6 +108,9 @@ main() {
             --storage_token)
                 STORAGE_TOKEN="$2"
                 shift 2;;
+            --azcopy_download_link)
+                AZCOPY_DOWNLOAD_LINK="$2"
+                shift 2;;
             --azure_token)
                 AZURE_TOKEN="$2"
                 shift 2;;
@@ -143,7 +146,8 @@ main() {
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "@prepare_lis_vm.sh" \
         "sec=install_kernel kernel_repolist=\"$KERNEL_REPO_LIST\" os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
-            kernel_ver=\"$KERNEL_VERSION\" storage_account=\"$STORAGE_ACCOUNT\" storage_token=\"$STORAGE_TOKEN\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
+            kernel_ver=\"$KERNEL_VERSION\" storage_account=\"$STORAGE_ACCOUNT\" storage_token=\"$STORAGE_TOKEN\" \
+            azcopy_download_link=\"$AZCOPY_DOWNLOAD_LINK\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
     
     # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"

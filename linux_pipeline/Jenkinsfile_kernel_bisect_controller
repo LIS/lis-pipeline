@@ -17,6 +17,13 @@ env.BISECT_CLONE_KERNEL_REPO = "true"
 env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "true"
 env.GOOD_COMMIT_PERF_RESULTS = ""
 
+env.BISECT_RESULT_TYPE = 'bad'
+env.BISECT_RESULT_TYPE_GOOD = 'good'
+env.BISECT_RESULT_TYPE_BAD = 'bad'
+env.LAST_GOOD_COMMIT = ""
+env.ANCESTOR_COMMIT = ""
+env.DESCENDANT_COMMIT = ""
+
 properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
@@ -41,6 +48,10 @@ properties ([
             choices: 'Ubuntu_18.04.1\nCentOS_7.5',
             name: 'DISTRO_VERSION',
             description: 'Distro version to be tested.'],
+        [$class: 'ChoiceParameterDefinition',
+            choices: 'False\nTrue',
+            name: 'REVERSE_BISECT',
+            description: 'If True, the bisect will be performed in reverse, returning the first good commit that fixes the BAD_COMMIT (the GOOD_COMMIT is after the BAD_COMMIT, on the same tree). If REVERSE_BISECT is set to false, the GOOD_COMMIT has to be before the bad commit, on the same tree.'],
         [$class: 'ChoiceParameterDefinition',
             choices: 'Boot\nFunctional\nPerformance',
             name: 'BISECT_TYPE',
@@ -295,7 +306,10 @@ String getCommit(String passed) {
         returnStdout: true
     )
     if (commit.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + commit.split(" ")[0])
+        if (params.REVERSE_BISECT) {
+            commit = env.LAST_GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit.split(" ")[0])
         currentBuild.displayName = "$BUILD_NUMBER-" + commit.substring(0,7)
         return false
     }
@@ -308,7 +322,7 @@ def getCurrentCommitId() {
            set -e
            pushd "$BISECT_BUILD_DIR/$BISECT_CLONE_DIR" 2>&1 > /dev/null
            unwanted_output=$(git bisect reset)
-           output=$(git bisect start "$BAD_COMMIT" "$GOOD_COMMIT")
+           output=$(git bisect start "$DESCENDANT_COMMIT" "$ANCESTOR_COMMIT")
            output=${output%%]*}
            output=${output##*[}
            echo $output
@@ -366,7 +380,7 @@ def getPerfTests() {
 
 node ("bisect_kernel_builder") {
     def currentCommitId = ""
-    def passed = ""
+    def result = ""
 
     if (!params.GOOD_COMMIT) {
         throw new Exception("GOOD_COMMIT must be set.")
@@ -390,6 +404,20 @@ node ("bisect_kernel_builder") {
         }
     }
 
+    if (params.REVERSE_BISECT.equals("True")) {
+        println "Performing reverse bisect. The quest for the first good commmit begins."
+        env.LAST_GOOD_COMMIT = params.GOOD_COMMIT
+        env.ANCESTOR_COMMIT = params.BAD_COMMIT
+        env.DESCENDANT_COMMIT = params.GOOD_COMMIT
+        env.BISECT_RESULT_TYPE = 'good'
+        env.BISECT_RESULT_TYPE_GOOD = 'bad'
+        env.BISECT_RESULT_TYPE_BAD = 'good'
+    } else {
+        println "Performing bisect. The quest for the first bad commmit begins."
+        env.ANCESTOR_COMMIT = params.GOOD_COMMIT
+        env.DESCENDANT_COMMIT = params.BAD_COMMIT
+    }
+
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
         println "Validate initial good and bad commits."
         validateInitialCommits()
@@ -402,8 +430,12 @@ node ("bisect_kernel_builder") {
 
     currentCommitId = getCurrentCommitId()
     if (currentCommitId.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + currentCommitId.split(" ")[0])
-        currentBuild.displayName = "$BUILD_NUMBER-" + currentCommitId.substring(0,7)
+        def commit_id_result = currentCommitId.split(" ")[0]
+        if (params.REVERSE_BISECT.equals("True")) {
+            commit_id_result = params.GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit_id_result)
+        currentBuild.displayName = "$BUILD_NUMBER-" + commit_id_result.substring(0,7)
         return
     }
     println("Initial bisection commit is " + currentCommitId)
@@ -414,22 +446,25 @@ node ("bisect_kernel_builder") {
             println "Check if the following commit is good or bad: " + currentCommitId
             def commitStatus = validateCommit(currentCommitId)
             if (commitStatus.status == 'SUCCESS') {
+                env.LAST_GOOD_COMMIT = currentCommitId
                 println "The following commit is good: " + currentCommitId
-                passed = 'good'
+                result = env.BISECT_RESULT_TYPE_GOOD
             } else if (commitStatus.status == 'FAILURE') {
                 println "The following commit is bad: " + currentCommitId
-                passed = 'bad'
+                result = env.BISECT_RESULT_TYPE_BAD
             } else {
                 println "Bisect has been aborted because slave build result is not FAILURE or SUCCESS"
                 println "Slave build result is: " + commitStatus.status
                 break
             }
         }
-        currentCommitId = getCommit(passed)
+        currentCommitId = getCommit(result)
         if (currentCommitId.equals(false)) {
             break
         }
     }
+
+    println "The quest for the first ${env.BISECT_RESULT_TYPE} commit has ended."
 
     if (env.BISECT_RUNS.equals(env.BISECT_MAX_RUNS)) {
         throw new Exception("Failed to finish bisection in the maximum allowed retries.")
