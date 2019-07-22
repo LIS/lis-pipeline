@@ -85,10 +85,18 @@ try {
         $Retry= $true
         While ($Retry) {
             try {
+                Write-LogInfo "Converting $($operation.ICloudBlob.Uri.AbsoluteUri) to managed disk (CreateOption: Import)"
                 $ManagedDisk = New-AzureRmDisk -DiskName $osDiskName -Disk $OSDiskConfig -ResourceGroupName $storageAccount.ResourceGroupName -Verbose
                 if (-not $?) {
                     Throw "Disk Creation Failed. Retrying..."
                 } else {
+                    $blob = $blobs | Where-Object { $_.ICloudBlob.Uri.AbsoluteUri -eq $operation.ICloudBlob.Uri.AbsoluteUri }
+                    $null = $blob | Remove-AzStorageBlob -Force
+                    if ($?) {
+                        Write-LogInfo "$($blob.ICloudBlob.Uri.AbsoluteUri) deleted successfully."
+                    } else {
+                        Write-LogErr "$($blob.ICloudBlob.Uri.AbsoluteUri) failed to delete. Please cleanup manually."
+                    }
                     $CreatedVMs += Create-VirtualMachine -Name $VMName -OSDiskID $ManagedDisk.id
                 }
                 $Retry = $false

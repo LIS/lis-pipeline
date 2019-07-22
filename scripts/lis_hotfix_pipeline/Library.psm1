@@ -153,16 +153,16 @@ Function Install-KernelPackages ( $PublicIP, $SSHPort, $LinuxUsername, $LinuxPas
         Start-Sleep 30
         $KernelAfter = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "uname -r" -maxRetryCount 20
         Write-LogInfo "Kernel Before: $KernelBefore"
-        Write-LogInfo "Kernel After: $KernelAfter"
+        Write-LogInfo "Kernel After : $KernelAfter"
         if ($KernelBefore -eq $KernelAfter) {
             Throw "Kernel before and after is same."
         } else {
             return $true
         }
     } catch {
-		$ErrorMessage = $_.Exception.Message
-		$ErrorLine = $_.InvocationInfo.ScriptLineNumber
-		Write-LogInfo "EXCEPTION : $ErrorMessage at line: $ErrorLine"
+        $ErrorMessage = $_.Exception.Message
+        $ErrorLine = $_.InvocationInfo.ScriptLineNumber
+        Write-LogInfo "EXCEPTION : $ErrorMessage at line: $ErrorLine"
         Write-LogInfo "Error: Failed to install kernel."
         return $false
     }
