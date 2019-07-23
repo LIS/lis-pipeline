@@ -1,7 +1,7 @@
 ﻿Function Create-VirtualMachine ($Name, $OSDiskID) {
     try {
         $Resources = Get-AzureRmResource -ResourceGroupName $ResourceGroupName
-        $VMs = $Resources | Where {$_.ResourceType -eq "Microsoft.Compute/virtualMachines"}
+        $VMs = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/virtualMachines" }
 
         if ($VMs.Name) {
             $DetectedVMs = $VMs.Name
@@ -9,33 +9,32 @@
             $DetectedVMs = @("None")
         }
 
-        if ($DetectedVMs.Contains($Name)  -and !$Overwrite ) {
-            Write-LogInfo "Virtual Machine: $Name Alreadey Exists."
+        if ($DetectedVMs.Contains($Name)) {
+            Write-LogInfo "Virtual Machine: $Name already Exists."
         } else {
             $NICName = "$NAME-NIC"
             $NatRuleName = "$Name-SSH"
             $OsDiskName = $OSDiskID.Split("/")[-1]
             Write-LogInfo "Creating VM: $Name, $OSDiskID"
 
-            $VNET =$Resources | Where {$_.ResourceType -eq "Microsoft.Network/virtualNetworks"}
+            $VNET = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/virtualNetworks" }
             $VNET = Get-AzureRmVirtualNetwork -Name $VNET.Name -ResourceGroupName $ResourceGroupName
-            $LB = $Resources | Where {$_.ResourceType -eq "Microsoft.Network/loadBalancers"}
+            $LB = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/loadBalancers" }
             $LB = Get-AzureRmLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName
 
             $FrontEndPort = (Get-Random -Maximum 9999 -Minimum 1111)
             while ( $LB.InboundNatRules.FrontendPort.Contains(($FrontEndPort)) ) {
                 $FrontEndPort = (Get-Random -Maximum 9999 -Minimum 1111)
             }
-            Write-LogInfo "FrontEndPort : $FrontEndPort"
 
-            $AvSet = $Resources | Where {$_.ResourceType -eq "Microsoft.Compute/availabilitySets"}
+            $AvSet = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/availabilitySets" }
             $AvSet = Get-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name $AvSet.Name
-            $PublicIP = $Resources | Where {$_.ResourceType -eq "Microsoft.Network/publicIPAddresses"}
+            $PublicIP = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/publicIPAddresses" }
             $PublicIP = Get-AzureRmPublicIpAddress -Name $PublicIP.Name -ResourceGroupName $PublicIP.ResourceGroupName
             $Frontend = Get-AzureRmLoadBalancerFrontendIpConfig -LoadBalancer $LB -Name FrontendIP
-            $VMs = $Resources | Where {$_.ResourceType -eq "Microsoft.Compute/virtualMachines"}
+            $VMs = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/virtualMachines" }
             Write-LogInfo "Adding SSH rule $NatRuleName"
-            [void]($LB | Add-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName  -FrontendIPConfiguration $Frontend -Protocol "Tcp" -FrontendPort $FrontEndPort  -BackendPort 22 -Verbose -ErrorAction SilentlyContinue)
+            [void]($LB | Add-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName -FrontendIPConfiguration $Frontend -Protocol "Tcp" -FrontendPort $FrontEndPort  -BackendPort 22 -Verbose -ErrorAction SilentlyContinue)
             [void]($LB | Set-AzureRmLoadBalancer -Verbose)
             $NatRule = Get-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName -LoadBalancer $LB
             Write-LogInfo "Adding $NICName"
@@ -45,13 +44,13 @@
             } else {
                 $VMsize = "Standard_F2s"
             }
-            Write-LogInfo "Creating  VM Config (New-AzureRmVMConfig -VMName '$Name' -VMSize '$VMsize' -AvailabilitySetId '$($AvSet.Id)')..."
+            Write-LogInfo "Creating VM Config (New-AzureRmVMConfig -VMName '$Name' -VMSize '$VMsize' -AvailabilitySetId '$($AvSet.Id)')..."
             $VMConfig = New-AzureRmVMConfig -VMName $Name -VMSize $VMsize -AvailabilitySetId $AvSet.Id
-            Write-LogInfo "Creating  VM Config (Setting OS DISK -ManagedDiskId '$OSDiskID')..."
+            Write-LogInfo "Creating VM Config (Setting OS DISK -ManagedDiskId '$OSDiskID')..."
             $VMConfig2 = Set-AzureRmVMOSDisk -Linux -ManagedDiskId $OSDiskID -CreateOption Attach -VM $VMConfig
-            Write-LogInfo "Creating  VM Config (Setting NIC -Id '$($NIC.Id)')..."
-            $VMConfig3=  Add-AzureRmVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
-            Write-LogInfo "Creating  VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticStorageAccount')..."
+            Write-LogInfo "Creating VM Config (Setting NIC -Id '$($NIC.Id)')..."
+            $VMConfig3 = Add-AzureRmVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
+            Write-LogInfo "Creating VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticStorageAccount')..."
             $VMConfig4 = Set-AzureRmVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
             Write-LogInfo "Creating Virtual Machine : '$NAME' -Location '$Location'..."
             $VM = New-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VMConfig4 -Location $Location -Verbose
@@ -73,7 +72,6 @@ Function Start-FailureCleanup ($ResourceGroupName, $VMName) {
     $retry = $true
 
     while ($maxRetry -gt 0 -and $retry) {
-
         try {
             Write-LogInfo "Rolling back the changes made to $ResourceGroupName"
             $NICName = "$VMName-NIC"
@@ -85,9 +83,9 @@ Function Start-FailureCleanup ($ResourceGroupName, $VMName) {
             $NatRule = $null
             $NIC = $null
             $Resources = Get-AzureRmResource -ResourceGroupName $ResourceGroupName
-            $LB = $Resources | Where {$_.ResourceType -eq "Microsoft.Network/loadBalancers"}
+            $LB = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/loadBalancers" }
             Write-LogInfo "Checking VM $VMName ..."
-            $VM = Get-AzureRmVm -ResourceGroupName $ResourceGroupName  -Name $VMName  -ErrorAction SilentlyContinue
+            $VM = Get-AzureRmVm -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction SilentlyContinue
             if ($VM) {
                 Write-LogInfo "Removing VM $VMName ..."
                 $null = $VM | Remove-AzureRmVM -Force -Verbose
@@ -96,7 +94,7 @@ Function Start-FailureCleanup ($ResourceGroupName, $VMName) {
             $OsDisk = Get-AzureRmDisk -ResourceGroupName $ResourceGroupName -DiskName $OSDIskName -Verbose -ErrorAction SilentlyContinue
             if ($OsDisk) {
                 Write-LogInfo "Removing OS Disk $OSDIskName ..."
-                $null = $OsDisk | Remove-AzureRmDisk -Force -Verbos
+                $null = $OsDisk | Remove-AzureRmDisk -Force -Verbose
             }
 
             Write-LogInfo "Checking SSH Rule $NatRuleName ..."
@@ -113,7 +111,7 @@ Function Start-FailureCleanup ($ResourceGroupName, $VMName) {
                 Write-LogInfo "Removing NIC $NicName ..."
                 $null = $NIC | Remove-AzureRmNetworkInterface -Force -Verbose -ErrorAction SilentlyContinue
             }
-            Write-LogInfo "Clenaup Completed."
+            Write-LogInfo "Cleanup Completed."
             $retry = $false
         } catch {
             $maxRetry -= 1
@@ -140,24 +138,49 @@ Function Get-RPMPackageNames ($StorageContext, $FolderPath, $KernelVersion) {
             }
         }
     }
-    return $KernelURI,$OtherPackages
+    return $KernelURI, $OtherPackages
 }
 
+Function Test-SSH ($PublicIP, $SSHPort) {
+    $RetryAttempts = 10
+    $SleepInterval = 30 #Seconds
+    $IsVMAccessible = $false
+    while ($RetryAttempts -ne 0 -and !$IsVMAccessible) {
+        $RetryAttempts -= 1
+        $out = Test-TCP -testIP $PublicIP -testport $SSHPort
+        if ($out -ne "True") {
+            Write-LogInfo "TCP Connection to $PublicIP : $SSHPort failed. Remaining attempts ($RetryAttempts)..."
+            Start-Sleep -Seconds $SleepInterval
+        } else {
+            Write-LogInfo "TCP Connection to $PublicIP : $SSHPort succeeded."
+            $IsVMAccessible = $true
+        }
+    }
+    return $IsVMAccessible
+}
 Function Install-KernelPackages ( $PublicIP, $SSHPort, $LinuxUsername, $LinuxPassword, $KernelPackage, $OtherPackages ) {
     try {
-        $KernelBefore = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "uname -r"
-        $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "rpm -ivh $KernelPackage $OtherPackages"
-        $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "yum -y --nogpgcheck update gcc" -ignoreLinuxExitCode
-        $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "init 6" -ignoreLinuxExitCode
-        Write-LogInfo "Sleeping 30 seconds..."
-        Start-Sleep 30
-        $KernelAfter = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "uname -r" -maxRetryCount 20
-        Write-LogInfo "Kernel Before: $KernelBefore"
-        Write-LogInfo "Kernel After : $KernelAfter"
-        if ($KernelBefore -eq $KernelAfter) {
-            Throw "Kernel before and after is same."
+        if ( Test-SSH -PublicIP $PublicIP -SSHPort $SSHPort ) {
+            $KernelBefore = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "uname -r"
+            $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "rpm -ivh $KernelPackage $OtherPackages"
+            $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "yum -y --nogpgcheck update gcc" -ignoreLinuxExitCode
+            $null = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "init 6" -ignoreLinuxExitCode
+            Write-LogInfo "Sleeping 30 seconds..."
+            Start-Sleep 30
+            if ( Test-SSH -PublicIP $PublicIP -SSHPort $SSHPort ) {
+                $KernelAfter = Run-LinuxCmd -username $LinuxUsername -password $LinuxPassword -ip $PublicIP -port $SSHPort -command "uname -r" -maxRetryCount 20
+                Write-LogInfo "Kernel Before: $KernelBefore"
+                Write-LogInfo "Kernel After : $KernelAfter"
+                if ($KernelBefore -eq $KernelAfter) {
+                    Throw "Kernel before and after is same."
+                } else {
+                    return $true
+                }
+            } else {
+                Throw "$PublicIP : $SSHPort not accessible after kernel install."
+            }
         } else {
-            return $true
+            Throw "$PublicIP : $SSHPort not accessible."
         }
     } catch {
         $ErrorMessage = $_.Exception.Message
@@ -168,7 +191,7 @@ Function Install-KernelPackages ( $PublicIP, $SSHPort, $LinuxUsername, $LinuxPas
     }
 }
 
-Function Start-VHDCopy ($context, $source,$destination, $Container ) {
+Function Start-VHDCopy ($context, $source, $destination, $Container ) {
     $expireTime = Get-Date
     $expireTime = $expireTime.AddYears(1)
     $SasUrl = New-AzureStorageBlobSASToken -container $Container -Blob $source -Permission R -ExpiryTime $expireTime -FullUri -Context $Context
@@ -181,32 +204,24 @@ Function Start-VHDCopy ($context, $source,$destination, $Container ) {
 
 Function Test-VHDCopyOperations($VHDCopyOperations, $context, $Container) {
     $CopyingInProgress = $true
-    while($CopyingInProgress)
-    {
+    while ($CopyingInProgress) {
         $CopyingInProgress = $false
         $newVHDCopyOperations = @()
-        foreach ($operation in $VHDCopyOperations)
-        {
+        foreach ($operation in $VHDCopyOperations) {
             $status = Get-AzureStorageBlobCopyState -Container $Container -Blob $operation.Name -Context $context
-            if ($status.Status -eq "Success")
-            {
+            if ($status.Status -eq "Success") {
                 Write-LogInfo "$($operation.Name): $($context.StorageAccountName) : Done : 100 %"
-            }
-            elseif ($status.Status -eq "Failed")
-            {
+            } elseif ($status.Status -eq "Failed") {
                 Write-LogInfo "$($operation.Name): $($context.StorageAccountName) : Failed."
-            }
-            elseif ($status.Status -eq "Pending")
-            {
+            } elseif ($status.Status -eq "Pending") {
                 Start-Sleep -Milliseconds 100
                 $CopyingInProgress = $true
                 $newVHDCopyOperations += $operation
-                $copyPercent = [math]::Round((($status.BytesCopied/$status.TotalBytes) * 100),2)
+                $copyPercent = [math]::Round((($status.BytesCopied / $status.TotalBytes) * 100), 2)
                 Write-LogInfo  "$($operation.Name): $($context.StorageAccountName) : Running : $copyPercent %"
             }
         }
-        if ($CopyingInProgress)
-        {
+        if ($CopyingInProgress) {
             Write-LogInfo "--------$($newVHDCopyOperations.Count) copy operations still in progress.-------"
             $VHDCopyOperations = $newVHDCopyOperations
             Start-Sleep -Seconds 10
