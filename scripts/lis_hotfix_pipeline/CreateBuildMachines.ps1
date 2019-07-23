@@ -58,14 +58,14 @@ try {
     Register-AzureSubscription($secretsFile)
 
     # Get required info about LIS Build RPM resource group.
-    Write-LogInfo "Get-AzureRmStorageAccount ..."
-    $storageAccounts = Get-AzureRmStorageAccount
+    Write-LogInfo "Get-AzStorageAccount ..."
+    $storageAccounts = Get-AzStorageAccount
     $storageAccount = $storageAccounts | Where-Object { $_.StorageAccountName -eq $VHDSourceStorageAccount }
     $ResourceGroupName = $storageAccount.ResourceGroupName
     $Location = $storageAccount.Location
     Write-LogInfo "Get-AzStorageAccountKey -ResourceGroupName $($storageAccount.ResourceGroupName) -Name $($storageAccount.StorageAccountName)..."
-    $storageKey = (Get-AzureRmStorageAccountKey -ResourceGroupName $storageAccount.ResourceGroupName -Name $storageAccount.StorageAccountName)[0].Value
-    $context = New-AzureStorageContext -StorageAccountName $storageAccount.StorageAccountName -StorageAccountKey $storageKey
+    $storageKey = (Get-AzStorageAccountKey -ResourceGroupName $storageAccount.ResourceGroupName -Name $storageAccount.StorageAccountName)[0].Value
+    $context = New-AzStorageContext -StorageAccountName $storageAccount.StorageAccountName -StorageAccountKey $storageKey
 
     #Set Global Variables.
     Set-Variable -Name ResourceGroupName -Value $ResourceGroupName -Scope Global
@@ -77,16 +77,16 @@ try {
     $allDiskNames = @()
     $VHDCopyOperations = @()
     $SourceContainer = "vhdsrepo"
-    $container = Get-AzureStorageContainer -Context $context -ConcurrentTaskCount 64 | Where-Object { $_.Name -eq $SourceContainer }
+    $container = Get-AzStorageContainer -Context $context -ConcurrentTaskCount 64 | Where-Object { $_.Name -eq $SourceContainer }
     $TotalKernels = $DistroKernelVersions.split(",").Count
 
     Write-LogInfo "Get-AzStorageBlob -Container $($container.Name) ..."
-    $blobs = Get-AzureStorageBlob -Container $container.Name -Context $context
+    $blobs = Get-AzStorageBlob -Container $container.Name -Context $context
     foreach ($blob in $blobs) {
         $DiskURI = $($blob.ICloudBlob.Uri.AbsoluteUri)
         $allDiskNames += $DiskURI.Split()
     }
-    $AllVMs = (Get-AzureRmVM -ResourceGroupName $ResourceGroupName).Name
+    $AllVMs = (Get-AzVM -ResourceGroupName $ResourceGroupName).Name
     foreach ($item in $DistroKernelVersions.split(",")) {
         $RequestedDistro = $item.split("=")[0].Replace("rhel_", "").Replace("centos_", "").Replace(".", "")
         Write-LogInfo "Requested distro = $RequestedDistro"
@@ -109,7 +109,7 @@ try {
     # Create a new VM for each copied VHD.
     $CreatedVMs = @()
     foreach ($operation in $VHDCopyOperations) {
-        $OSDiskConfig = New-AzureRmDiskConfig -AccountType Standard_LRS `
+        $OSDiskConfig = New-AzDiskConfig -AccountType Standard_LRS `
             -Location $storageAccount.Location -CreateOption Import `
             -SourceUri $operation.ICloudBlob.Uri.AbsoluteUri -OsType Linux
         $osDiskName = "$($operation.Name)-OsDisk"
@@ -120,7 +120,7 @@ try {
         While ($Retry) {
             try {
                 Write-LogInfo "Converting $($operation.ICloudBlob.Uri.AbsoluteUri) to managed disk (CreateOption: Import)"
-                $ManagedDisk = New-AzureRmDisk -DiskName $osDiskName -Disk $OSDiskConfig -ResourceGroupName $storageAccount.ResourceGroupName -Verbose
+                $ManagedDisk = New-AzDisk -DiskName $osDiskName -Disk $OSDiskConfig -ResourceGroupName $storageAccount.ResourceGroupName -Verbose
                 if (-not $?) {
                     Throw "Disk Creation Failed. Retrying..."
                 } else {
@@ -144,9 +144,9 @@ try {
     $SuccessfulKernelInstall = 0
     if ($CreatedVMs) {
         if ($CreatedVMs.Count -eq $TotalKernels) {
-            $PublicIP = Get-AzureRmPublicIpAddress | Where-Object { $_.ResourceGroupName -eq "$ResourceGroupName" }
+            $PublicIP = Get-AzPublicIpAddress | Where-Object { $_.ResourceGroupName -eq "$ResourceGroupName" }
             $PublicIPAddress = $PublicIP.IpAddress
-            $Resources = Get-AzureRmResource -ResourceGroupName $ResourceGroupName
+            $Resources = Get-AzResource -ResourceGroupName $ResourceGroupName
             $LB = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/loadBalancers" }
             foreach ($item in $DistroKernelVersions.split(",")) {
                 $RequestedDistro = $item.split("=")[0].Replace("rhel_", "").Replace("centos_", "").Replace(".", "")
@@ -155,8 +155,8 @@ try {
                 $NatRuleName = "$VMName-SSH"
                 $Packages = Get-RPMPackageNames -StorageContext $context -FolderPath kernel -KernelVersion $RequestedKernel
                 Write-LogInfo "Checking SSH Rule $NatRuleName ..."
-                $LB2 = Get-AzureRmLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName
-                $NatRule = Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $LB2 -Name $NatRuleName
+                $LB2 = Get-AzLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName
+                $NatRule = Get-AzLoadBalancerInboundNatRuleConfig -LoadBalancer $LB2 -Name $NatRuleName
                 $SSHPort = $NatRule.FrontendPort
                 $KernelInstallStatus = Install-KernelPackages -PublicIP $PublicIPAddress -SSHPort $SSHPort -KernelPackage $Packages[0] `
                     -OtherPackages $Packages[1] -LinuxUsername $LinuxUsername -LinuxPassword $LinuxPassword

@@ -1,6 +1,6 @@
 ﻿Function Create-VirtualMachine ($Name, $OSDiskID) {
     try {
-        $Resources = Get-AzureRmResource -ResourceGroupName $ResourceGroupName
+        $Resources = Get-AzResource -ResourceGroupName $ResourceGroupName
         $VMs = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/virtualMachines" }
 
         if ($VMs.Name) {
@@ -18,9 +18,9 @@
             Write-LogInfo "Creating VM: $Name, $OSDiskID"
 
             $VNET = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/virtualNetworks" }
-            $VNET = Get-AzureRmVirtualNetwork -Name $VNET.Name -ResourceGroupName $ResourceGroupName
+            $VNET = Get-AzVirtualNetwork -Name $VNET.Name -ResourceGroupName $ResourceGroupName
             $LB = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/loadBalancers" }
-            $LB = Get-AzureRmLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName
+            $LB = Get-AzLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName
 
             $FrontEndPort = (Get-Random -Maximum 9999 -Minimum 1111)
             while ( $LB.InboundNatRules.FrontendPort.Contains(($FrontEndPort)) ) {
@@ -28,32 +28,32 @@
             }
 
             $AvSet = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/availabilitySets" }
-            $AvSet = Get-AzureRmAvailabilitySet -ResourceGroupName $ResourceGroupName -Name $AvSet.Name
+            $AvSet = Get-AzAvailabilitySet -ResourceGroupName $ResourceGroupName -Name $AvSet.Name
             $PublicIP = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/publicIPAddresses" }
-            $PublicIP = Get-AzureRmPublicIpAddress -Name $PublicIP.Name -ResourceGroupName $PublicIP.ResourceGroupName
-            $Frontend = Get-AzureRmLoadBalancerFrontendIpConfig -LoadBalancer $LB -Name FrontendIP
+            $PublicIP = Get-AzPublicIpAddress -Name $PublicIP.Name -ResourceGroupName $PublicIP.ResourceGroupName
+            $Frontend = Get-AzLoadBalancerFrontendIpConfig -LoadBalancer $LB -Name FrontendIP
             $VMs = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Compute/virtualMachines" }
             Write-LogInfo "Adding SSH rule $NatRuleName"
-            [void]($LB | Add-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName -FrontendIPConfiguration $Frontend -Protocol "Tcp" -FrontendPort $FrontEndPort  -BackendPort 22 -Verbose -ErrorAction SilentlyContinue)
-            [void]($LB | Set-AzureRmLoadBalancer -Verbose)
-            $NatRule = Get-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName -LoadBalancer $LB
+            [void]($LB | Add-AzLoadBalancerInboundNatRuleConfig -Name $NatRuleName -FrontendIPConfiguration $Frontend -Protocol "Tcp" -FrontendPort $FrontEndPort  -BackendPort 22 -Verbose -ErrorAction SilentlyContinue)
+            [void]($LB | Set-AzLoadBalancer -Verbose)
+            $NatRule = Get-AzLoadBalancerInboundNatRuleConfig -Name $NatRuleName -LoadBalancer $LB
             Write-LogInfo "Adding $NICName"
-            $NIC = New-AzureRmNetworkInterface -Name $NICName -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $VNET.Subnets[0].ID -Force -Verbose -LoadBalancerInboundNatRuleId $NatRule.Id
+            $NIC = New-AzNetworkInterface -Name $NICName -ResourceGroupName $ResourceGroupName -Location $Location -SubnetId $VNET.Subnets[0].ID -Force -Verbose -LoadBalancerInboundNatRuleId $NatRule.Id
             if ($Name -imatch "_73_" -or $Name -imatch "_74_") {
                 $VMsize = "Standard_F8s"
             } else {
                 $VMsize = "Standard_F2s"
             }
-            Write-LogInfo "Creating VM Config (New-AzureRmVMConfig -VMName '$Name' -VMSize '$VMsize' -AvailabilitySetId '$($AvSet.Id)')..."
-            $VMConfig = New-AzureRmVMConfig -VMName $Name -VMSize $VMsize -AvailabilitySetId $AvSet.Id
+            Write-LogInfo "Creating VM Config (New-AzVMConfig -VMName '$Name' -VMSize '$VMsize' -AvailabilitySetId '$($AvSet.Id)')..."
+            $VMConfig = New-AzVMConfig -VMName $Name -VMSize $VMsize -AvailabilitySetId $AvSet.Id
             Write-LogInfo "Creating VM Config (Setting OS DISK -ManagedDiskId '$OSDiskID')..."
-            $VMConfig2 = Set-AzureRmVMOSDisk -Linux -ManagedDiskId $OSDiskID -CreateOption Attach -VM $VMConfig
+            $VMConfig2 = Set-AzVMOSDisk -Linux -ManagedDiskId $OSDiskID -CreateOption Attach -VM $VMConfig
             Write-LogInfo "Creating VM Config (Setting NIC -Id '$($NIC.Id)')..."
-            $VMConfig3 = Add-AzureRmVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
+            $VMConfig3 = Add-AzVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
             Write-LogInfo "Creating VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticStorageAccount')..."
-            $VMConfig4 = Set-AzureRmVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
+            $VMConfig4 = Set-AzVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
             Write-LogInfo "Creating Virtual Machine : '$NAME' -Location '$Location'..."
-            $VM = New-AzureRmVM -ResourceGroupName $ResourceGroupName -VM $VMConfig4 -Location $Location -Verbose
+            $VM = New-AzVM -ResourceGroupName $ResourceGroupName -VM $VMConfig4 -Location $Location -Verbose
             Write-LogInfo "Virtual Machine '$NAME' is created. Check progress in resource group : '$ResourceGroupName'"
             return $NAME
         }
@@ -82,34 +82,34 @@ Function Start-FailureCleanup ($ResourceGroupName, $VMName) {
             $OSDisk = $null
             $NatRule = $null
             $NIC = $null
-            $Resources = Get-AzureRmResource -ResourceGroupName $ResourceGroupName
+            $Resources = Get-AzResource -ResourceGroupName $ResourceGroupName
             $LB = $Resources | Where-Object { $_.ResourceType -eq "Microsoft.Network/loadBalancers" }
             Write-LogInfo "Checking VM $VMName ..."
-            $VM = Get-AzureRmVm -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction SilentlyContinue
+            $VM = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction SilentlyContinue
             if ($VM) {
                 Write-LogInfo "Removing VM $VMName ..."
-                $null = $VM | Remove-AzureRmVM -Force -Verbose
+                $null = $VM | Remove-AzVM -Force -Verbose
             }
             Write-LogInfo "Checking OS Disk $OSDIskName ..."
-            $OsDisk = Get-AzureRmDisk -ResourceGroupName $ResourceGroupName -DiskName $OSDIskName -Verbose -ErrorAction SilentlyContinue
+            $OsDisk = Get-AzDisk -ResourceGroupName $ResourceGroupName -DiskName $OSDIskName -Verbose -ErrorAction SilentlyContinue
             if ($OsDisk) {
                 Write-LogInfo "Removing OS Disk $OSDIskName ..."
-                $null = $OsDisk | Remove-AzureRmDisk -Force -Verbose
+                $null = $OsDisk | Remove-AzDisk -Force -Verbose
             }
 
             Write-LogInfo "Checking SSH Rule $NatRuleName ..."
-            $LB2 = Get-AzureRmLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName  -ErrorAction SilentlyContinue
-            $NatRule = Get-AzureRmLoadBalancerInboundNatRuleConfig -LoadBalancer $LB2 -Name $NatRuleName  -ErrorAction SilentlyContinue
+            $LB2 = Get-AzLoadBalancer -Name $LB.Name -ResourceGroupName $ResourceGroupName  -ErrorAction SilentlyContinue
+            $NatRule = Get-AzLoadBalancerInboundNatRuleConfig -LoadBalancer $LB2 -Name $NatRuleName  -ErrorAction SilentlyContinue
             if ( $NatRule ) {
                 Write-LogInfo "Removing SSH Rule $NatRuleName ..."
-                [void]($LB2 | Remove-AzureRmLoadBalancerInboundNatRuleConfig -Name $NatRuleName -Verbose)
-                [void]($LB2 | Set-AzureRmLoadBalancer -Verbose )
+                [void]($LB2 | Remove-AzLoadBalancerInboundNatRuleConfig -Name $NatRuleName -Verbose)
+                [void]($LB2 | Set-AzLoadBalancer -Verbose )
             }
             Write-LogInfo "Checking NIC $NicName ..."
-            $NIC = Get-AzureRmNetworkInterface -ResourceGroupName $ResourceGroupName -Name $NicName -ErrorAction SilentlyContinue
+            $NIC = Get-AzNetworkInterface -ResourceGroupName $ResourceGroupName -Name $NicName -ErrorAction SilentlyContinue
             if ( $NIC ) {
                 Write-LogInfo "Removing NIC $NicName ..."
-                $null = $NIC | Remove-AzureRmNetworkInterface -Force -Verbose -ErrorAction SilentlyContinue
+                $null = $NIC | Remove-AzNetworkInterface -Force -Verbose -ErrorAction SilentlyContinue
             }
             Write-LogInfo "Cleanup Completed."
             $retry = $false
@@ -127,7 +127,7 @@ Function Get-RPMPackageNames ($StorageContext, $FolderPath, $KernelVersion) {
     $KernelURI = ""
     $OtherPackages = ""
     Write-LogInfo "Get-AzStorageBlob -Container kernel ..."
-    $RPMs = Get-AzureStorageBlob -Container kernel -Context $context
+    $RPMs = Get-AzStorageBlob -Container kernel -Context $context
     foreach ($rpm in $RPMs) {
         $rpmURI = $($rpm.ICloudBlob.Uri.AbsoluteUri)
         if ($rpmURI -imatch "/$KernelVersion/") {
@@ -194,9 +194,8 @@ Function Install-KernelPackages ( $PublicIP, $SSHPort, $LinuxUsername, $LinuxPas
 Function Start-VHDCopy ($context, $source, $destination, $Container ) {
     $expireTime = Get-Date
     $expireTime = $expireTime.AddYears(1)
-    $SasUrl = New-AzureStorageBlobSASToken -container $Container -Blob $source -Permission R -ExpiryTime $expireTime -FullUri -Context $Context
-    Write-LogInfo $SasUrl
-    $Status = Start-AzureStorageBlobCopy -AbsoluteUri $SasUrl  -DestContainer $Container -DestContext $Context -DestBlob $destination -Force
+    $SasUrl = New-AzStorageBlobSASToken -container $Container -Blob $source -Permission R -ExpiryTime $expireTime -FullUri -Context $Context
+    $Status = Start-AzStorageBlobCopy -AbsoluteUri $SasUrl  -DestContainer $Container -DestContext $Context -DestBlob $destination -Force
     return $Status
 }
 
@@ -208,7 +207,7 @@ Function Test-VHDCopyOperations($VHDCopyOperations, $context, $Container) {
         $CopyingInProgress = $false
         $newVHDCopyOperations = @()
         foreach ($operation in $VHDCopyOperations) {
-            $status = Get-AzureStorageBlobCopyState -Container $Container -Blob $operation.Name -Context $context
+            $status = Get-AzStorageBlobCopyState -Container $Container -Blob $operation.Name -Context $context
             if ($status.Status -eq "Success") {
                 Write-LogInfo "$($operation.Name): $($context.StorageAccountName) : Done : 100 %"
             } elseif ($status.Status -eq "Failed") {
@@ -243,7 +242,7 @@ Function Register-AzureSubscription($secretsFile) {
         Write-LogInfo "Authenticating Azure PS session using Service Principal..."
         $pass = ConvertTo-SecureString $key -AsPlainText -Force
         $mycred = New-Object System.Management.Automation.PSCredential ($ClientID, $pass)
-        $null = Add-AzureRmAccount -ServicePrincipal -Tenant $TenantID -Credential $mycred
+        $null = Add-AzAccount -ServicePrincipal -Tenant $TenantID -Credential $mycred
     } else {
         Throw "Unable to authenticate Azure subscription due to missing ClientID and/or Key in secret file."
     }
