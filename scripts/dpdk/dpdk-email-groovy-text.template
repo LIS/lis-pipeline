@@ -8,15 +8,21 @@ Test case description:
 
 * VERIFY-DPDK-COMPLIANCE - verifies kernel is supported and that the build is successful
 * VERIFY-DPDK-BUILD-AND-TESTPMD-TEST - verifies using testpmd that packets can be sent from a VM to another VM
-* VERIFY-DPDK-OVS - builds OVS with DPDK support and tests if the OVS DPDK ports can be created (only on Ubuntu)
 * VERIFY-SRIOV-FAILSAFE-FOR-DPDK - disables/enables Accelerated Networking for the NICs under test and makes sure DPDK works in both scenarios
 * VERIFY-DPDK-FAILSAFE-DURING-TRAFFIC - disables/enables Accelerated Networking for the NICs while generating traffic using testpmd
+
 * PERF-DPDK-FWD-PPS-DS15 - verifies DPDK forwarding performance using testpmd on 2, 4, 8 cores, rx and io mode on size Standard_DS15_v2
 * PERF-DPDK-SINGLE-CORE-PPS-DS4 - verifies DPDK performance using testpmd on 1 core, rx and io mode on size Standard_DS4_v2
 * PERF-DPDK-SINGLE-CORE-PPS-DS15 - verifies DPDK performance using testpmd on 1 core, rx and io mode on size Standard_DS15_v2
 * PERF-DPDK-MULTICORE-PPS-DS15 - verifies DPDK performance using testpmd on 2, 4, 8 cores, rx and io mode on size Standard_DS15_v2
 * PERF-DPDK-MULTICORE-PPS-F32 - verifies DPDK performance using testpmd on 2, 4, 8, 16 cores, rx and io mode on size Standard_F32s_v2
+
 * DPDK-RING-LATENCY - verifies DPDK CPU latency using https://github.com/shemminger/dpdk-ring-ping.git
+* VERIFY-DPDK-PRIMARY-SECONDARY-PROCESSES - verifies primary / secondary processes support for DPDK. Runs only on RHEL and Ubuntu distros with Linux kernel >= 4.20
+
+* VERIFY-DPDK-OVS - builds OVS with DPDK support and tests if the OVS DPDK ports can be created. Runs only on Ubuntu distro.
+* VERIFY-DPDK-VPP - builds VPP with DPDK support and tests if the VPP ports are present. Runs only on RHEL and Ubuntu distros.
+* VERIFY-DPDK-NFF-GO - builds NFF-GO with DPDK support and runs the functional tests from the NFF-GO repository. Runs only on Ubuntu distro.
 TEST_RESULTS
 
 Thank you,
