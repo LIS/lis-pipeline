@@ -51,7 +51,7 @@
             Write-LogInfo "Creating VM Config (Setting NIC -Id '$($NIC.Id)')..."
             $VMConfig3 = Add-AzVMNetworkInterface -Id $NIC.Id -VM $VMConfig2
             Write-LogInfo "Creating VM Config (BootDiagnostics -StorageAccountName '$BootDiagnosticStorageAccount')..."
-            $VMConfig4 = Set-AzVMBootDiagnostics -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
+            $VMConfig4 = Set-AzVMBootDiagnostic -VM $VMConfig3 -Enable -StorageAccountName $BootDiagnosticStorageAccount -ResourceGroupName $ResourceGroupName
             Write-LogInfo "Creating Virtual Machine : '$NAME' -Location '$Location'..."
             $VM = New-AzVM -ResourceGroupName $ResourceGroupName -VM $VMConfig4 -Location $Location -Verbose
             Write-LogInfo "Virtual Machine '$NAME' is created. Check progress in resource group : '$ResourceGroupName'"

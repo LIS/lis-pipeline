@@ -11,7 +11,7 @@ Important Notes:
 
     LIS-RPM-BUILD-RESOURCE-GROUP (Name can be anything)
     |--StorageAccount (say lisbuild0001. Should be passed to this script as string parameter)
-    |--|--vhdsrepo (This is container. Name is case-sensitive)
+    |--|--basevhdrepo (This is container. Name is case-sensitive)
     |--|--|--lis_build_centos_73_x64.vhd (This VHD should be present in container with exact name.)
     |--|--|--lis_build_centos_74_x64.vhd (This VHD should be present in container with exact name.)
     |--|--|--lis_build_centos_75_x64.vhd (This VHD should be present in container with exact name.)
@@ -76,7 +76,7 @@ try {
     Write-LogInfo "Get-AzStorageContainer..."
     $allDiskNames = @()
     $VHDCopyOperations = @()
-    $SourceContainer = "vhdsrepo"
+    $SourceContainer = "basevhdrepo"
     $container = Get-AzStorageContainer -Context $context -ConcurrentTaskCount 64 | Where-Object { $_.Name -eq $SourceContainer }
     $TotalKernels = $DistroKernelVersions.split(",").Count
 
@@ -106,9 +106,11 @@ try {
 
     # Poll and wait till VHD copy.
     Test-VHDCopyOperations -VHDCopyOperations $VHDCopyOperations -context $context -Container $SourceContainer
+    $blobs = Get-AzStorageBlob -Container $container.Name -Context $context
     # Create a new VM for each copied VHD.
     $CreatedVMs = @()
     foreach ($operation in $VHDCopyOperations) {
+        $blob = $blobs | Where-Object { $_.ICloudBlob.Uri.AbsoluteUri -eq $operation.ICloudBlob.Uri.AbsoluteUri }
         $OSDiskConfig = New-AzDiskConfig -AccountType Standard_LRS `
             -Location $storageAccount.Location -CreateOption Import `
             -SourceUri $operation.ICloudBlob.Uri.AbsoluteUri -OsType Linux
@@ -124,8 +126,7 @@ try {
                 if (-not $?) {
                     Throw "Disk Creation Failed. Retrying..."
                 } else {
-                    $blob = $blobs | Where-Object { $_.ICloudBlob.Uri.AbsoluteUri -eq $operation.ICloudBlob.Uri.AbsoluteUri }
-                    $null = $blob | Remove-AzStorageBlob -Force
+                    $null = $blob | Remove-AzStorageBlob -Force -Verbose
                     if ($?) {
                         Write-LogInfo "$($blob.ICloudBlob.Uri.AbsoluteUri) deleted successfully."
                     } else {
