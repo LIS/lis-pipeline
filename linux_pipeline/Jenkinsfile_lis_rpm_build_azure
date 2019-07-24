@@ -1,3 +1,5 @@
+#!/usr/bin/env groovy
+
 // Wrapper to execute powershell scripts / commands
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
@@ -41,13 +43,26 @@ node ("meta_slave") {
         env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY = readFile 'LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY.tmp'
     }
 
+    stage ('Turn ON Build VMs') {
+        node('azure') {
+            git branch: "master", url: "https://github.com/LIS/lis-pipeline.git"
+            withCredentials([file(credentialsId: 'Azure_Secrets_File_LIS_Val', variable: 'Azure_Secrets_File_LIS_Val')]) {
+                RunPowershellCommand(".\\scripts\\lis_hotfix_pipeline\\lis-build-vm-power-on-off.ps1"+
+                                " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
+                                " -secretsFile '${Azure_Secrets_File_LIS_Val}' " +
+                                " -Operation On"
+                                )
+            }
+        }
+    }
+
     stage ('Generate Build Files') {
         node('azure') {
             git branch: "${build_rpm_source_branch}", url: "${build_rpm_source}"
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+            withCredentials([file(credentialsId: 'Azure_Secrets_File_LIS_Val', variable: 'Azure_Secrets_File_LIS_Val')]) {
                 RunPowershellCommand(".\\CreatePBuild-IP-Files.ps1"+
                                 " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
-                                " -secretsFile '${Azure_Secrets_File}' "
+                                " -secretsFile '${Azure_Secrets_File_LIS_Val}' "
                                 )
             }
             stash includes: '*.pbuild', name: 'LISISO_PBUILD'
@@ -59,7 +74,7 @@ node ("meta_slave") {
         def Distros = [:]
         if( ( distro == 'all') || ( distro == 'rh5')) {
             Distros["RH5"] = {
-                node('lisbuilddemo') {
+                node('lis-rpm-build-controller-vm') {
                     try {
                         stage ('RH5') {
                             cleanWs()
@@ -79,7 +94,7 @@ node ("meta_slave") {
         }
         if( ( distro == 'all') || ( distro == 'rh6')) {
             Distros["RH6"] = {
-                node('lisbuilddemo') {
+                node('lis-rpm-build-controller-vm') {
                     try {
                         stage ('RH6') {
                             cleanWs()
@@ -98,7 +113,7 @@ node ("meta_slave") {
         }
         if( ( distro == 'all') || ( distro == 'rh7')) {
             Distros["RH7"] =  {
-                node("lisbuilddemo") {
+                node("lis-rpm-build-controller-vm") {
                     try {
                         stage ('RH7') {
                             cleanWs()
@@ -161,6 +176,19 @@ node ("meta_slave") {
                 archiveArtifacts 'LIS_RPM_URL.txt'
                 archiveArtifacts 'LIS_ISO_URL.txt'
                 stash includes: '*.azure.env', name: 'azure.env'
+            }
+        }
+    }
+
+    stage ('Turn OFF Build VMs') {
+        node('azure') {
+            git branch: "master", url: "https://github.com/LIS/lis-pipeline.git"
+            withCredentials([file(credentialsId: 'Azure_Secrets_File_LIS_Val', variable: 'Azure_Secrets_File_LIS_Val')]) {
+                RunPowershellCommand(".\\scripts\\lis_hotfix_pipeline\\lis-build-vm-power-on-off.ps1"+
+                                " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
+                                " -secretsFile '${Azure_Secrets_File_LIS_Val}' " +
+                                " -Operation Off"
+                                )
             }
         }
     }
