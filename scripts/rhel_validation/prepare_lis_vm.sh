@@ -35,19 +35,25 @@ function prepare_vm {
     done
     yum clean all
     yum -y install wget gcc redhat-lsb-core
-    yum -y install kernel-${kernel_version}
-    if [[ $? -ne 0 ]];then
-	    printf "\n kernel-${kernel_version} installation failed \n"
-    fi
-    yum -y install kernel-devel-${kernel_version}
 
     mkdir "${kernel_version}"
     pushd "${kernel_version}"
 
     yum -y install yum-utils
-    yumdownloader -y kernel-${kernel_version} kernel-devel-${kernel_version} --resolve
+    yumdownloader -y kernel-${kernel_version} kernel-devel-${kernel_version} --resolve --destdir=$(pwd)
+
+    # yumdownloader is downloading kernel-firmware of current installed kernel, which is not required and creates conflict for later testing
+    # Hence removing kernel-firmware package of installed kernel
+    kernel_firmware=$(rpm -q kernel-firmware)
+    rm -rf $kernel_firmware.rpm
 
     popd
+
+    yum -y install kernel-${kernel_version}
+    if [[ $? -ne 0 ]];then
+	    printf "\n kernel-${kernel_version} installation failed \n"
+    fi
+    yum -y install kernel-devel-${kernel_version}
 
     storage_account=$(echo $storage_account|sed -e 's/[\r\n]//g')
     storage_sas_token=$(echo $storage_sas_token|sed -e 's/[\r\n]//g')
