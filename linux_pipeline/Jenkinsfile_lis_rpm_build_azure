@@ -149,34 +149,32 @@ node ("meta_slave") {
         node ('azure') {
             cleanWs()
             unstash 'LISAv2'
-            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
-                unstash 'lisrpmtarball'
-                unstash 'lisrpmiso'
-                RunPowershellCommand("Set-Variable -Name LogDir -Value '.' -Scope Global; Set-Variable -Name LogFileName -Value 'UploadFiles.log.txt' -Scope Global;" +
-                '$LIS_RPM_URL = ' +  ".\\Utilities\\UploadFilesToStorageAccount.ps1" +
-                ' -filePaths $((Get-ChildItem "*.tar.gz").Name)'  +
-                " -destinationStorageAccount '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT}'" +
-                " -destinationStorageKey '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY}'" +
-                " -destinationContainer lis-rpm-builds" +
-                " -destinationFolder 'lis-builds'" +
-                '; Set-Content -Value $LIS_RPM_URL -Path LIS_RPM_DOWNLOAD_URL.azure.env -Force -NoNewline' +
-                '; Write-Host $LIS_RPM_URL' +
-                '; Set-Content -Path LIS_RPM_URL.txt -Value $LIS_RPM_URL -Force -Verbose -NoNewline'
-                )
-                RunPowershellCommand("Set-Variable -Name LogDir -Value '.' -Scope Global; Set-Variable -Name LogFileName -Value 'UploadFiles.log.txt' -Scope Global;" +
-                '$LIS_ISO_URL = ' +  ".\\Utilities\\UploadFilesToStorageAccount.ps1" +
-                ' -filePaths $((Get-ChildItem "*.iso").Name)'  +
-                " -destinationStorageAccount '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT}'" +
-                " -destinationStorageKey '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY}'" +
-                " -destinationContainer lis-rpm-builds" +
-                " -destinationFolder 'lis-builds'" +
-                '; Write-Host $LIS_ISO_URL; '  +
-                '; Set-Content -Path LIS_ISO_URL.txt -Value $LIS_ISO_URL -Force -Verbose -NoNewline'
-                )
-                archiveArtifacts 'LIS_RPM_URL.txt'
-                archiveArtifacts 'LIS_ISO_URL.txt'
-                stash includes: '*.azure.env', name: 'azure.env'
-            }
+            unstash 'lisrpmtarball'
+            unstash 'lisrpmiso'
+            RunPowershellCommand("Set-Variable -Name LogDir -Value '.' -Scope Global; Set-Variable -Name LogFileName -Value 'UploadFiles.log.txt' -Scope Global;" +
+            '$LIS_RPM_URL = ' +  ".\\Utilities\\UploadFilesToStorageAccount.ps1" +
+            ' -filePaths $((Get-ChildItem "*.tar.gz").Name)'  +
+            " -destinationStorageAccount '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT}'" +
+            " -destinationStorageKey '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY}'" +
+            " -destinationContainer lis-rpm-builds" +
+            " -destinationFolder 'lis-builds'" +
+            '; Set-Content -Value $LIS_RPM_URL -Path LIS_RPM_DOWNLOAD_URL.azure.env -Force -NoNewline' +
+            '; Write-Host $LIS_RPM_URL' +
+            '; Set-Content -Path LIS_RPM_URL.txt -Value $LIS_RPM_URL -Force -Verbose -NoNewline'
+            )
+            RunPowershellCommand("Set-Variable -Name LogDir -Value '.' -Scope Global; Set-Variable -Name LogFileName -Value 'UploadFiles.log.txt' -Scope Global;" +
+            '$LIS_ISO_URL = ' +  ".\\Utilities\\UploadFilesToStorageAccount.ps1" +
+            ' -filePaths $((Get-ChildItem "*.iso").Name)'  +
+            " -destinationStorageAccount '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT}'" +
+            " -destinationStorageKey '${env.LIS_RPM_BUILD_PUBLISH_STORAGE_ACCOUNT_KEY}'" +
+            " -destinationContainer lis-rpm-builds" +
+            " -destinationFolder 'lis-builds'" +
+            '; Write-Host $LIS_ISO_URL; '  +
+            '; Set-Content -Path LIS_ISO_URL.txt -Value $LIS_ISO_URL -Force -Verbose -NoNewline'
+            )
+            archiveArtifacts 'LIS_RPM_URL.txt'
+            archiveArtifacts 'LIS_ISO_URL.txt'
+            stash includes: '*.azure.env', name: 'azure.env'
         }
     }
 
@@ -222,7 +220,7 @@ node ("meta_slave") {
                 try {
                     stage ("${it}") {
                         node('azure') {
-                            withCredentials([file(credentialsId: 'Azure_Secrets_File', variable: 'Azure_Secrets_File')]) {
+                            withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
                                 cleanWs()
                                 echo "Current Image: ${it}"
                                 unstash 'azure.env'
@@ -236,7 +234,7 @@ node ("meta_slave") {
                                 " -CustomLIS '${LIS_DOWNLOAD_URL}'" +
                                 " -TestNames 'VERIFY-DEPLOYMENT-PROVISION,LIS-DRIVER-VERSION-CHECK'" +
                                 " -StorageAccount 'ExistingStorage_Standard'" +
-                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                " -XMLSecretFile '${Azure_Secrets_TESTONLY_File}'" +
                                 " -CustomParameters 'DiskType=Managed'" +
                                 " -ExitWithZero" +
                                 " -EnableTelemetry"
