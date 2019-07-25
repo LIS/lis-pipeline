@@ -99,6 +99,9 @@ def getTests(priority, platform) {
 										HV_P3_NVME_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Functional -TestArea NVME",
 										HV_P3_MIGRATE_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Functional -TestArea MIGRATION"]
 
+	def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_MsftKernel'",
+		PERF_LATENCY:"-TestNames 'PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV' -ResultDBTable 'Perf_Network_Latency_Azure_MsftKernel'",
+		PERF_STORAGE_4K:"-TestNames 'PERF-STORAGE-4K-IO,PERF-NVME-4K-IO' -ResultDBTable 'Perf_Storage_Azure_MsftKernel'"]
 
 	if ("${priority}" == "P0") {
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P0
@@ -113,7 +116,8 @@ def getTests(priority, platform) {
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P0
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P1
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P2
-		HYPERV_VALIDATION_TESTS_HASH = HYPERV_VALIDATION_TESTS_HASH_P2
+		HYPERV_VALIDATION_TESTS_HASH = HYPERV_VALIDATION_TESTS_HASH_P1
+		//HYPERV_VALIDATION_TESTS_HASH = HYPERV_VALIDATION_TESTS_HASH_P2
 	}
 	if ("${priority}" == "P3") {
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P0
@@ -121,6 +125,9 @@ def getTests(priority, platform) {
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P2
 		AZURE_VALIDATION_TESTS_HASH += AZURE_VALIDATION_TESTS_HASH_P3
 		HYPERV_VALIDATION_TESTS_HASH = HYPERV_VALIDATION_TESTS_HASH_P3
+	}
+	if ("${platform}".contains("PERF")) {
+		return AZURE_PERFORMANCE_TESTS_HASH
 	}
 	if ("${platform}".contains("Azure")) {
 		return AZURE_VALIDATION_TESTS_HASH
@@ -163,7 +170,7 @@ pipeline {
 		choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
 		choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
 		choice(choices: 'P0\nP1\nP2\nP3\n', description: 'Priority', name: 'PRIORITY')
-		string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_jessie_hyperv, validation_hyperv, publish_azure_vhd, validation_azure, publish_results, send_mail",
+		string(defaultValue: "build_artifacts, publish_temp_artifacts, boot_test, publish_artifacts, validation, validation_jessie_hyperv, validation_hyperv, publish_azure_vhd, validation_azure, validation_jessie_perf, validation_perf, publish_results, send_mail",
 		description: 'What stages to run', name: 'ENABLED_STAGES')
 	}
 	environment {
@@ -604,7 +611,6 @@ pipeline {
 					}
 				}
 
-
 				stage('validation_azure') {
 					when {
 						beforeAgent true
@@ -684,98 +690,181 @@ pipeline {
 			}
 		}
 
-		stage('validation_jessie_hyperv') {
-			when {
-				beforeAgent true
-				expression { params.ENABLED_STAGES.contains('validation_jessie_hyperv') }
-				expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
-			}
-			agent {
-				node {
-					label 'hyper-v'
-				}
-			}
-			steps {
-				script {
-					hashtableHV=[:]
-					hashtableHV=getTests("${PRIORITY}", "HyperV")
-					def stepsForParallel = [:]
-					hashtableHV.each {
-						def stepName = it.key
-						def test_cmd = it.value
-						stepsForParallel[stepName] = { ->
-							if (test_cmd.contains("-TestArea SRIOV")){
-								LABEL_NAME = "sriov_pipelines"
-							} else if (test_cmd.contains("-TestArea NVME")) {
-								LABEL_NAME = 'hy_nvme'
-							} else if (test_cmd.contains("-TestArea MIGRATION")) {
-								LABEL_NAME = 'live_migration'
-							} else {
-								LABEL_NAME = 'hyper-v'
-							}
-							node("${LABEL_NAME}") {
-								try {
-									stage("${stepName}") {
-										withCredentials(bindings: [
-											file(credentialsId: 'HyperV_Secrets_File',
-											variable: 'HyperV_Secrets_File'),
-											string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-											variable: 'LISAV2_IMAGES_SHARE_URL'),
-											string(credentialsId:'SRIOV_TEST_LOCATION',
-											variable: 'SRIOV_TEST_LOCATION')
-											]) {
-											dir ("..\\${DEBIAN_DISTRO}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
-												deleteDir()
-												prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
-												unstashKernel(env.KERNEL_ARTIFACTS_PATH)
-												script {
-													if (test_cmd.contains("-TestArea SRIOV")){
-														LOCATION = "${SRIOV_TEST_LOCATION}"
-													} else {
-														LOCATION = "localhost"
-													}
-													env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DEBIAN_DISTRO)
-												}
-												println("Current VHD: ${env.HYPERV_VHD_PATH}")
-												try {
-													RunPowershellCommand(".\\Run-LisaV2.ps1" +
-													" -TestLocation '${LOCATION}'" +
-													" -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
-													" -TestPlatform 'HyperV'" +
-													" ${test_cmd}" +
-													" -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-													" -OsVHD '${HYPERV_VHD_PATH}'" +
-													" -XMLSecretFile '${HyperV_Secrets_File}'" +
-													" -ResourceCleanup Delete" +
-													" -ExitWithZero")
-												} finally {
-													junit "Report\\*-junit.xml"
-													archiveArtifacts "*-TestLogs.zip"
-													script {
-														def passCount = GetTestResults("pass")
-														def abortCount = GetTestResults("abort")
-														def failCount = GetTestResults("fail")
-														def skippedCount = GetTestResults("skipped")
-														FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
-														FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
-														FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
-														FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
-													}
-												}
-												deleteDir()
-											}
-										}
-									}
-								} catch (exc) {
-									println exc
-									println "HV-Jessie-Validation-${stepName}: STAGE_FAILED_EXCEPTION."
-									currentBuild.result = 'SUCCESS'
-								}
-							}
+		stage('validation_jessie_perf') {
+			parallel {
+				stage('validation_jessie_hyperv') {
+					when {
+						beforeAgent true
+						expression { params.ENABLED_STAGES.contains('validation_jessie_hyperv') }
+						expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+					}
+					agent {
+						node {
+							label 'hyper-v'
 						}
 					}
-					parallel stepsForParallel
+					steps {
+						script {
+							hashtableHV=[:]
+							hashtableHV=getTests("${PRIORITY}", "HyperV")
+							def stepsForParallel = [:]
+							hashtableHV.each {
+								def stepName = it.key
+								def test_cmd = it.value
+								stepsForParallel[stepName] = { ->
+									if (test_cmd.contains("-TestArea SRIOV")){
+										LABEL_NAME = "sriov_pipelines"
+									} else if (test_cmd.contains("-TestArea NVME")) {
+										LABEL_NAME = 'hy_nvme'
+									} else if (test_cmd.contains("-TestArea MIGRATION")) {
+										LABEL_NAME = 'live_migration'
+									} else {
+										LABEL_NAME = 'hyper-v'
+									}
+									node("${LABEL_NAME}") {
+										try {
+											stage("${stepName}") {
+												withCredentials(bindings: [
+													file(credentialsId: 'HyperV_Secrets_File',
+													variable: 'HyperV_Secrets_File'),
+													string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+													variable: 'LISAV2_IMAGES_SHARE_URL'),
+													string(credentialsId:'SRIOV_TEST_LOCATION',
+													variable: 'SRIOV_TEST_LOCATION')
+													]) {
+													dir ("..\\${DEBIAN_DISTRO}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+														deleteDir()
+														prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+														unstashKernel(env.KERNEL_ARTIFACTS_PATH)
+														script {
+															if (test_cmd.contains("-TestArea SRIOV")){
+																LOCATION = "${SRIOV_TEST_LOCATION}"
+															} else {
+																LOCATION = "localhost"
+															}
+															env.HYPERV_VHD_PATH = getVhdLocation(LISAV2_IMAGES_SHARE_URL, DEBIAN_DISTRO)
+														}
+														println("Current VHD: ${env.HYPERV_VHD_PATH}")
+														try {
+															RunPowershellCommand(".\\Run-LisaV2.ps1" +
+															" -TestLocation '${LOCATION}'" +
+															" -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+															" -TestPlatform 'HyperV'" +
+															" ${test_cmd}" +
+															" -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
+															" -OsVHD '${HYPERV_VHD_PATH}'" +
+															" -XMLSecretFile '${HyperV_Secrets_File}'" +
+															" -ResourceCleanup Delete" +
+															" -ExitWithZero")
+														} finally {
+															junit "Report\\*-junit.xml"
+															archiveArtifacts "*-TestLogs.zip"
+															script {
+																def passCount = GetTestResults("pass")
+																def abortCount = GetTestResults("abort")
+																def failCount = GetTestResults("fail")
+																def skippedCount = GetTestResults("skipped")
+																FUNC_PASS_ONLOCAL = FUNC_PASS_ONLOCAL.toInteger() + passCount.toInteger()
+																FUNC_ABORT_ONLOCAL = FUNC_ABORT_ONLOCAL.toInteger() + abortCount.toInteger()
+																FUNC_FAIL_ONLOCAL = FUNC_FAIL_ONLOCAL.toInteger() + failCount.toInteger()
+																FUNC_SKIP_ONLOCAL = FUNC_SKIP_ONLOCAL.toInteger() + skippedCount.toInteger()
+															}
+														}
+														deleteDir()
+													}
+												}
+											}
+										} catch (exc) {
+											println exc
+											println "HV-Jessie-Validation-${stepName}: STAGE_FAILED_EXCEPTION."
+											currentBuild.result = 'SUCCESS'
+										}
+									}
+								}
+							}
+							parallel stepsForParallel
+						}
+					}
 				}
+
+				stage('validation_perf') {
+					when {
+						beforeAgent true
+						expression { params.ENABLED_STAGES.contains('validation_perf') }
+						expression { params.DISTRO_VERSION.toLowerCase().contains('ubuntu') }
+						expression { params.KERNEL_DEBUG.toLowerCase().contains('false') }
+					}
+					agent {
+						node {
+							label 'azure'
+						}
+					}
+					steps {
+						script {
+							hashtableAZ=[:]
+							hashtableAZ=getTests("${PRIORITY}", "PERF")
+							def stepsForParallel = [:]
+							hashtableAZ.each {
+								def stepName = it.key
+								def test_cmd = it.value
+								stepsForParallel[stepName] = { ->
+									node('azure') {
+										try {
+											stage("${stepName}") {
+												withCredentials(bindings: [
+													file(credentialsId: 'Azure_Secrets_TESTONLY_File',
+													variable: 'Azure_Secrets_File')
+												]) {
+													dir ("..\\${DISTRO_VERSION}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${stepName}") {
+														deleteDir()
+														prepareEnv(LISAV2_BRANCH, LISAV2_REMOTE, DISTRO_VERSION)
+														unstash 'CapturedVHD.azure.env'
+														script {
+															env.CapturedVHD = readFile 'CapturedVHD.azure.env'
+														}
+														println("VHD under test : ${env.CapturedVHD}")
+														try {
+															RunPowershellCommand(".\\Run-LisaV2.ps1" +
+															" -TestLocation '${LISAV2_AZURE_REGION}'" +
+															" -RGIdentifier '${LISAV2_RG_IDENTIFIER}'" +
+															" -TestPlatform 'Azure'" +
+															" ${test_cmd}" +
+															" -OsVHD '${CapturedVHD}'" +
+															" -XMLSecretFile '${Azure_Secrets_File}'" +
+															" -ResourceCleanup Delete" +
+															" -ResultDBTestTag 'msft_${env.BUILD_NUMBER}'" +
+															" -ExitWithZero")
+														} finally {
+															junit "Report\\*-junit.xml"
+															archiveArtifacts "*-TestLogs.zip"
+															script {
+																def passCount = GetTestResults("pass")
+																def abortCount = GetTestResults("abort")
+																def failCount = GetTestResults("fail")
+																def skippedCount = GetTestResults("skipped")
+																FUNC_PASS_ONAZURE = FUNC_PASS_ONAZURE.toInteger() + passCount.toInteger()
+																FUNC_ABORT_ONAZURE = FUNC_ABORT_ONAZURE.toInteger() + abortCount.toInteger()
+																FUNC_FAIL_ONAZURE = FUNC_FAIL_ONAZURE.toInteger() + failCount.toInteger()
+																FUNC_SKIP_ONAZURE = FUNC_SKIP_ONAZURE.toInteger() + skippedCount.toInteger()
+															}
+														}
+														deleteDir()
+													}
+												}
+											}
+										} catch (exc) {
+											println exc
+											println "Azure-Validation-${stepName}: STAGE_FAILED_EXCEPTION."
+											currentBuild.result = 'SUCCESS'
+										}
+									}
+								}
+							}
+							parallel stepsForParallel
+						}
+					}
+				}
+
 			}
 		}
 
