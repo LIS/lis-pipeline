@@ -77,17 +77,36 @@ def ReportException(stageName, exc) {
     }
 }
 
-def GetErrataKernelLink(kernelVersion) {
-    println "storage account ${env.STORAGE_ACCOUNT_NAME} kernel version ${kernelVersion}"
-    return "https://${env.STORAGE_ACCOUNT_NAME}.blob.core.windows.net/kernel/${kernelVersion}/kernel-${kernelVersion}.x86_64.rpm"
-}
-
-def CheckerrataLink(errataLink) {
+def CheckerrataLink(kernelVersion) {
+    def errataKernelDir = "https://${env.STORAGE_ACCOUNT_NAME}.blob.core.windows.net/kernel/${kernelVersion}/"
+    def errataKernelLink = "${errataKernelDir}kernel-${kernelVersion}.x86_64.rpm"
     def status = sh (returnStatus: true, script: """
-        wget ${errataLink}
+        wget -q ${errataKernelLink}
         """ )
     if ( status != 0) {
-        throw new Exception("${errataLink} is unreachable.")
+        throw new Exception("${errataKernelLink} is unreachable.")
+    }
+    CleanWorkspace()
+    return errataKernelDir
+}
+
+def DownloadStashKernelPackages(storage, sasKey, azcopyLink, kernelVersion)
+{
+    node('jenkins-meta-slave') {
+        sourceDir = CheckerrataLink("${kernelVersion}")
+        def status = sh (returnStatus: true, script: """#!/bin/bash
+        wget -q -O azcopy.tar.gz ${azcopyLink}
+        tar -xf azcopy.tar.gz
+	azcopy_dir=\$(tar -tf azcopy.tar.gz | head -1)
+        \$azcopy_dir/azcopy copy '${sourceDir}${sasKey}' . --recursive=true
+        tar -C ./${kernelVersion}/ -cvf ${kernelVersion}.tar.gz \$(ls ./${kernelVersion})
+        """)
+        if ( status != 0) {
+            throw new Exception("Failed to download ${kernelVersion}" )
+        }
+        //stash the kernel packages
+        stash includes: "${kernelVersion}.tar.gz", name: "Package-${kernelVersion}-stash"
+        CleanWorkspace()
     }
 }
 
@@ -151,6 +170,7 @@ def CaptureImageWithCustomErrata(distro, errata) {
     withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
         def currentVHD = "${distro}"
         Prepare()
+        unstash "Package-${errata}-stash"
         def Command = ".\\Run-LisaV2.ps1"
         Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
         Command += " -TestPlatform 'Azure'"
@@ -163,7 +183,7 @@ def CaptureImageWithCustomErrata(distro, errata) {
         Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
         Command += " -OverrideVMSize 'Standard_DS2_v2'"
         Command += " -ARMImageName '${currentVHD}'"
-        Command += " -CustomKernel '${errata}'"
+        Command += " -CustomKernel 'localfile:${errata}.tar.gz'"
         Command += " -CustomParameters 'DiskType=Unmanaged'"
         println Command
         RunPowershellCommand(Command)
@@ -183,6 +203,7 @@ def CaptureImageWithCustomLIS(distro, errata, rpmURL) {
     withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
         def currentVHD = "${distro}"
         Prepare()
+        unstash "Package-${errata}-stash"
         def Command = ".\\Run-LisaV2.ps1"
         Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
         Command += " -TestPlatform 'Azure'"
@@ -195,7 +216,7 @@ def CaptureImageWithCustomLIS(distro, errata, rpmURL) {
         Command += " -TestNames 'CAPTURE-VHD-BEFORE-TEST'"
         Command += " -OverrideVMSize 'Standard_DS2_v2'"
         Command += " -ARMImageName '${currentVHD}'"
-        Command += " -CustomKernel '${errata}'"
+        Command += " -CustomKernel 'localfile:${errata}.tar.gz'"
         Command += " -CustomLIS '${rpmURL}'"
         Command += " -CustomParameters 'DiskType=Unmanaged'"
         println Command
@@ -224,16 +245,20 @@ node ("jenkins-meta-slave") {
                 . ${LIS_HOTFIX_CONFIGURE_FILE}
                 echo -n "\$LIS_HOTFIX_STORAGE_ACCOUNT" > LIS_HOTFIX_STORAGE_ACCOUNT.tmp
                 echo -n "\$LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT" > LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp
+                echo -n "\$LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY" > LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY.tmp
                 echo -n "\$LIS_BUILD_VM_USERNAME" > LIS_BUILD_VM_USERNAME.tmp
                 echo -n "\$LIS_BUILD_VM_PASSWORD" > LIS_BUILD_VM_PASSWORD.tmp
                 echo -n "\$LIS_REDMOND_SHARE_PATH" > LIS_REDMOND_SHARE_PATH.tmp
+                echo -n "\$AZCOPY_DOWNLOAD_LINK" > AZCOPY_DOWNLOAD_LINK.tmp
                 """ )
             }
             env.STORAGE_ACCOUNT_NAME = readFile 'LIS_HOTFIX_STORAGE_ACCOUNT.tmp'
             env.LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT = readFile 'LIS_HOTFIX_BOOTDIAG_STORAGE_ACCOUNT.tmp'
+            env.LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY = readFile 'LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY.tmp'
             env.LIS_BUILD_VM_USERNAME = readFile 'LIS_BUILD_VM_USERNAME.tmp'
             env.LIS_BUILD_VM_PASSWORD = readFile 'LIS_BUILD_VM_PASSWORD.tmp'
             env.LIS_REDMOND_SHARE_PATH = readFile 'LIS_REDMOND_SHARE_PATH.tmp'
+            env.AZCOPY_DOWNLOAD_LINK = readFile 'AZCOPY_DOWNLOAD_LINK.tmp'
 
             CleanWorkspace()
             git branch: env.GIT_BRANCH, url: env.GIT_REPO
@@ -245,8 +270,8 @@ node ("jenkins-meta-slave") {
                 distro = HotfixTargetList[i].split('=')[0]
                 version = HotfixTargetList[i].split('=')[1]
                 println "Input distro: ${distro} version ${version}"
-                def custom_kernel = GetErrataKernelLink("${version}")
-                CheckerrataLink("${custom_kernel}")
+                //Get the kernel packages from storage blob and stash it
+                DownloadStashKernelPackages("${env.STORAGE_ACCOUNT_NAME}","${env.LIS_HOTFIX_STORAGE_ACCOUNT_SAS_KEY}", "${env.AZCOPY_DOWNLOAD_LINK}","${version}")
             }
             def body = ""
             body += "<br/>New non compatible errata kernel have been detected:<br/>"
@@ -360,7 +385,6 @@ node ("jenkins-meta-slave") {
             for (count = 0; count < TotalHotfixErratas; count++) {
                 def testDistro = HotfixTargetList[count].split('=')[0]
                 def version = HotfixTargetList[count].split('=')[1]
-                def errataKernel = GetErrataKernelLink("${version}")
                 def DistroList = [ ArmImagesCentOS[testDistro], ArmImagesRHEL[testDistro] ]
                 def total_test_images = DistroList.size()
                 for (i = 0; i < total_test_images; i++) {
@@ -375,7 +399,7 @@ node ("jenkins-meta-slave") {
                                     sleep "${delay}"
                                     println "Running test: ${currentTest}..."
                                     node('azure') {
-                                        CaptureImageWithCustomErrata("${currentDistro}", "${errataKernel}")
+                                        CaptureImageWithCustomErrata("${currentDistro}", "${version}")
                                     }
                                 }
                                 catch (exc) {
@@ -395,7 +419,7 @@ node ("jenkins-meta-slave") {
                                     sleep "${delay}"
                                     println "Running test: ${currentTest}..."
                                     node('azure') {
-                                        CaptureImageWithCustomLIS("${currentDistro}", "${errataKernel}", "${CustomLIS}")
+                                        CaptureImageWithCustomLIS("${currentDistro}", "${version}", "${CustomLIS}")
                                     }
                                 }
                                 catch (exc) {
@@ -423,8 +447,7 @@ node ("jenkins-meta-slave") {
                 for (i=0; i < TotalHotfixErratas; i++) {
                     def distro = HotfixTargetList[i].split('=')[0]
                     def version = HotfixTargetList[i].split('=')[1]
-                    def errataKernel = GetErrataKernelLink("${version}")
-                    println "LIS test for distro ${distro} version ${version} erretalink ${errataKernel}"
+                    println "LIS test for distro ${distro} version ${version}"
                     def DistroList = [ ArmImagesCentOS[distro], ArmImagesRHEL[distro] ]
                     def total_test_images = DistroList.size()
                     for (j = 0; j < total_test_images; j++) {
