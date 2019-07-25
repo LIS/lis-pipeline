@@ -238,7 +238,7 @@ def runBootSpeedTest() {
                     & ".\\lisa.ps1 -cmdVerb run -cmdNoun .\\xml\\boot_test.xml"
                         -dbgLevel "9"
                         -CLImageStorDir "${env:IMAGE_PATH}"
-                        -testParams ('BASE_TIME=5s;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
+                        -testParams ('BASE_TIME=10s;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
                         ''')
                 STAGES_RESULTS["Boot_Test"] = exitCode
                 archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
