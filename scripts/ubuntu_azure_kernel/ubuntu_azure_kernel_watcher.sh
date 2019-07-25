@@ -5,8 +5,7 @@
 # DESCRIPTION
 #
 #    This bash script is looking for linux-azure and linux-azure-edge proposed
-# kernels. There are 5 Ubuntu versions checked: Trusty, Xenial, Bionic, Cosmic,
-# Disco.
+# kernels. The following Ubuntu versions are checked: Trusty, Xenial, Bionic, Disco.
 # It will take the latest version available for each using apt-cache and compare
 # it to latest known version.
 #
@@ -94,7 +93,7 @@ EOM
 }
 
 # Main
-RELEASES=(trusty xenial bionic cosmic disco)
+RELEASES=(trusty xenial bionic disco)
 VERSION_HISTORY_LOCATION="/home/lisa/latest_versions.sh"
 VERSION_TO_TEST_LOCATION="/home/lisa/version_to_test.sh"
 . $VERSION_HISTORY_LOCATION
