@@ -19,25 +19,25 @@ function Remove-Dir {
     param (
         [String] $Dir
     )
-    
+
     $rmCmd = 'rmdir /s /q "' + $Dir + '"'
     cmd /c "${rmCmd}"
 }
 
 function login_azure {
     param (
-        [string] $rg = "", 
-        [string] $sa = "", 
+        [string] $rg = "",
+        [string] $sa = "",
         [string] $location = "" ,
         [bool] $createOnError = $false)
 
     . "C:\Framework-Scripts\secrets.ps1"
 
-    Import-AzureRmContext -Path 'C:\Azure\ProfileContext.ctx' > $null
-    Select-AzureRmSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID" > $null
+    Import-AzContext -Path 'C:\Azure\ProfileContext.ctx' > $null
+    Select-AzSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID" > $null
 
     if ($rg -ne "" -and $sa -ne "") {
-        $existingAccount = Get-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa
+        $existingAccount = Get-AzStorageAccount -ResourceGroupName $rg -Name $sa
         if ($? -eq $true) {
             #
             #  Existing account -- use it
@@ -46,18 +46,18 @@ function login_azure {
             if ($currentLoc -ne $location) {
                 if ($false -eq $createOnError) {
                 #
-                    #  Wrong region and we're suppposed to use existing.  This won't work, but we may not care         
+                    #  Wrong region and we're suppposed to use existing.  This won't work, but we may not care
                     Write-Warning "***************************************************************************************"
                     Write-Warning "Storage account $sa is in different region ($currentLoc) than current ($location)."
                     Write-Warning "       You will not be able to create any virtual machines from this account!"
                     Write-Warning "***************************************************************************************"
-                    Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+                    Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
                 } else {
                     #
                     #  Take it out and start over
-                    Remove-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Force
-                    New-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
-                    Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+                    Remove-AzStorageAccount -ResourceGroupName $rg -Name $sa -Force
+                    New-AzStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
+                    Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
                 }
             } else {
                 #
@@ -70,8 +70,8 @@ function login_azure {
             Write-Warning "***************************************************************************************"
             $sa = $null
         } else {
-            New-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS 
-            Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+            New-AzStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
+            Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
         }
     }
 
@@ -81,7 +81,7 @@ function login_azure {
 function make_cred () {
     . "C:\Framework-Scripts\secrets.ps1"
 
-    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PASS" 
+    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PASS"
     $cred = new-object -typename system.management.automation.pscredential -argumentlist "$TEST_USER_ACCOUNT_NAME",$pw
 
     return $cred
@@ -90,7 +90,7 @@ function make_cred () {
 function make_cred_initial () {
     . "C:\Framework-Scripts\secrets.ps1"
 
-    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PAS2" 
+    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PAS2"
     $cred = new-object -typename system.management.automation.pscredential -argumentlist "$TEST_USER_ACCOUNT_NAME",$pw
 
     return $cred

@@ -1,4 +1,4 @@
-﻿param (
+param (
     $LisaPath,
     $NewFile,
     $OldFile,
@@ -24,7 +24,7 @@ $HtmlStart = '
     <th class="tg-amwmleft">SR. #</th>
     <th class="tg-amwmleft">Region</th>
     <th class="tg-amwmleft">Size</th>
-    <th class="tg-amwmleft">Added/Removed</th>    
+    <th class="tg-amwmleft">Added/Removed</th>
   </tr>
 '
 
@@ -67,11 +67,11 @@ $HtmlEnd = '</table><p style="text-align: right;"><em><span style="font-size: 18
     Remove-Item -Path $OldFile -Verbose -Force
     Copy-Item -Path $NewFile -Destination $OldFile -Verbose -Force
     Remove-Item -Path $NewFile -Force -Verbose
-    $allRegions = (Get-AzureRMLocation | Where-Object {$_.Providers.Contains("Microsoft.Compute")}).Location
+    $allRegions = (Get-AzLocation | Where-Object {$_.Providers.Contains("Microsoft.Compute")}).Location
     foreach ( $region in $allRegions) {
         try {
             Write-Host "Getting VM sizes from $region"
-            $vmSizes = Get-AzureRmVMSize -Location $region
+            $vmSizes = Get-AzVMSize -Location $region
             foreach ( $vmSize in $vmSizes ) {
                 Add-Content -Value "$region $($vmSize.Name)" -Path $NewFile -Force
             }

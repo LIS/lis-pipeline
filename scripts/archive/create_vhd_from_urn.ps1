@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Mandatory=$false)] [string[]] $Incoming_vmNames,
     [Parameter(Mandatory=$false)] [string[]] $Incoming_blobURNs,
 
@@ -83,17 +83,17 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 $saLength = $destSA.Length
 Write-Host "Looking for storage account $destSA in resource group $destRG.  Length of name is $saLength"
 #
-$existingGroup = Get-AzureRmResourceGroup -Name $destRG
-$status = $? 
+$existingGroup = Get-AzResourceGroup -Name $destRG
+$status = $?
 if ($status -eq $true -and $existingGroup -ne $null -and $useExistingResources -eq "False") {
     write-host "Resource group already existed.  Deleting resource group." -ForegroundColor Yellow
-    Remove-AzureRmResourceGroup -Name $destRG -Force
+    Remove-AzResourceGroup -Name $destRG -Force
 
     write-host "Creating new resource group $destRG in loction $location"
-    New-AzureRmResourceGroup -Name $destRG -Location $location
+    New-AzResourceGroup -Name $destRG -Location $location
 } elseif ($status -eq $false -and $existingGroup -eq $null) {
     write-host "Creating new resource group $destRG in loction $location"
-    New-AzureRmResourceGroup -Name $destRG -Location $location
+    New-AzResourceGroup -Name $destRG -Location $location
 } else {
     write-host "Using existing resource group $destRG"
 }
@@ -105,34 +105,34 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 #
 #
 #  Change the name of the SA to include the region, then Now see if the SA exists
-$existing = Get-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA 
+$existing = Get-AzStorageAccount -ResourceGroupName $destRG -Name $destSA
 if ($? -eq $false -or $existing -eq $null) {
     Write-Host "Storage account $destSA did not exist.  Creating it and populating with the right containers..." -ForegroundColor Yellow
-    New-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA -Location $location -SkuName Standard_LRS -Kind Storage
+    New-AzStorageAccount -ResourceGroupName $destRG -Name $destSA -Location $location -SkuName Standard_LRS -Kind Storage
 
     write-host "Selecting it as the current SA" -ForegroundColor Yellow
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 
     Write-Host "creating the containers" -ForegroundColor Yellow
-    New-AzureStorageContainer -Name "ready-for-bvt" -Permission Blob
-    New-AzureStorageContainer -Name "drones" -Permission Blob
+    New-AzStorageContainer -Name "ready-for-bvt" -Permission Blob
+    New-AzStorageContainer -Name "drones" -Permission Blob
     Write-Host "Complete." -ForegroundColor Green
 }
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
 Write-Host "It required $elapsed to clean or validate the storage account"
 
 $commandTimer = [Diagnostics.Stopwatch]::StartNew()
-Get-AzureStorageBlob -Container "ready-for-bvt" -Prefix $vmName 
+Get-AzStorageBlob -Container "ready-for-bvt" -Prefix $vmName
 if ($? -eq $false) {
     Write-Host "creating the BVT ready container" -ForegroundColor Yellow
-    New-AzureStorageContainer -Name "ready-for-bvt" -Permission Blob
+    New-AzStorageContainer -Name "ready-for-bvt" -Permission Blob
 }
 
-Get-AzureStorageBlob -Container "drones" -Prefix $vmName 
+Get-AzStorageBlob -Container "drones" -Prefix $vmName
 if ($? -eq $false) {
-    New-AzureStorageContainer -Name "drones" -Permission Blob
+    New-AzStorageContainer -Name "drones" -Permission Blob
     Write-Host "Complete." -ForegroundColor Green
 }
 $commandTimer.Stop()
@@ -175,7 +175,7 @@ Write-Host "It required $elapsed to clean set up the NSG and Network"
 #
 #  If the account does not exist, create it.
 
-$scriptBlockString = 
+$scriptBlockString =
 {
     param ( [string] $vmName,
             [string] $VMFlavor,
@@ -190,7 +190,7 @@ $scriptBlockString =
             [string] $subnetName,
             [string] $useExistingResources,
             [string] $timeStarted
-            )    
+            )
 
     $logName = "C:\temp\transcripts\create_vhd_from_URN_scriptblock-" + $vmName + "-" + $timeStarted
     Start-Transcript -path $logName -force
@@ -205,16 +205,16 @@ $scriptBlockString =
 
     login_azure $destRG $destSA $location
 
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 
     Write-Host "Deleting any existing VM" -ForegroundColor Green
-    $runningVMs = Get-AzureRmVm -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*" | Remove-AzureRmVM -Force 
+    $runningVMs = Get-AzVM -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*" | Remove-AzVM -Force
     if ($? -eq $true -and $runningVMs -ne $null) {
         deallocate_machines_in_group $runningVMs $destRG $destSA $location
     }
-    
+
     Write-Host "Clearing any old images in $destContainer with prefix $vmName..." -ForegroundColor Green
-    Get-AzureStorageBlob -Container $destContainer -Prefix $vmName | ForEach-Object {Remove-AzureStorageBlob -Blob $_.Name -Container $destContainer}   
+    Get-AzStorageBlob -Container $destContainer -Prefix $vmName | ForEach-Object {Remove-AzStorageBlob -Blob $_.Name -Container $destContainer}
 
     . C:\Framework-Scripts\backend.ps1
     # . "$scriptPath\backend.ps1"
@@ -249,11 +249,11 @@ $scriptBlockString =
     Write-Host "It required $elapsed to create the VM from the URN"
 
     $commandTimer = [Diagnostics.Stopwatch]::StartNew()
-    
+
     #
     #  Disable Cloud-Init so it doesn't try to deprovision the machine (known bug in Azure)
     write-host "Attempting to contact the machine..." -ForegroundColor Green
-    
+
     $machineIsUp = $false
     [int]$sleepCount = 0
     while ($false -eq $machineIsUp -and $sleepCount -lt 30) {

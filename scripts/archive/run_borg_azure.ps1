@@ -1,4 +1,4 @@
-﻿#
+#
 #  Run the Basic Operations and Readiness Gateway on Azure.  This script will:
 #      - Copy a VHD from the templates container to a working one
 #      - Create a VM around the VHD and launch it.  It is assumed that the VHD has a
@@ -23,10 +23,10 @@ param (
 
     [Parameter(Mandatory=$false)] [string] $sourceURI="Unset",
 
-    # 
+    #
     #  A place with the contents of Last Known Good.  This is similar to Latest for packagee
     [Parameter(Mandatory=$false)] [string] $testOutputResourceGroup="smoke_output_resoruce_group",
-    [Parameter(Mandatory=$false)] [string] $testOutputStorageAccountName="smoketest",    
+    [Parameter(Mandatory=$false)] [string] $testOutputStorageAccountName="smoketest",
     [Parameter(Mandatory=$false)] [string] $testOutputContainerName="last-known-good-vhds",
 
     #
@@ -147,31 +147,31 @@ function copy_azure_machines {
     {
         #
         #  In the source group, stop any machines, then get the keys.
-        Set-AzureRmCurrentStorageAccount –ResourceGroupName $global:sourceResourceGroupName –StorageAccountName $global:sourceStorageAccountName > $null
+        Set-AzCurrentStorageAccount -ResourceGroupName $global:sourceResourceGroupName -StorageAccountName $global:sourceStorageAccountName > $null
 
         Write-Host "Stopping any currently running machines in source resource group $global:sourceResourceGroupName / $global:sourceStorageAccountName / $global:sourceContainerName..."  -ForegroundColor green
-        $runningVMs = Get-AzureRmVm -ResourceGroupName $global:sourceResourceGroupName
+        $runningVMs = Get-AzVM -ResourceGroupName $global:sourceResourceGroupName
         deallocate_machines_in_group $runningVMs $global:sourceResourceGroupName $global:sourceStorageAccountName $global:location
 
-        $sourceKey=Get-AzureRmStorageAccountKey -ResourceGroupName $global:sourceResourceGroupName -Name $global:sourceStorageAccountName
-        $sourceContext=New-AzureStorageContext -StorageAccountName $global:sourceStorageAccountName -StorageAccountKey $sourceKey[0].Value
+        $sourceKey=Get-AzStorageAccountKey -ResourceGroupName $global:sourceResourceGroupName -Name $global:sourceStorageAccountName
+        $sourceContext=New-AzStorageContext -StorageAccountName $global:sourceStorageAccountName -StorageAccountKey $sourceKey[0].Value
 
-        $blobs = Get-AzureStorageBlob -Container $global:sourceContainerName
+        $blobs = Get-AzStorageBlob -Container $global:sourceContainerName
 
         #
         #  Switch to the target resource group
-        Set-AzureRmCurrentStorageAccount –ResourceGroupName $global:workingResourceGroupName –StorageAccountName $global:workingStorageAccountName > $null
+        Set-AzCurrentStorageAccount -ResourceGroupName $global:workingResourceGroupName -StorageAccountName $global:workingStorageAccountName > $null
 
         Write-Host "Stopping and deleting any currently running machines in  target storage $global:workingResourceGroupName / $global:workingStorageAccountName / $global:workingContainerName..."  -ForegroundColor green
-        $runningVMs = Get-AzureRmVm -ResourceGroupName $global:workingResourceGroupName
+        $runningVMs = Get-AzVM -ResourceGroupName $global:workingResourceGroupName
         deallocate_machines_in_group $runningVMs $global:workingResourceGroupName $global:workingStorageAccountName $global:location
-        Get-AzureStorageBlob -Blob "*" -Container $global:workingContainerName | Remove-AzureStorageBlob -Force
+        Get-AzStorageBlob -Blob "*" -Container $global:workingContainerName | Remove-AzStorageBlob -Force
 
         Write-Host "Getting the storage account access keys.."
-        $destKey=Get-AzureRmStorageAccountKey -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName
-        $destContext=New-AzureStorageContext -StorageAccountName $global:workingStorageAccountName -StorageAccountKey $destKey[0].Value
+        $destKey=Get-AzStorageAccountKey -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName
+        $destContext=New-AzStorageContext -StorageAccountName $global:workingStorageAccountName -StorageAccountKey $destKey[0].Value
 
-        Write-Host "Preparing the individual machines..." -ForegroundColor green        
+        Write-Host "Preparing the individual machines..." -ForegroundColor green
 
         foreach ($oneblob in $blobs) {
             $fullName=$oneblob.Name
@@ -184,7 +184,7 @@ function copy_azure_machines {
                 Write-Warning "NOTE:  Image name $targetName is too long"
                 $targetName = $targetName.substring(0, 62)
                 Write-Warning "NOTE:  Image name is now $targetName"
-                if ($targetName.EndsWith("-") -eq $true) {                
+                if ($targetName.EndsWith("-") -eq $true) {
                     $targetName = $targetName -Replace ".$","X"
                     Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $imagtargetNameeName"
                 }
@@ -192,11 +192,11 @@ function copy_azure_machines {
             }
             $vmName = $targetName
             $targetName = $targetName + ".vhd"
-            
+
             $global:neededVMs.Add($vmName)
 
             Write-Host "     --------- Initiating job to copy VHD $fullName from $global:sourceContainerName to $global:workingContainerName as $targetName..." -ForegroundColor Yellow
-            $blob = Start-AzureStorageBlobCopy -SrcBlob $fullName -DestContainer $global:workingContainerName `
+            $blob = Start-AzStorageBlobCopy -SrcBlob $fullName -DestContainer $global:workingContainerName `
                                                 -SrcContainer $global:sourceContainerName -DestBlob $targetName `
                                                 -Context $sourceContext -DestContext $destContext
 
@@ -206,7 +206,7 @@ function copy_azure_machines {
         Write-Host "Clearing the destination container..."  -ForegroundColor green
         Write-Host "Deleting any currently running machines in  target storage $global:workingResourceGroupName / $global:workingStorageAccountName / $global:workingContainerName..."  -ForegroundColor green
 
-        Get-AzureStorageBlob -Container $global:workingContainerName -blob * | ForEach-Object {Remove-AzureStorageBlob -Blob $_.Name -Container $global:workingContainerName -Force}  > $null
+        Get-AzStorageBlob -Container $global:workingContainerName -blob * | ForEach-Object {Remove-AzStorageBlob -Blob $_.Name -Container $global:workingContainerName -Force}  > $null
 
         foreach ($singleURI in $global:URI) {
             Write-Host "Preparing to copy disk by URI.  Source URI is $singleURI"  -ForegroundColor green
@@ -222,7 +222,7 @@ function copy_azure_machines {
                 Write-Warning "NOTE:  Image name $targetName is too long"
                 $targetName = $targetName.substring(0, 62)
                 Write-Warning "NOTE:  Image name is now $targetName"
-                if ($targetName.EndsWith("-") -eq $true) {                
+                if ($targetName.EndsWith("-") -eq $true) {
                     $targetName = $targetName -Replace ".$","X"
                     Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $imagtargetNameeName"
                 }
@@ -234,7 +234,7 @@ function copy_azure_machines {
             $global:neededVMs.Add($sourceName)
 
             Write-Host "Initiating job to copy VHD $targetName from  $global:sourceContainerName to working $global:workingContainerName..." -ForegroundColor Yellow
-            $blob = Start-AzureStorageBlobCopy -SrcBlob $singleURI -DestContainer $global:workingContainerName -SrcContainer $global:sourceContainerName -DestBlob $targetName -Context $sourceContext -DestContext $destContext
+            $blob = Start-AzStorageBlobCopy -SrcBlob $singleURI -DestContainer $global:workingContainerName -SrcContainer $global:sourceContainerName -DestBlob $targetName -Context $sourceContext -DestContext $destContext
 
             $global:copyblobs += $targetName
         }
@@ -253,7 +253,7 @@ function copy_azure_machines {
         while ($reset_copyblobs -eq $true) {
             $reset_copyblobs = $false
             foreach ($blob in $global:copyblobs) {
-                $status = Get-AzureStorageBlobCopyState -Blob $blob -Container $global:workingContainerName -ErrorAction SilentlyContinue
+                $status = Get-AzStorageBlobCopyState -Blob $blob -Container $global:workingContainerName -ErrorAction SilentlyContinue
                 if ($? -eq $false) {
                     Write-Host "     **** Could not get copy state for job $blob.  Job may not have started." -ForegroundColor Red
                     # $copyblobs.Remove($blob)
@@ -291,14 +291,14 @@ function create_azure_topology {
 
     . C:\Framework-Scripts\backend.ps1
     # . "$scriptPath\backend.ps1"
-    
+
      ## Storage
     $vnetAddressPrefix = "10.0.0.0/16"
     $vnetSubnetAddressPrefix = "10.0.0.0/24"
-    
+
     $backendFactory = [BackendFactory]::new()
     $azureBackend = $backendFactory.GetBackend("AzureBackend", @(1))
-    
+
     $azureBackend.ResourceGroupName = $global:workingResourceGroupName
     $azureBackend.StorageAccountName = $global:workingStorageAccountName
     $azureBackend.ContainerName = "drones"
@@ -312,17 +312,17 @@ function create_azure_topology {
     $azureBackend.blobURN = "None"
     $azureBackend.suffix = "-Smoke-1"
     $azureBackend.useInitialPW = "No"
-    
+
     $azureInstance = $azureBackend.GetInstanceWrapper("AzureSetup")
     $azureInstance.SetupAzureRG()
 
     $requestedNames = ""
     foreach ($vmName in $global:neededVms) {
         $requestedNames = $requestedNames + $vmName + " "
-    
+
         $machine = new-Object MonitoredMachine
         $machine.name = $vmName
-        
+
         $machine.status = "Booting" # $status
         $global:monitoredMachines.Add($machine)
 
@@ -332,7 +332,7 @@ function create_azure_topology {
         $machine_log = New-Object MachineLog
         $machine_log.name = $vmName
         $machine_log.job_name = $jobname
-        $global:machineLogs.Add($machine_log)        
+        $global:machineLogs.Add($machine_log)
 
         $resourceGroup="smoke_working_resource_group"
         $storageAccount="smokework"
@@ -341,12 +341,12 @@ function create_azure_topology {
         $network="SmokeVNet"
         $subnet="SmokeSubnet-1"
         $NSG="SmokeNSG"
-    
+
         $VMFlavor="Standard_D2_V2"
-    
+
         $addressPrefix = "10.0.0.0/16"
         $subnetPrefix = "10.0.0.0/24"
-    
+
         $suffix = "-BORG.vhd"
 
         $scriptText = {
@@ -377,17 +377,17 @@ function create_azure_topology {
     }
 
     foreach ($singleLog in $global:machineLogs) {
-    
+
         $jobname=$singleLog.job_name
         $jobStatus=get-job -Name $jobName
         $jobState = $jobStatus.State
-        
+
         if ($jobState -eq "Failed") {
             Write-Host " ---------> Azure boot Job $jobName failed to lanch.  Error information is $jobStatus.Error" -ForegroundColor yellow
             $global:num_remaining -= 1
             if ($global:num_remaining -eq 0) {
                 $global:completed = 1
-            }                        
+            }
         }
         elseif ($jobState -eq "Completed")
         {
@@ -400,7 +400,7 @@ function create_azure_topology {
         else
         {
             Write-Host "      Azure boot job $jobName launched successfully." -ForegroundColor green
-        }    
+        }
     }
 }
 
@@ -410,7 +410,7 @@ $action={
 
     $logName = "C:\temp\transcripts\run_borg_azure-timer_scriptblock-" + $global:logFileTime
     Start-Transcript -path $logName -force
-    
+
     function checkMachine ([MonitoredMachine]$machine) {
         $machineName=$machine.name
         $machineStatus=$machine.status
@@ -425,7 +425,7 @@ $action={
             Write-Host "    **** ??? Machine $machineName was not in state Booting.  Cannot process" -ForegroundColor red
             Stop-Transcript
             return 1
-        }        
+        }
 
         #
         #  Attempt to create the PowerShell PSRP session
@@ -441,7 +441,7 @@ $action={
                     $localSession = create_psrp_session $machineName $global:workingResourceGroupName $global:workingStorageAccountName `
                                                         $global:location $global:cred $global:o
 
-                    
+
                     if ($localSession -ne $null) {
                         Write-Host "Creating PowerShell Remoting session to machine $machineName"  -ForegroundColor green
                         $machineIsUp = $true
@@ -458,17 +458,17 @@ $action={
 
         if ($machineIsUp -eq $true) {
             $exceptionCaught = $false
-            try {            
+            try {
                 $installed_vers=invoke-command -session $localSession -ScriptBlock {/bin/uname -r}
                 # Write-Host "$machineName installed version retrieved as $installed_vers" -ForegroundColor Cyan
-                      
+
                 #
                 #  This must be done as root
                 $command = "/usr/bin/powershell get-content /HIPPEE/expected_version"
                 $password=$TEST_USER_ACCOUNT_PASS
                 $runCommand = "echo $password | sudo -S bash -c `'$command`'"
                 $commandBLock=[scriptblock]::Create($runCommand)
-                $expected_vers = invoke-command -session $localSession -ScriptBlock $commandBLock -ArgumentList $command      
+                $expected_vers = invoke-command -session $localSession -ScriptBlock $commandBLock -ArgumentList $command
                 # Write-Host "$machineName Expected version retrieved as $expected_vers" -ForegroundColor Cyan
                 $expected_vers = ($expected_vers.Split(" "))[0]
             }
@@ -484,7 +484,7 @@ $action={
                 Remove-PSSession -Session $localSession
                 $localMachine.session = $null
             }
-        
+
             # Write-Host "Looking for version $expected_verDeb or $expected_verCent"
             if ($exceptionCaught -eq $false) {
                 if ($expected_vers -eq "") {
@@ -521,7 +521,7 @@ $action={
             if (($global:elapsed % $global:boot_timeout_intervals_per_minute) -eq 0) {
                 Write-Host "Machine $machineName is not up yet, as far as we know..." -ForegroundColor yellow
             }
-            
+
         }
     }
 
@@ -563,7 +563,7 @@ $action={
                 } else {
                     $jobStatus = "Unknown"
                 }
-               
+
                 if ($jobStatus -ne $null -and ($jobStatus -eq "Completed" -or $jobStatus -eq "Failed")) {
                     if ($jobStatus -eq "Completed") {
                         if ($monitoredMachineStatus -ne "Completed") {
@@ -620,7 +620,7 @@ $action={
                     } else {
                         $jobStatus = "Completed"
                     }
-               
+
                     if ($jobStatus -eq "Completed" -or $jobStatus -eq "Failed") {
                         if ($jobStatus -eq "Completed") {
                            if ($monitoredMachineStatus -eq "Completed") {
@@ -633,7 +633,7 @@ $action={
 
                                     $localSession = create_psrp_session $monitoredMachineName $global:workingResourceGroupName $global:workingStorageAccountName `
                                                                         $global:location $cred $o
-                                    
+
                                     if ($localSession -ne $null) {
                                         $monitoredMachine.session = $localSession
                                         $machineIsUp = $true
@@ -644,8 +644,8 @@ $action={
 
                                 if ($monitoredMachine.session -ne $null) {
                                     $localSession = $localMachine.session
-                                    Write-Host "          Last three lines of the log file for machine $monitoredMachineName ..." -ForegroundColor Magenta   
-                                    try {             
+                                    Write-Host "          Last three lines of the log file for machine $monitoredMachineName ..." -ForegroundColor Magenta
+                                    try {
                                         $last_lines=invoke-command -session $localSession -ScriptBlock { get-content /opt/microsoft/borg_progress.log }
                                         if ($? -eq $true) {
                                             $last_lines | write-host -ForegroundColor Magenta
@@ -659,29 +659,29 @@ $action={
                                     }
                                 }
                                 $calledIt = $true
-                            }                          
+                            }
                         } elseif ($jobStatus -eq "Failed") {
                             Write-Host "    *** Job $singleLogName failed to start." -ForegroundColor Red
                             Write-Host "        Log information, if any, follows:" -ForegroundColor Red
-                            receive-job $singleLogJobName 
+                            receive-job $singleLogJobName
                             $calledIt = $true
-                        }                      
+                        }
                     } elseif ($jobStatusObj -ne $null) {
                         $message="     ----- The job starting VM $monitoredMachineName has not completed yet.  The current state is " + $jobStatus
                         Write-Host $message -ForegroundColor Yellow
                         $calledIt = $true
                     }
-                    
+
                     break
                 }
             }
 
             if ($calledIt -eq $false -and $monitoredMachineStatus -ne "Completed") {
                 Write-Host " ----- Machine $monitoredMachineName has not completed yet" -ForegroundColor yellow
-            }                                  
+            }
         }
     }
-    [Console]::Out.Flush() 
+    [Console]::Out.Flush()
     Stop-Transcript
 }
 
@@ -723,16 +723,16 @@ Write-Host "Using timer name $timerName"
 Write-Host "Looking for storage account $global:workingStorageAccountName in resource group $global:workingResourceGroupName."
 $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
-$existingGroup = Get-AzureRmResourceGroup -Name $global:workingResourceGroupName 
+$existingGroup = Get-AzResourceGroup -Name $global:workingResourceGroupName
 if ($? -eq $true -and $existingGroup -ne $null -and $global:CleanRG -eq $true) {
     write-host "Resource group already existed.  Deleting resource group." -ForegroundColor Yellow
-    Remove-AzureRmResourceGroup -Name $global:workingResourceGroupName -Force
+    Remove-AzResourceGroup -Name $global:workingResourceGroupName -Force
 
     write-host "Creating new resource group $global:workingResourceGroupName in loction $global:location"
-    New-AzureRmResourceGroup -Name $global:workingResourceGroupName -Location $global:location
+    New-AzResourceGroup -Name $global:workingResourceGroupName -Location $global:location
 } elseif ($existingGroup -eq $null) {
     write-host "Creating new resource group $global:workingResourceGroupName in loction $global:location"
-    New-AzureRmResourceGroup -Name $global:workingResourceGroupName  -Location $global:location
+    New-AzResourceGroup -Name $global:workingResourceGroupName  -Location $global:location
 }
 
 $commandTimer.Stop()
@@ -743,34 +743,34 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 #
 #
 #  Change the name of the SA to include the region, then Now see if the SA exists
-Get-AzureRmStorageAccount -ResourceGroupName $global:workingResourceGroupName  -Name $global:workingStorageAccountName
+Get-AzStorageAccount -ResourceGroupName $global:workingResourceGroupName  -Name $global:workingStorageAccountName
 if ($? -eq $false -or $global:CleanRG -eq $true) {
     if ($? -eq $false) {
-        New-AzureRmStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName `
-                                  -Kind Storage -Location $global:location -SkuName Standard_LRS 
-        # Remove-AzureRmStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName -Force
+        New-AzStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName `
+                                  -Kind Storage -Location $global:location -SkuName Standard_LRS
+        # Remove-AzStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName -Force
         Write-Host "created..."
     }
-    # New-AzureRmStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName `
-    #                           -Kind Storage -Location $global:location -SkuName Standard_LRS 
-    
+    # New-AzStorageAccount -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName `
+    #                           -Kind Storage -Location $global:location -SkuName Standard_LRS
+
 }
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $global:workingResourceGroupName –StorageAccountName $global:workingStorageAccountName 
+Set-AzCurrentStorageAccount -ResourceGroupName $global:workingResourceGroupName -StorageAccountName $global:workingStorageAccountName
 Write-Host "Rebuilt..."
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
 Write-Host "It required $elapsed to rebuild the storage acount"
 $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
-Get-AzureStorageContainer -Name $global:workingContainerName
+Get-AzStorageContainer -Name $global:workingContainerName
 if ($? -eq $false) {
     Write-Host "Setting up storage container $global:workingContainerName"  -ForegroundColor green
-    $destKey=Get-AzureRmStorageAccountKey -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName
-    $destContext=New-AzureStorageContext -StorageAccountName $global:workingStorageAccountName -StorageAccountKey $destKey[0].Value
+    $destKey=Get-AzStorageAccountKey -ResourceGroupName $global:workingResourceGroupName -Name $global:workingStorageAccountName
+    $destContext=New-AzStorageContext -StorageAccountName $global:workingStorageAccountName -StorageAccountKey $destKey[0].Value
 
-    New-AzureStorageContainer -name $global:workingContainerName -Permission Blob -Context $destContext
+    New-AzStorageContainer -name $global:workingContainerName -Permission Blob -Context $destContext
     Write-Host "And populated."
-} 
+}
 
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
@@ -779,9 +779,9 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 #
 #
 #  Copy the virtual machines to the staging container
-#      
+#
 get-job | Stop-Job
-get-job | Remove-Job          
+get-job | Remove-Job
 copy_azure_machines
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
@@ -790,9 +790,9 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
 #
 #  Launch the virtual machines
-#        
+#
 get-job | Stop-Job
-get-job | Remove-Job        
+get-job | Remove-Job
 create_azure_topology
 write-host "$global:num_remaining machines have been launched.  Waiting for completion..."
 $commandTimer.Stop()
@@ -802,12 +802,12 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
 #
 #  Wait for the machines to report back
-#    
-Get-EventSubscriber -SourceIdentifier $timerName | Unregister-Event     
+#
+Get-EventSubscriber -SourceIdentifier $timerName | Unregister-Event
 
 Write-Host "                          Initiating temporal evaluation loop (Starting the timer)" -ForegroundColor yellow
 
-Register-ObjectEvent -InputObject $timer -EventName elapsed –SourceIdentifier $timerName -Action $action
+Register-ObjectEvent -InputObject $timer -EventName elapsed -SourceIdentifier $timerName -Action $action
 $global:timer_is_running=1
 $timer.Interval = 1000
 $timer.Enabled = $true
@@ -832,7 +832,7 @@ Write-Host "It required $elapsed complete the timer loop"
 if ($global:num_remaining -eq 0) {
     Write-Host "                          All machines have come back up.  Checking results." -ForegroundColor green
     Write-Host ""
-    
+
     if ($global:failed -eq $true) {
         Write-Host "     Failures were detected in reboot and/or reporting of kernel version.  See log above for details." -ForegroundColor red
         Write-Host "                                             BORG TESTS HAVE FAILED!!" -ForegroundColor red
@@ -849,9 +849,9 @@ if ($global:num_remaining -eq 0) {
             $monitoredMachineName=$monitoredMachine.name
             $monitoredMachineState=$monitoredMachine.status
             if ($monitoredMachineState -ne "Completed") {
-                
+
                 if ($monitoredMachine.session -ne $null) {
-                    Write-Host "   ----- Machine $monitoredMachineName is in state $monitoredMachineState.  This is the log, if any:" -ForegroundColor red 
+                    Write-Host "   ----- Machine $monitoredMachineName is in state $monitoredMachineState.  This is the log, if any:" -ForegroundColor red
                     $log_lines=invoke-command -session $monitoredMachine.session -ScriptBlock { get-content /opt/microsoft/borg_progress.log } -ErrorAction SilentlyContinue
                     if ($? -eq $true) {
                         $log_lines | write-host -ForegroundColor Magenta
@@ -874,7 +874,7 @@ Write-Host "It required $elapsed to set up"
 
 Stop-Transcript
 
-if ($global:failed -eq 0) {    
+if ($global:failed -eq 0) {
     Write-Host "                                    BORG is Exiting with success.  Thanks for Playing" -ForegroundColor green
     exit 0
 } else {

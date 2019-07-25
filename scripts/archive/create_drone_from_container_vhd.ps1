@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Mandatory=$false)] [string[]] $requestedNames,
     [Parameter(Mandatory=$false)] [string] $makeDronesFromAll="False",
     [Parameter(Mandatory=$false)] [string] $overwriteVHDs="False",
@@ -79,19 +79,19 @@ if ($makeDronesFromAll -ne $true -and ($vmNameArray.Count -eq 1  -and $vmNameArr
     Stop-Transcript
     exit 1
 }
-    
+
 
 get-job | Stop-Job
 get-job | Remove-Job
 
 login_azure $sourceRG $sourceSA $location
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
 if ($makeDronesFromAll -eq $true) {
-    
+
     $blobSearch = "*.vhd"
     Write-Host "Looking at all images in container $sourceContainer"
-    $copyblob_new=get-AzureStorageBlob -Container $sourceContainer -Blob $blobSearch
+    $copyblob_new=Get-AzStorageBlob -Container $sourceContainer -Blob $blobSearch
     foreach ($blob in $copyblob_new) {
         $blobName = $blob.Name
         Write-Host "Adding blob $Name to the list"
@@ -107,8 +107,8 @@ if ($makeDronesFromAll -eq $true) {
         }
         $fullName = $fullName + ".vhd"
         Write-Host "Looking for image $fullName in container $sourceContainer"
-        
-        $singleBlob=get-AzureStorageBlob -Container $sourceContainer -Blob $fullName -ErrorAction SilentlyContinue
+
+        $singleBlob=Get-AzStorageBlob -Container $sourceContainer -Blob $fullName -ErrorAction SilentlyContinue
         if ($? -eq $true) {
             $singleBlobName = $singleBlob.Name
             Write-Host "Adding blob for $fullName ($singleBlobName) to the list..."
@@ -149,9 +149,9 @@ $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
 Write-Host "It required $elapsed copy the blobs"
 $commandTimer = [Diagnostics.Stopwatch]::StartNew()
-                                       
-                                       
-$scriptBlockString = 
+
+
+$scriptBlockString =
 {
     param ($vmName,
             $sourceRG,
@@ -170,7 +170,7 @@ $scriptBlockString =
             $timeStarted
             )
             write-host "Checkpoint 1" -ForegroundColor Cyan
-    
+
     $logName = "C:\temp\transcripts\create_drone_from_container-scriptblock-" + $vmName + "-" + $timeStarted
     Start-Transcript $logName -Force
     write-host "Checkpoint 2" -ForegroundColor Cyan
@@ -178,11 +178,11 @@ $scriptBlockString =
     . "C:\Framework-Scripts\secrets.ps1"
 
     write-host "Checkpoint 3" -ForegroundColor Cyan
-    
+
     login_azure $destRG $destSA $location
 
     Write-Host "Deallocating machine $vmName, if it is up"
-    $runningMachines = Get-AzureRmVm -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*"
+    $runningMachines = Get-AzVM -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*"
     deallocate_machines_in_group $runningMachines $destRG $destSA $location
 
     $newVMName = $vmName
@@ -216,10 +216,10 @@ $scriptBlockString =
         Write-Warning "NOTE:  Image name $imageName is too long"
         $imageName = $imageName.substring(0, 62)
         Write-Warning "NOTE:  Image name is now $imageName"
-        if ($imageName.EndsWith("-") -eq $true) {                
+        if ($imageName.EndsWith("-") -eq $true) {
             $imageName = $imageName -Replace ".$","X"
             Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $imageName"
-        }        
+        }
         Write-Warning "NOTE:  Image name $imageName was truncated to 62 characters"
     }
     $pipName = $imageName
@@ -228,8 +228,8 @@ $scriptBlockString =
 
     $gotAnAddress = $false
     while ($gotAnAddress -eq $false) {
-        $ipOfDrone=Get-AzureRmPublicIpAddress -ResourceGroupName $destRG -Name $pipName
-        
+        $ipOfDrone=Get-AzPublicIpAddress -ResourceGroupName $destRG -Name $pipName
+
         if ($? -ne $true) {
             Write-Host "Error getting IP address for VM $newVMName.  Trying again in a few seconds..." -ForegroundColor red
         }
@@ -246,7 +246,7 @@ $scriptBlockString =
     #  Send make_drone to the new machine
     #
     #  The first one gets the machine added to known_hosts
-    
+
 
     #
     #  Now transfer the files
@@ -327,8 +327,8 @@ get-job | Stop-Job
 get-job | Remove-Job
 
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
-foreach ($vmName in $vmNameArray) { 
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
+foreach ($vmName in $vmNameArray) {
     $jobName=$vmName + "-drone-job"
     Start-Job -Name $jobName -ScriptBlock $scriptBlock -ArgumentList $vmName,$sourceRG,$sourceSA,$sourceContainer,$destRG,$destSA,`
                                                                       $destContainer,$location,$currentSuffix,$newSuffix,$NSG,`
@@ -361,7 +361,7 @@ while ($notDone -eq $true) {
         write-host "    Job $jobName is in state $jobState" -ForegroundColor Yellow
         if ($jobState -eq "Running") {
             $notDone = $true
-            $logName = "C:\temp\transcripts\create-drone-from-container-scriptblock-" + $vmName + "-" + $timeStarted            
+            $logName = "C:\temp\transcripts\create-drone-from-container-scriptblock-" + $vmName + "-" + $timeStarted
             $logLines = Get-Content -Path $logName -Tail 5
             if ($? -eq $true) {
                 Write-Host "         Last 5 lines from the script log file:" -ForegroundColor Cyan
@@ -400,13 +400,13 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
 if ($status -contains "FAILED to establish PSRP connection") {
     Write-Host "Errors found in this job, so adding the job output to the log..."
-    
+
     $jobs = get-job
     foreach ($job in $jobs) {
         $jobName = $job.Name
         Write-Host ""
         Write-Host "------------------------------------------------------------------------------------------------------"
-        Write-Host "                             JOB LOG FOR JOB $jobname"   
+        Write-Host "                             JOB LOG FOR JOB $jobname"
         Write-Host "------------------------------------------------------------------------------------------------------"
         Write-Host ""
         $job | receive-job
@@ -422,7 +422,7 @@ Write-Host "It required $elapsed to execute this script"
 
 Stop-Transcript
 
-if ($sessionFailed -eq $true) {    
+if ($sessionFailed -eq $true) {
     exit 1
 } else {
     exit 0

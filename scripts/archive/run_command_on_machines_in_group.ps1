@@ -1,6 +1,6 @@
-﻿param (
+param (
     [Parameter(Mandatory=$false)] [string[]] $requestedNames,
-    
+
     [Parameter(Mandatory=$false)] [string] $destSA="smokesrc",
     [Parameter(Mandatory=$false)] [string] $destRG="smoke_source_resource_group",
 
@@ -13,7 +13,7 @@
 
     [Parameter(Mandatory=$false)] [int] $retryCount=2
 )
-    
+
 $destSA = $destSA.Trim()
 $destRG = $destRG.Trim()
 $suffix = $suffix.Trim()
@@ -35,7 +35,7 @@ if ($requestedNames -like "*,*") {
 
 $suffix = $suffix -replace "_","-"
 
-$commandString = 
+$commandString =
 {
     param ( $DestRG,
             $DestSA,
@@ -55,7 +55,7 @@ $commandString =
 
     login_azure $DestRG $DestSA $location > $null
 
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $DestRG –StorageAccountName $DestSA > $null
+    Set-AzCurrentStorageAccount -ResourceGroupName $DestRG -StorageAccountName $DestSA > $null
     #
     #  Session stuff
     #
@@ -80,7 +80,7 @@ $commandString =
     while ($timesTried -lt $retryCount) {
         Write-verbose "Executing remote command on machine $vm_name, resource group $DestRG"
         $timesTried = $timesTried + 1
-        
+
         $session = create_psrp_session $vm_name $DestRG $DestSA $location $cred $o
         if ($? -eq $true -and $session -ne $null) {
             $result = invoke-command -session $session -ScriptBlock $commandBLock -ArgumentList $command -ErrorAction SilentlyContinue
@@ -91,7 +91,7 @@ $commandString =
                 Remove-PSSession -Session $session
             }
             if ($timesTried -lt $retryCount) {
-                
+
                 Write-Error "    Try $timesTried of $retryCount -- FAILED to establish PSRP connection to machine $vm_name."
             }
         }
@@ -137,7 +137,7 @@ while ($allDone -eq $false) {
 
     foreach ($baseName in $vmNameArray) {
         $vm_name = $baseName
-        $vm_name = $vm_name -replace ".vhd", "" 
+        $vm_name = $vm_name -replace ".vhd", ""
         $job_name = "run_command_" + $vm_name
 
         if ($vm_name -eq "") {
@@ -193,7 +193,7 @@ while ($allDone -eq $false) {
 
 foreach ($baseName in $vmNameArray) {
     $vm_name = $baseName
-    $vm_name = $vm_name -replace ".vhd", "" 
+    $vm_name = $vm_name -replace ".vhd", ""
     $job_name = "run_command_" + $vm_name
 
     if ($vm_name -eq "") {
