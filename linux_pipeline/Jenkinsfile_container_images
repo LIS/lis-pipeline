@@ -24,10 +24,6 @@ properties ([
             defaultValue: true, 
             description: 'Run binaries version test', 
             name: 'binaries_check'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true, 
-            description: 'Test kernel boot speed in VM', 
-            name: 'Boot_Test'],
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run ltp tests in docker container',
@@ -69,7 +65,7 @@ HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 STAGES_RESULTS = [:]
 STAGES_SUMMARY = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"LTP"]
+testMap = ["smoke_tests":"binaries_check","test_functional":"LTP"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
 skipBuild = false
