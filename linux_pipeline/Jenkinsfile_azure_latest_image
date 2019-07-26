@@ -25,7 +25,7 @@ def gitBranchName = "master"
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegions = env.AZURE_REGIONS.split(",")
 
-def P1_EXCLUDE = "PERF-*"
+def P1_EXCLUDE = "PERF-*,INFINIBAND-HPCX-MPI-2VM"
 
 if (!azureImages || !azureRegions) {
   throw 'Failed to validate the pipeline parameters'
