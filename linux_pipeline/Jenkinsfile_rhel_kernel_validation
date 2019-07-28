@@ -173,3 +173,37 @@ stage ("Send Email Report"){
         }
     }
 }
+
+stage ("Trigger Hotfix"){
+    node ("jenkins-meta-slave") {
+        if (!sendMail) {
+            return
+        }
+        def TestDistros = ""
+        def TriggerHotfix = true
+        dir ("trigger-hotfix-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
+            for (distro in stashList) {
+                unstash distro
+                VersionLog = readFile("${distro}_lis_check.log")
+                InstallLog = readFile("${distro}_lis_install.log")
+                if (InstallLog.matches("(?is).*ERRATA kernel (.*) not installed.*")) {
+                    echo "Failed to Trigger Hot-fix pipeline since detected errata kernel installation is failed"
+                    echo InstallLog
+                    TriggerHotfix = false
+                    break
+                }
+                if (VersionLog.contains("built-in driver")) {
+                    def Kernelversion = (VersionLog =~ "Running kernel version: (.*).x86_64")[0][1]
+                    TestDistros+="${distro}=${Kernelversion}"+"\n"
+                }
+            }
+            if(TestDistros && TriggerHotfix){
+                TestDistros=TestDistros.trim()
+                echo "TRIGGER the HOT-FIX pipline for non-compatible Errata kernels ${TestDistros}"
+                build job: 'LIS/pipeline-lis-hotfix', parameters: [ text(name: 'DISTRO_KERNEL', value: "${TestDistros}")],
+                wait: false
+            }
+            deleteDir()
+        }
+    }
+}
