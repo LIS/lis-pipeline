@@ -506,7 +506,7 @@ if (!skipBuild) {
         node (hostName) {
             dir ("lisa-clone-dir") {
                 withCredentials(bindings: [string(credentialsId: 'LISA_DEPS_PATH', variable: 'LISA_DEPS_PATH')]) {
-                    git branch: 'lcow-testing', url: 'https://github.com/mbivolan/lis-test'
+                    git branch: 'lcow-testing', url: 'https://github.com/vyadavmsft/lis-test'
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\bin\\*" ".\\WS2012R2\\lisa\\bin"')
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\tools\\*" ".\\WS2012R2\\lisa\\tools"')
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\ssh\\*" ".\\WS2012R2\\lisa\\ssh"')
