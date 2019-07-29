@@ -443,11 +443,15 @@ node ("jenkins-meta-slave") {
                                         def LIS_VHD = readFile "LIS-${StashName}-CapturedVHD.azure.env"
 
                                         println "Invoke functional validation pipeline for Base VHD ${BASE_VHD} and LIS VHD ${LIS_VHD}"
+                                        def FunctionalTests = FUNCTIONAL_TESTS.replaceAll("[\n\r]", "");
+                                        def ExcludeTests = EXCLUDE_TESTS.replaceAll("[\n\r]", "");
                                         JobBuild = build job: 'LIS/pipeline-lis-hotfix-functional-validation', parameters: [
-                                        string(name: 'rpmURL', value: "${CustomLIS}"),
-                                        string(name: 'testDistro', value: "${distro}"),
-                                        string(name: 'ExecutionTag', value: "${ExecutionTag}"),
-                                        string(name: 'LISoldurl', value: "LatestLIS"),
+                                        string(name: 'FUNCTIONAL_TESTS', value: "${FunctionalTests}"),
+                                        string(name: 'EXCLUDE_TESTS', value: "${ExcludeTests}"),
+                                        string(name: 'TEST_LOCATION', value: "${TEST_LOCATION}"),
+                                        string(name: 'NEW_LIS_RPM_URL', value: "${CustomLIS}"),
+                                        string(name: 'EXECUTION_TAG', value: "${ExecutionTag}"),
+                                        string(name: 'OLD_LIS_RPM_URL', value: "LatestLIS"),
                                         string(name: 'BASE_VHD', value: "${BASE_VHD}"),
                                         string(name: 'LIS_VHD', value: "${LIS_VHD}")
                                         ],
@@ -478,11 +482,13 @@ node ("jenkins-meta-slave") {
                                         def LIS_VHD = readFile "LIS-${StashName}-CapturedVHD.azure.env"
 
                                         println "Invoke performance validation pipeline for LIS VHD: ${LIS_VHD}"
+                                        def PerformanceTests = PERFORMANCE_TESTS.replaceAll("[\n\r]", "");
                                         PerfJob = build job: 'LIS/pipeline-lis-hotfix-performance-validation', parameters: [
-                                        string(name: 'rpmURL', value: "${CustomLIS}"),
-                                        string(name: 'testDistro', value: "${distro}"),
-                                        string(name: 'ExecutionTag', value: "${ExecutionTag}"),
-                                        string(name: 'LISoldurl', value: "LatestLIS"),
+                                        string(name: 'PERFORMANCE_TESTS', value: "${PerformanceTests}"),
+                                        string(name: 'TEST_LOCATION', value: "${TEST_LOCATION}"),
+                                        string(name: 'NEW_LIS_RPM_URL', value: "${CustomLIS}"),
+                                        string(name: 'EXECUTION_TAG', value: "${ExecutionTag}"),
+                                        string(name: 'OLD_LIS_RPM_URL', value: "LatestLIS"),
                                         string(name: 'LIS_VHD', value: "${LIS_VHD}")
                                         ],
                                         quietPeriod: 10, wait: true, propagate: false
@@ -542,7 +548,7 @@ node ("jenkins-meta-slave") {
             }
             try {
                 node ("azure") {
-                    Prepare()		
+                    Prepare()
                     def VHD_NAMES = ""
                     for (i=0; i < TotalHotfixErratas; i++) {
                         def distro = HotfixTargetList[i].split('=')[0]

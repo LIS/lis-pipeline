@@ -1,9 +1,7 @@
 #!/usr/bin/env groovy
-def FunctionalTests = """
-NVIDIA-CUDA-DRIVER-VALIDATION-MAX-GPU,NVIDIA-GRID-DRIVER-VALIDATION-MAX-GPU,INFINIBAND-OPEN-MPI-2VM,NVME-MAX-DISK-VALIDATION,SRIOV-VERIFY-SINGLE-VF-CONNECTION-MAX-VCPU,
-SRIOV-VERIFY-MAX-VF-CONNECTION-MAX-VCPU,SRIOV-RELOAD-MODULE,STORAGE-HOT-ADD-DISK-SERIAL,STORAGE-HOT-ADD-DISK-PARALLEL,VMBUS_VERIFY_INTERRUPTS,LIS-PREINSTALL-DISK-SIZE-VERIFICATION,
-VERIFY-DPDK-BUILD-AND-TESTPMD-TEST,INFINIBAND-INTEL-MPI-2VM"""
-def DeployTests = "LIS-DRIVER-VERSION-CHECK,LIS-DEPLOY-SCENARIO-1,LIS-DEPLOY-SCENARIO-2,LIS-DEPLOY-SCENARIO-3,LIS-DEPLOY-SCENARIO-4,LIS-DEPLOY-SCENARIO-5,LIS-DEPLOY-SCENARIO-6,LIS-DEPLOY-SCENARIO-7,LIS-DEPLOY-SCENARIO-8"
+
+def FunctionalTests = FUNCTIONAL_TESTS.replaceAll("[\n\r]", "");
+def ExcludeTests = EXCLUDE_TESTS.replaceAll("[\n\r]", "");
 
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
@@ -66,8 +64,8 @@ stage ("${currentStage}") {
                 Command += " -TestArea 'LIS_DEPLOY'"
                 Command += " -OverrideVMSize 'Standard_D2_v2'"
                 Command += " -StorageAccount 'ExistingStorage_Standard'"
-                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
                 Command += " -DeployVMPerEachTest"
                 Command += " -TestIterations 1"
                 Command += " -ExitWithZero"
@@ -109,13 +107,13 @@ stage ("${currentStage}") {
                 Command += " -TestCategory 'Functional'"
                 Command += " -TestPriority '0'"
                 Command += " -StorageAccount 'ExistingStorage_Standard'"
-                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
                 Command += " -DeployVMPerEachTest"
                 Command += " -TestIterations 1"
                 Command += " -ExitWithZero"
                 Command += " -EnableTelemetry"
-                Command += " -ExcludeTests '${DeployTests}'"
+                Command += " -ExcludeTests '${ExcludeTests}'"
                 Command += " -OsVHD '${currentVHD}'"
                 println Command
                 RunPowershellCommand(Command)
@@ -130,8 +128,8 @@ stage ("${currentStage}") {
                 def SelectedTests = FunctionalTests.replaceAll("[\n\r]", "");
                 Command += " -TestNames '${SelectedTests}'"
                 Command += " -StorageAccount 'ExistingStorage_Standard'"
-                Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-                Command += " -ResultDBTestTag '${ExecutionTag}'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
                 Command += " -DeployVMPerEachTest"
                 Command += " -TestIterations 1"
                 Command += " -ExitWithZero"
