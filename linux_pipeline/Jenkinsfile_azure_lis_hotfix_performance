@@ -1,15 +1,9 @@
 #!/usr/bin/env groovy
-def PerfTestList = [
-    ["TCPNetworkPerformance_Multiclient", "PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICLIENTS-NTTTCP-SRIOV","westus2"],
-    ["TCPNetworkPerformance_SingleClient","PERF-NETWORK-TCP-LATENCY-Synthetic,PERF-NETWORK-TCP-LATENCY-SRIOV,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC,PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SRIOV",
-    "westus2"],
-    ["Storage4K", "PERF-STORAGE-4K-IO", "westus2"],
-    ["Storage1024K", "PERF-STORAGE-1024K-IO", "northeurope"],
-    ["NVME4K", "PERF-NVME-4K-IO", "westus2"],
-    ["UDPNetworkPerformance_Multiclient", "PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV", "westus2"],
-    ["PERF-SYSCALL-BENCHMARK", "PERF-SYSCALL-BENCHMARK", "westus2"]
-]
-def PerfTestCount = PerfTestList.size()
+
+def TestLocation = TEST_LOCATION
+def PerfTestList = PERFORMANCE_TESTS.replaceAll("[\n\r]", "").split(',');
+
+def PerfTestCount = PerfTestList.length
 
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
@@ -53,88 +47,40 @@ stage ("${currentStage}") {
     }
 }
 
-def stageTimeout = 90
-def currentStage = "Copy Image to other regions"
-stage ("${currentStage}") {
-    println "Copy Image ${LIS_VHD} in other regions"
-    node ("azure") {
-        try {
-            timeout(time: stageTimeout, unit: 'MINUTES') {
-                node('azure') {
-                    CleanWorkspace()
-                    withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-                        Prepare()
-                        //Demo command is to set the environment in Jenkin working directory
-                        def Command = ".\\Run-LisaV2.ps1"
-                        Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
-                        Command += " -TestPlatform 'Azure'"
-                        Command += " -RGIdentifier 'DEMO'"
-                        Command += " -TestLocation centralus"
-                        Command += " -ARMImageName 'Canonical UbuntuServer 16.04-LTS latest'"
-                        Command += " -TestCategory 'Functional'"
-                        Command += " -TestArea 'CORE'"
-                        Command += " -TestNames 'DEMO-TEST'"
-                        Command += " -ResourceCleanup Delete"
-                        Command += " -TestIterations 1"
-                        Command += " -ExitWithZero"
-                        println "Copy VHD to other storage"
-                        RunPowershellCommand(".\\Utilities\\AddAzureRmAccountFromSecretsFile.ps1 -customSecretsFilePath ${Azure_Secrets_TESTONLY_File};" +
-                            "${Command};" +
-                            ".\\Utilities\\CopyVHDtoOtherStorageAccount.ps1" +
-                            " -sourceLocation 'westus2'" +
-                            " -destinationLocations 'westus2,northeurope,southcentralus'" +
-                            " -sourceVHDName '${LIS_VHD}'" +
-                            " -destinationVHDName '${LIS_VHD}'"
-                        )
-                    }
-                }
-            }
-        }
-        catch (exc) {
-            currentBuild.result = 'FAILURE'
-            println "${currentStage}: STAGE_FAILED_EXCEPTION."
-            ReportException("${currentStage}", "${exc}")
-        }
-    }
-}
-
 node ("azure") {
     currentStage = "PerformanceTests"
     def parellel_jobs = [:]
     def delay = 0
     stage ("${currentStage}") {
         for (counter=0; counter < PerfTestCount; counter++) {
-            def currentTest = PerfTestList[counter][0]
-            def perfTest = PerfTestList[counter][1]
-            def testLocation = PerfTestList[counter][2]
-            if (currentTest != null && currentTest != "" ) {
-                currentTest = "${currentTest}"
-                parellel_jobs ["${currentTest}"] =
+            def performanceTest = PerfTestList[counter]
+            if (performanceTest != null && performanceTest != "" ) {
+                parellel_jobs ["${performanceTest}"] =
                 {
-                    stage ("${currentTest}") {
+                    stage ("${performanceTest}") {
                         try {
                             node ("azure") {
                                 delay += 5
                                 println "Sleeping ${delay} seconds..."
                                 sleep "${delay}"
                                 withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
-                                    println "Current Performance Test ${currentTest} location ${testLocation}"
+                                    println "Current Performance Test ${performanceTest} location ${TestLocation}"
                                     Prepare()
                                     def Command = ".\\Run-LisaV2.ps1"
                                     Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
                                     Command += " -TestPlatform 'Azure'"
                                     Command += " -RGIdentifier 'RPMBUILD-${BUILD_NUMBER}'"
                                     Command += " -TestCategory 'Performance'"
-                                    Command += " -TestNames '${perfTest}'"
+                                    Command += " -TestNames '${performanceTest}'"
                                     Command += " -StorageAccount 'ExistingStorage_Standard'"
-                                    Command += " -CustomTestParameters 'LIS_OLD_URL=${LISoldurl};LIS_CURRENT_URL=${rpmURL}'"
-                                    Command += " -ResultDBTestTag '${ExecutionTag}'"
+                                    Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                                    Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
                                     Command += " -DeployVMPerEachTest 1"
                                     Command += " -ExitWithZero"
                                     Command += " -EnableTelemetry"
                                     Command += " -TestIterations 3"
                                     Command += " -OsVHD '${LIS_VHD}'"
-                                    Command += " -TestLocation '${testLocation}'"
+                                    Command += " -TestLocation '${TestLocation}'"
                                     println Command
                                     RunPowershellCommand(Command)
                                     junit "Report\\*-junit.xml"
@@ -146,7 +92,7 @@ node ("azure") {
                         catch (exc) {
                             currentBuild.result = 'SUCCESS'
                             println exc
-                            ReportException("${currentTest}", "${exc}")
+                            ReportException("$performanceTest}", "${exc}")
                         }
                     }
                 }
