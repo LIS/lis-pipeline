@@ -183,7 +183,7 @@ def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTe
     HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
 
 def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE'",
-    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*'",
+    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM'",
     AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS'",
     AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
 

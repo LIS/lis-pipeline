@@ -903,7 +903,7 @@ pipeline {
 			steps {
 				withCredentials([string(credentialsId: 'MAIL_LIST', variable: 'MAIL_LIST')]) {
 					emailext (
-						subject: "Test results for ${KERNEL_GIT_BRANCH} against ${DISTRO_VERSION}",
+						subject: "Test results for ${KERNEL_GIT_BRANCH} against ${DISTRO_VERSION}, debug kernel - ${KERNEL_DEBUG}",
 						to: "${env.MAIL_LIST}",
 						mimeType : "text/html",
 						body: '${SCRIPT, template="ubuntu.template"}'
