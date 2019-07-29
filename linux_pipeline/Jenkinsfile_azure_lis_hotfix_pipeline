@@ -1,22 +1,6 @@
 #!/usr/bin/env groovy
 import hudson.tasks.test.AbstractTestResultAction
 
-def ArmImagesCentOS = ["rhel_6.5": "OpenLogic CentOS 6.5 Latest", "rhel_6.6": "OpenLogic CentOS 6.6 Latest", "rhel_6.7": "OpenLogic CentOS 6.7 Latest",
-                 "rhel_6.8": "OpenLogic CentOS 6.8 Latest", "rhel_6.9": "OpenLogic CentOS 6.9 Latest", "rhel_6.10": "OpenLogic CentOS 6.10 Latest",
-                 "rhel_7.0": "OpenLogic CentOS 7.0 Latest", "rhel_7.1": "OpenLogic CentOS 7.1 Latest", "rhel_7.2": "OpenLogic CentOS 7.2 Latest",
-                 "rhel_7.3": "OpenLogic CentOS 7.3 Latest", "rhel_7.4": "OpenLogic CentOS 7.4 Latest", "rhel_7.5": "OpenLogic CentOS 7.5 Latest",
-                 "rhel_7.6": "OpenLogic CentOS 7.6 Latest"]
-def ArmImagesRHEL = ["rhel_6.5": "NA", "rhel_6.6": "NA", "rhel_6.7": "RedHat RHEL 6.7 Latest",
-                 "rhel_6.8": "RedHat RHEL 6.8 Latest", "rhel_6.9": "RedHat RHEL 6.9 Latest", "rhel_6.10": "RedHat RHEL 6.10 Latest",
-                 "rhel_7.0": "NA", "rhel_7.1": "NA", "rhel_7.2": "RedHat RHEL 7.2 Latest",
-                 "rhel_7.3": "RedHat RHEL 7.3 Latest", "rhel_7.4": "RedHat RHEL 7.4 Latest", "rhel_7.5": "RedHat RHEL 7.5 Latest",
-                 "rhel_7.6": "RedHat RHEL 7-RAW 7.6.2018103108"]
-def HyperVImages = ["rhel_6.5": "rhel_6.5", "rhel_6.6": "rhel_6.6_x64", "rhel_6.7": "NA",
-            "rhel_6.8": "rhel_6.8_x64", "rhel_6.9": "rhel_6.9_x64", "rhel_6.10": "rhel_6.10_x64",
-             "rhel_7.0": "rhel_7.0", "rhel_7.1": "rhel_7.1", "rhel_7.2": "rhel_7.2",
-             "rhel_7.3": "rhel_7.3", "rhel_7.4": "rhel_7.4", "rhel_7.5": "rhel_7.5",
-             "rhel_7.6": "rhel_7.6"]
-
 def HotfixTargetList = DISTRO_KERNEL.split("\n")
 def TotalHotfixErratas = HotfixTargetList.length
 def CustomLIS = null
@@ -27,6 +11,23 @@ def TestsExecuted = 0
 def TestsFailed = 0
 def TestsSkipped = 0
 def TestsPassed = 0
+
+/* Helper function to convert a multi string parameter to map */
+def ConvertListToMap(imageList)
+{
+    def distroImageMap = [:]
+    def len = imageList.length
+    for(i=0; i<len; i++)
+    {
+        def tmpMapElement = imageList[i].split(':')
+        distroImageMap[tmpMapElement[0].trim()] = tmpMapElement[1].trim()
+    }
+    return distroImageMap
+}
+
+def ArmImagesCentOS = ConvertListToMap(CENTOS_ARM_IMAGES.replaceAll("\n", ",").split(","))
+def ArmImagesRHEL = ConvertListToMap(RHEL_ARM_IMAGES.replaceAll("\n", ",").split(","))
+def HyperVImages = ConvertListToMap(HYPERV_IMAGES.replaceAll("\n", ",").split(","))
 
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
