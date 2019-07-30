@@ -93,7 +93,7 @@ azureImages.each {
                             " -TestPlatform  'Azure'" +
                             " -ARMImageName '${currentImage}'" +
                             " -TestPriority '1'" +
-                            " -ExcludeTests ${P1_EXCLUDE}" +
+                            " -ExcludeTests '${P1_EXCLUDE}'" +
                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                             " -ResourceCleanup Delete" +
                             " -EnableTelemetry" +
