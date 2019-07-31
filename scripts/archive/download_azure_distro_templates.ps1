@@ -1,4 +1,4 @@
-﻿##############################################################
+##############################################################
 #
 #  Microsoft Linux Kernel Build and Validation Pipeline
 #
@@ -32,7 +32,7 @@ $neededVms_array=@()
 $neededVms = {$neededVms_array}.Invoke()
 
 Write-Host "Getting the list of disks.  GetAll = $getAll.."
-$blobs=get-AzureStorageBlob -Container $srcContainer -Blob "*.vhd"
+$blobs=Get-AzStorageBlob -Container $srcContainer -Blob "*.vhd"
 foreach ($oneblob in $blobs) {
     $sourceName=$oneblob.Name
     $targetName = $sourceName
@@ -44,7 +44,7 @@ foreach ($oneblob in $blobs) {
             remove-vm -Name $targetName -Force -ErrorAction SilentlyContinue
             $neededVms.Add($targetName)
         } elseIf (Test-Path D:\azure_images\$targetName) {
-            Write-Host "Machine $targetName was already on the disk and the replaceVHD flag was not given.  Machine will not be updated." -ForegroundColor red            
+            Write-Host "Machine $targetName was already on the disk and the replaceVHD flag was not given.  Machine will not be updated." -ForegroundColor red
         } else {
             Write-Host "Machine $targetName does not yet exist on the disk.  Machine will be downloaded..." -ForegroundColor green
             stop-vm -Name $targetName -ErrorAction SilentlyContinue
@@ -69,7 +69,7 @@ if ($getAll -eq "True") {
         $vmName=$neededMachine
 
         $foundIt = $false
-        foreach ($machine in $neededVms) {            
+        foreach ($machine in $neededVms) {
             if ($vmName -eq $machine) {
                 $foundIt = $true
                 break;
@@ -121,7 +121,7 @@ while ($stop_checking -eq $false) {
             Write-Host "Download has FAILED" -ForegroundColor red
             $stop_checking = $true
         } elseif ($jobState.State -eq "Stopped") {
-            Write-Host "Download has Stopped"  -ForegroundColor red   
+            Write-Host "Download has Stopped"  -ForegroundColor red
             $stop_checking = $true
         } elseif ($jobState.State -eq "Blocked") {
             Write-Host "Download has Blocked" -ForegroundColor red

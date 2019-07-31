@@ -1,5 +1,5 @@
-﻿#
-#  Copies user VHDs it finds for VMs in the reference resource group into the 'clean-vhds' 
+#
+#  Copies user VHDs it finds for VMs in the reference resource group into the 'clean-vhds'
 #  storage container.  The target blobs will have the name of the VM, as a .vhd
 #
 #  Author:  John W. Fawcett, Principal Software Development Engineer, Microsoft
@@ -19,7 +19,7 @@ param (
     [Parameter(Mandatory=$false)] [string] $location="westus",
 
     [Parameter(Mandatory=$false)] [string[]] $vmNamesIn,
-    
+
     [Parameter(Mandatory=$false)] [string] $makeDronesFromAll=$false,
     [Parameter(Mandatory=$false)] [string] $clearDestContainer=$false,
     [Parameter(Mandatory=$false)] [string] $overwriteVHDs=$false
@@ -82,16 +82,16 @@ if ($makeDronesFromAll -eq $false) {
     #  Build the list of VMs to stop/delete
     foreach ($vmName in $vmNames) {
         if ($same_rg -eq $false) {
-            $runningVMsSource += (Get-AzureRmVm -ResourceGroupName $sourceRG -status | Where-Object -Property Name -Like "$vmName*" | where-object -Property PowerState -eq -value "VM running")
+            $runningVMsSource += (Get-AzVM -ResourceGroupName $sourceRG -status | Where-Object -Property Name -Like "$vmName*" | where-object -Property PowerState -eq -value "VM running")
         }
 
-        $runningVMsDest += (Get-AzureRmVm -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*")
-    } 
+        $runningVMsDest += (Get-AzVM -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*")
+    }
 } else {
     if ($same_rg -eq $false) {
-        $runningVMsSource = (Get-AzureRmVm -ResourceGroupName $sourceRG -status | where-object -Property PowerState -eq -value "VM running")
+        $runningVMsSource = (Get-AzVM -ResourceGroupName $sourceRG -status | where-object -Property PowerState -eq -value "VM running")
     }
-    $runningVMsDest = (Get-AzureRmVm -ResourceGroupName $destRG -status)
+    $runningVMsDest = (Get-AzVM -ResourceGroupName $destRG -status)
 }
 
 if ($same_rg -eq $false) {
@@ -102,15 +102,15 @@ deallocate_machines_in_group $runningVMsDest $destRG $destSA $location
 
 Write-Host "Launching jobs to copy individual machines..." -ForegroundColor Yellow
 
-$destKey=Get-AzureRmStorageAccountKey -ResourceGroupName $destRG -Name $destSA
-$destContext=New-AzureStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
+$destKey=Get-AzStorageAccountKey -ResourceGroupName $destRG -Name $destSA
+$destContext=New-AzStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
 
-$sourceKey=Get-AzureRmStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
-$sourceContext=New-AzureStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
+$sourceKey=Get-AzStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
+$sourceContext=New-AzStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
 if ($makeDronesFromAll -eq $true) {
-    $blobs=get-AzureStorageBlob -Container $sourceContainer -Blob "*$sourceExtension"
+    $blobs=Get-AzStorageBlob -Container $sourceContainer -Blob "*$sourceExtension"
     $blobCount = $blobs.Count
     Write-Host "Making drones of all VHDs in container $sourceContainer from region $location, with extenstion $sourceExtension.  There will be $blobCount VHDs:"-ForegroundColor Magenta
     $vmNames.Clear()
@@ -121,7 +121,7 @@ if ($makeDronesFromAll -eq $true) {
         $vmNames.Add($blobName)
     }
 } else {
-    $blobs=get-AzureStorageBlob -Container $sourceContainer -Blob "*.vhd"
+    $blobs=Get-AzStorageBlob -Container $sourceContainer -Blob "*.vhd"
     foreach ($vmName in $vmNames) {
         $foundIt = $false
         foreach ($blob in $blobs) {
@@ -143,10 +143,10 @@ if ($makeDronesFromAll -eq $true) {
     }
 }
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 if ($clearDestContainer -eq $true) {
     Write-Host "Clearing destination container of all jobs with extension $destExtension"
-    get-AzureStorageBlob -Container $destContainer -Blob "*$destExtension" | ForEach-Object {Remove-AzureStorageBlob -Blob $_.Name -Container $destContainer }
+    Get-AzStorageBlob -Container $destContainer -Blob "*$destExtension" | ForEach-Object {Remove-AzStorageBlob -Blob $_.Name -Container $destContainer }
 }
 
 [int] $index = 0
@@ -159,10 +159,10 @@ foreach ($vmName in $vmNames) {
         Write-Warning "NOTE:  Image name $targetName is too long"
         $targetName = $targetName.substring(0, 62)
         Write-Warning "NOTE:  Image name is now $targetName"
-        if ($targetName.EndsWith("-") -eq $true) {                
+        if ($targetName.EndsWith("-") -eq $true) {
             $targetName = $targetName -Replace ".$","X"
             Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $targetName"
-        }        
+        }
         Write-Warning "NOTE:  Image name $imageName was truncated to 62 characters"
     }
     $targetName = $targetName + ".vhd"
@@ -176,9 +176,9 @@ foreach ($vmName in $vmNames) {
 
     Write-Host "Initiating job to copy VHD $sourceName from $sourceRG and $sourceContainer to $targetName in $destRG and $destSA, container $destContainer" -ForegroundColor Yellow
     if ($overwriteVHDs -eq $true) {
-        $blob = Start-AzureStorageBlobCopy -SrcBlob $sourceBlob.Name -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
+        $blob = Start-AzStorageBlobCopy -SrcBlob $sourceBlob.Name -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
     } else {
-        $blob = Start-AzureStorageBlobCopy -SrcBlob $sourceBlob.Name -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext
+        $blob = Start-AzStorageBlobCopy -SrcBlob $sourceBlob.Name -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext
     }
 
     if ($? -eq $false) {
@@ -207,7 +207,7 @@ while ($stillCopying -eq $true) {
             Write-Warning "NOTE:  Image name $targetName is too long"
             $targetName = $targetName.substring(0, 62)
             Write-Warning "NOTE:  Image name is now $targetName"
-            if ($targetName.EndsWith("-") -eq $true) {                
+            if ($targetName.EndsWith("-") -eq $true) {
                 $targetName = $targetName -Replace ".$","X"
                 Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $targetName"
             }
@@ -215,7 +215,7 @@ while ($stillCopying -eq $true) {
             Write-Warning "NOTE:  Image name $imageName was truncated to 62 characters"
         }
 
-        $copyStatus = Get-AzureStorageBlobCopyState -Blob $targetName -Container $destContainer -ErrorAction SilentlyContinue
+        $copyStatus = Get-AzStorageBlobCopyState -Blob $targetName -Container $destContainer -ErrorAction SilentlyContinue
         $status = $copyStatus.Status
         if ($? -eq $false) {
             Write-Host "        Could not get copy state for job $targetName.  Job may not have started." -ForegroundColor Yellow
@@ -232,7 +232,7 @@ while ($stillCopying -eq $true) {
             $stillCopying = $true
         } else {
             if ($status -eq "Success") {
-                Write-Host "   **** Job $targetName has completed successfully." -ForegroundColor Green                    
+                Write-Host "   **** Job $targetName has completed successfully." -ForegroundColor Green
             } else {
                 Write-Host "   **** Job $targetName has failed with state $Status." -ForegroundColor Red
             }

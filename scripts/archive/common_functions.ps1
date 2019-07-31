@@ -1,17 +1,17 @@
 function login_azure {
     param (
-        [string] $rg = "", 
-        [string] $sa = "", 
+        [string] $rg = "",
+        [string] $sa = "",
         [string] $location = "" ,
         [bool] $createOnError = $false)
 
     . "C:\Framework-Scripts\secrets.ps1"
 
-    Import-AzureRmContext -Path 'C:\Azure\ProfileContext.ctx' > $null
-    Select-AzureRmSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID" > $null
+    Import-AzContext -Path 'C:\Azure\ProfileContext.ctx' > $null
+    Select-AzSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID" > $null
 
     if ($rg -ne "" -and $sa -ne "") {
-        $existingAccount = Get-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa
+        $existingAccount = Get-AzStorageAccount -ResourceGroupName $rg -Name $sa
         if ($? -eq $true) {
             #
             #  Existing account -- use it
@@ -20,18 +20,18 @@ function login_azure {
             if ($currentLoc -ne $location) {
                 if ($false -eq $createOnError) {
                 #
-                    #  Wrong region and we're suppposed to use existing.  This won't work, but we may not care         
+                    #  Wrong region and we're suppposed to use existing.  This won't work, but we may not care
                     Write-Warning "***************************************************************************************"
                     Write-Warning "Storage account $sa is in different region ($currentLoc) than current ($location)."
                     Write-Warning "       You will not be able to create any virtual machines from this account!"
                     Write-Warning "***************************************************************************************"
-                    Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+                    Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
                 } else {
                     #
                     #  Take it out and start over
-                    Remove-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Force
-                    New-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
-                    Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+                    Remove-AzStorageAccount -ResourceGroupName $rg -Name $sa -Force
+                    New-AzStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
+                    Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
                 }
             } else {
                 #
@@ -44,8 +44,8 @@ function login_azure {
             Write-Warning "***************************************************************************************"
             $sa = $null
         } else {
-            New-AzureRmStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS 
-            Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
+            New-AzStorageAccount -ResourceGroupName $rg -Name $sa -Kind Storage -Location $location -SkuName Standard_LRS
+            Set-AzCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $sa
         }
     }
 
@@ -55,7 +55,7 @@ function login_azure {
 function make_cred () {
     . "C:\Framework-Scripts\secrets.ps1"
 
-    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PASS" 
+    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PASS"
     $cred = new-object -typename system.management.automation.pscredential -argumentlist "$TEST_USER_ACCOUNT_NAME",$pw
 
     return $cred
@@ -64,7 +64,7 @@ function make_cred () {
 function make_cred_initial () {
     . "C:\Framework-Scripts\secrets.ps1"
 
-    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PAS2" 
+    $pw = convertto-securestring -AsPlainText -force -string "$TEST_USER_ACCOUNT_PAS2"
     $cred = new-object -typename system.management.automation.pscredential -argumentlist "$TEST_USER_ACCOUNT_NAME",$pw
 
     return $cred
@@ -83,12 +83,12 @@ function create_psrp_session([string] $vmName, [string] $rg, [string] $SA, [stri
     while ($attempts -lt 5) {
         $attempts = $attempts + 1
         write-verbose "Attempting to locate host by search string $vm_search_string"
-        $ipAddress = Get-AzureRmPublicIpAddress -ResourceGroupName $rg | Where-Object -Property Name -Like $vm_search_string
+        $ipAddress = Get-AzPublicIpAddress -ResourceGroupName $rg | Where-Object -Property Name -Like $vm_search_string
 
         write-verbose "Got IP Address $($ipAddress.Name), with IP Address $($ipAddress.IpAddress)"
 
         if ($ipAddress -ne $null) {
-            $theAddress = $ipAddress.IpAddress            
+            $theAddress = $ipAddress.IpAddress
             if ($theAddress.ToLower() -eq "not assigned") {
                 Write-Error "Machine $vmName does not have an assigned IP address.  Cannot create PSRP session to the machine."
                 return $null
@@ -137,13 +137,13 @@ function stop_machines_in_group([Microsoft.Azure.Commands.Compute.Models.PSVirtu
                 [Parameter(Mandatory=$false)] [string] $destSA,
                 [Parameter(Mandatory=$false)] [string] $location
         )
-                
+
         . C:\Framework-Scripts\common_functions.ps1
         . C:\Framework-Scripts\secrets.ps1
 
         login_azure $destRG $destSA $location
         Write-Verbose "Stopping machine $vm_name in RG $destRG"
-        Stop-AzureRmVM -Name $vm_name -ResourceGroupName $destRG -Force
+        Stop-AzVM -Name $vm_name -ResourceGroupName $destRG -Force
     }
 
     $scriptBlock = [scriptblock]::Create($scriptBlockString)
@@ -194,17 +194,17 @@ function deallocate_machines_in_list([string[]] $requestedNames,
                 [Parameter(Mandatory=$false)] [string] $destSA,
                 [Parameter(Mandatory=$false)] [string] $location
         )
-                
+
         . C:\Framework-Scripts\common_functions.ps1
         . C:\Framework-Scripts\secrets.ps1
 
         login_azure $destRG $destSA $location
         write-verbose "Deallocating machine $vm_name in RG $destRG"
-        Remove-AzureRmVM -Name $vm_name -ResourceGroupName $destRG -Force
+        Remove-AzVM -Name $vm_name -ResourceGroupName $destRG -Force
 
-        Get-AzureRmNetworkInterface -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzureRmNetworkInterface -Force
+        Get-AzNetworkInterface -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzNetworkInterface -Force
 
-        Get-AzureRmPublicIpAddress -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzureRmPublicIpAddress -Force
+        Get-AzPublicIpAddress -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzPublicIpAddress -Force
     }
 
     if ($runningVMs.Count -lt 1) {
@@ -263,13 +263,13 @@ function stop_machines_in_list([stringe[]] $requestedNames,
                 [Parameter(Mandatory=$false)] [string] $destSA,
                 [Parameter(Mandatory=$false)] [string] $location
         )
-                
+
         . C:\Framework-Scripts\common_functions.ps1
         . C:\Framework-Scripts\secrets.ps1
 
         login_azure $destRG $destSA $location
         Write-Verbose "Stopping machine $vm_name in RG $destRG"
-        Stop-AzureRmVM -Name $vm_name -ResourceGroupName $destRG -Force
+        Stop-AzVM -Name $vm_name -ResourceGroupName $destRG -Force
     }
 
     $scriptBlock = [scriptblock]::Create($scriptBlockString)
@@ -312,17 +312,17 @@ function deallocate_machines_in_group([Microsoft.Azure.Commands.Compute.Models.P
                 [Parameter(Mandatory=$false)] [string] $destSA,
                 [Parameter(Mandatory=$false)] [string] $location
         )
-                
+
         . C:\Framework-Scripts\common_functions.ps1
         . C:\Framework-Scripts\secrets.ps1
 
         login_azure $destRG $destSA $location
         Write-verbose "Deallocating machine $vm_name in RG $destRG"
-        Remove-AzureRmVM -Name $vm_name -ResourceGroupName $destRG -Force
+        Remove-AzVM -Name $vm_name -ResourceGroupName $destRG -Force
 
-        Get-AzureRmNetworkInterface -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzureRmNetworkInterface -Force
+        Get-AzNetworkInterface -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzNetworkInterface -Force
 
-        Get-AzureRmPublicIpAddress -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzureRmPublicIpAddress -Force
+        Get-AzPublicIpAddress -ResourceGroupName $destRG | Where-Object -Property Name -Like $vm_name | Remove-AzPublicIpAddress -Force
     }
 
     $scriptBlock = [scriptblock]::Create($scriptBlockString)
@@ -339,18 +339,18 @@ function deallocate_machines_in_group([Microsoft.Azure.Commands.Compute.Models.P
         start-sleep -Seconds 10
 
         $allDone = $false
-        while ($allDone -eq $false) {        
+        while ($allDone -eq $false) {
             $allDone = $true
             $timeNow = get-date
-            write-verbose "Checking jobs at time $timeNow :" 
+            write-verbose "Checking jobs at time $timeNow :"
             $vm_name = $singleVM.Name
             $vmJobName = $vm_name + "-Deprov"
             $job = Get-Job -Name $vmJobName
-            $jobState = $job.State        
-            write-verbose "    Job $vmJobName is in state $jobState" 
+            $jobState = $job.State
+            write-verbose "    Job $vmJobName is in state $jobState"
             if ($jobState -eq "Running") {
                 $allDone = $false
-            } 
+            }
 
             if ($allDone -eq $false) {
                 Start-Sleep -Seconds 10
@@ -368,7 +368,7 @@ function try_pscp([string] $file,
                   [string] $ipTemp)
 {
     . C:\Framework-Scripts\secrets.ps1
-    
+
     [int]$num_tries = 0
     $result = $false
     $plink_err = $null
@@ -405,7 +405,7 @@ function try_plink([string] $ip,
     . C:\Framework-Scripts\secrets.ps1
 
     $port=22
-    
+
     [int]$num_tries = 0
     $result = $false
     $plink_err = $null
@@ -450,32 +450,32 @@ Function CopyVHDToAnotherStorageAccount {
     }
 
     Write-Verbose "Retrieving $sourceStorageAccount storage account key"
-    $SrcStorageAccountKey = (Get-AzureRmStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceStorageAccount)[0].Value
+    $SrcStorageAccountKey = (Get-AzStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceStorageAccount)[0].Value
     [string]$SrcStorageAccount = $sourceStorageAccount
     [string]$SrcStorageBlob = $vhdName
     $SrcStorageContainer = $sourceStorageContainer
 
 
     Write-Verbose "Retrieving $destinationStorageAccount storage account key"
-    $DestAccountKey= (Get-AzureRmStorageAccountKey -ResourceGroupName $destRG -Name $destinationStorageAccount)[0].Value
+    $DestAccountKey= (Get-AzStorageAccountKey -ResourceGroupName $destRG -Name $destinationStorageAccount)[0].Value
     [string]$DestAccountName =  $destinationStorageAccount
     [string]$DestBlob = $destVHDName
     $DestContainer = $destinationStorageContainer
 
-    $context = New-AzureStorageContext -StorageAccountName $srcStorageAccount -StorageAccountKey $srcStorageAccountKey 
+    $context = New-AzStorageContext -StorageAccountName $srcStorageAccount -StorageAccountKey $srcStorageAccountKey
     $expireTime = Get-Date
     $expireTime = $expireTime.AddYears(1)
-    $SasUrl = New-AzureStorageBlobSASToken -container $srcStorageContainer -Blob $srcStorageBlob -Permission R -ExpiryTime $expireTime -FullUri -Context $Context 
+    $SasUrl = New-AzStorageBlobSASToken -container $srcStorageContainer -Blob $srcStorageBlob -Permission R -ExpiryTime $expireTime -FullUri -Context $Context
 
-    $destContext = New-AzureStorageContext -StorageAccountName $destAccountName -StorageAccountKey $destAccountKey
-    $testContainer = Get-AzureStorageContainer -Name $destContainer -Context $destContext -ErrorAction Ignore
-    if ($testContainer -eq $null) 
+    $destContext = New-AzStorageContext -StorageAccountName $destAccountName -StorageAccountKey $destAccountKey
+    $testContainer = Get-AzStorageContainer -Name $destContainer -Context $destContext -ErrorAction Ignore
+    if ($testContainer -eq $null)
     {
-        $out = New-AzureStorageContainer -Name $destContainer -context $destContext
+        $out = New-AzStorageContainer -Name $destContainer -context $destContext
     }
     # Start the Copy
     Write-Verbose "Copy $vhdName --> $($destContext.StorageAccountName) : Running"
-    $out = Start-AzureStorageBlobCopy -AbsoluteUri $SasUrl  -DestContainer $destContainer -DestContext $destContext -DestBlob $destBlob -Force
+    $out = Start-AzStorageBlobCopy -AbsoluteUri $SasUrl  -DestContainer $destContainer -DestContext $destContext -DestBlob $destBlob -Force
     #
     # Monitor replication status
     #
@@ -483,8 +483,8 @@ Function CopyVHDToAnotherStorageAccount {
     while($CopyingInProgress)
     {
         $CopyingInProgress = $false
-        $status = Get-AzureStorageBlobCopyState -Container $destContainer -Blob $destBlob -Context $destContext   
-        if ($status.Status -ne "Success") 
+        $status = Get-AzStorageBlobCopyState -Container $destContainer -Blob $destBlob -Context $destContext
+        if ($status.Status -ne "Success")
         {
             $CopyingInProgress = $true
         }
@@ -497,7 +497,7 @@ Function CopyVHDToAnotherStorageAccount {
         if ($CopyingInProgress)
         {
             $copyPercentage = [math]::Round( $(($status.BytesCopied * 100 / $status.TotalBytes)) , 2 )
-            Write-Verbose "Bytes Copied:$($status.BytesCopied), Total Bytes:$($status.TotalBytes) [ $copyPercentage % ]"            
+            Write-Verbose "Bytes Copied:$($status.BytesCopied), Total Bytes:$($status.TotalBytes) [ $copyPercentage % ]"
             Sleep -Seconds 10
         }
     }

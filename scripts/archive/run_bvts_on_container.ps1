@@ -1,4 +1,4 @@
-﻿#
+#
 #  Copies VHDs that have booted as expected to the test location where they will be prepped
 #  for Azure automation
 #
@@ -56,7 +56,7 @@ if ($OverwriteVHDs -ne "False") {
 }
 
 $logFileName = "C:\temp\transcripts\run_bvts_on_container-" + $sourceRG + "-" + $sourceSA + "-" + $sourceContainer + "-" + (Get-Date -Format s).replace(":","-")
-Start-Transcript $logFileName 
+Start-Transcript $logFileName
 
 write-host "Overwrite flag is $overwriteVHDs"
 get-job | Stop-Job
@@ -66,7 +66,7 @@ set-location C:\azure-linux-automation
 git pull
 
 $blobFilter = '*.vhd'
-if ($removeTag -ne "") {    
+if ($removeTag -ne "") {
     $blobFilter = '*' + $removeTag
 }
 Write-Host "Blob filter is $blobFilter"
@@ -79,20 +79,20 @@ $fullSuffix = $regionSuffix + "-Booted-and-Verified"
 login_azure $sourceRG $sourceSA $location
 
 Write-Host "Stopping all running machines..."  -ForegroundColor green
-$runningVMs = Get-AzureRmVm -ResourceGroupName $sourceRG
+$runningVMs = Get-AzVM -ResourceGroupName $sourceRG
 deallocate_machines_in_group $runningVMs $sourceRG $sourceSA $location
 
-$sourceKey=Get-AzureRmStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
-$sourceContext=New-AzureStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
+$sourceKey=Get-AzStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
+$sourceContext=New-AzStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA 
-$blobs=get-AzureStorageBlob -Container $sourceContainer -Blob $blobFilter
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
+$blobs=Get-AzStorageBlob -Container $sourceContainer -Blob $blobFilter
 
 Write-Host "Deleting any existing storage account and recreating it."
 $wasThere = $false
 $currentLoc = $null
 $existingAccount = $null
-$existingAccount = Get-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA
+$existingAccount = Get-AzStorageAccount -ResourceGroupName $destRG -Name $destSA
 if ($? -eq $true) {
     $wasThere = $true
 
@@ -104,14 +104,14 @@ if ($? -eq $true) {
 if (($wasThere -eq $true) -and ($overwriteVHDs -eq $true)) {
     #
     #  Was the container there?
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA 
-    
-    $containerWasThere = Get-AzureStorageContainer -Name $destContainer
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
+
+    $containerWasThere = Get-AzStorageContainer -Name $destContainer
     if ($? -eq $true -and $containerWasThere -ne $null) {
-        Remove-AzureStorageContainer -Name $destContainer -Force
+        Remove-AzStorageContainer -Name $destContainer -Force
     }
-    # Remove-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA -Force
-    # New-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA -Kind Storage -Location $location -SkuName Standard_LRS
+    # Remove-AzStorageAccount -ResourceGroupName $destRG -Name $destSA -Force
+    # New-AzStorageAccount -ResourceGroupName $destRG -Name $destSA -Kind Storage -Location $location -SkuName Standard_LRS
 } elseif (($wasThere -eq $true) -and ($OverwriteVHDs -eq $false)) {
     if ($currentLoc -ne $location) {
         Write-Error "The storage account exists, but it is in region $currentLoc, while the tests specify region $location.  Tests will exit."
@@ -121,26 +121,26 @@ if (($wasThere -eq $true) -and ($overwriteVHDs -eq $true)) {
     Write-Host "Using existing storage account $destSA."
 } else {
     Write-Host "Storage account did not exist.  Creating now..."
-    New-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA -Kind Storage -Location $location -SkuName Standard_LRS
+    New-AzStorageAccount -ResourceGroupName $destRG -Name $destSA -Kind Storage -Location $location -SkuName Standard_LRS
 }
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA 
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 
 Write-Host "Copying the test VMs packages to BVT resource group"
-$destKey=Get-AzureRmStorageAccountKey -ResourceGroupName $destRG -Name $destSA
-$destContext=New-AzureStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
+$destKey=Get-AzStorageAccountKey -ResourceGroupName $destRG -Name $destSA
+$destContext=New-AzStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
 
-$existingContainer = Get-AzureStorageContainer -name $destContainer
+$existingContainer = Get-AzStorageContainer -name $destContainer
 if ($? -eq $false -or $existingContainer -eq $null) {
     Write-Host "Making a new onwe..."
-    New-AzureStorageContainer -Name $destContainer -Permission Blob
+    New-AzStorageContainer -Name $destContainer -Permission Blob
     $existingBlobs = $null
 } else {
-    $existingBlobs=get-AzureStorageBlob -Container $destContainer
+    $existingBlobs=Get-AzStorageBlob -Container $destContainer
 }
 
 foreach ($oneblob in $blobs) {
     $fullName=$oneblob.Name
-    
+
     if ($removeTag -ne "") {
         if ($removeTag -match ".*.vhd") {
             $targetName=$fullName.Replace($removeTag,$fullSuffix)
@@ -157,7 +157,7 @@ foreach ($oneblob in $blobs) {
         Write-Warning "NOTE:  Image name $targetName is too long"
         $targetName = $targetName.substring(0, 62)
         Write-Warning "NOTE:  Image name is now $targetName"
-        if ($targetName.EndsWith("-") -eq $true) {                
+        if ($targetName.EndsWith("-") -eq $true) {
             $targetName = $targetName -Replace ".$","X"
             Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $targetName"
         }
@@ -173,17 +173,17 @@ foreach ($oneblob in $blobs) {
     $start_copy = $true
     if (($blobIsInDest -eq $true) -and ($overwriteVHDs -eq $true)) {
         Write-Host "There is an existing blob in the destination and the overwrite flag has been set.  The existing blob will be deleted."
-        Remove-AzureStorageBlob -Blob $targetName -Container $destContainer -Force
+        Remove-AzStorageBlob -Blob $targetName -Container $destContainer -Force
     } elseif ($blobIsInDest -eq $false) {
         Write-Host "This is a new blob."
     } else {
         Write-Host "There was an existing blob named $targetName, and the overwrite flag was not set.  Blob will not be copied."
         $start_copy = $false
-    }    
-    
+    }
+
     if ($start_copy -eq $true) {
         Write-Host "Initiating job to copy VHD from $sourceSA/$sourceContainer/$fullName to $destSA/$destContainer/$targetName..." -ForegroundColor Yellow
-        $blob = Start-AzureStorageBlobCopy -SrcBlob $fullName -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
+        $blob = Start-AzStorageBlobCopy -SrcBlob $fullName -DestContainer $destContainer -SrcContainer $sourceContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
         if ($? -eq $true) {
             $copyblobs.Add($targetName)
         } else {
@@ -198,7 +198,7 @@ if ($copyblobs.Count -gt 0) {
     Start-Sleep -Seconds 10
     Write-Host "All jobs have been launched.  Initial check is:" -ForegroundColor Yellow
 
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
     $stillCopying = $true
     while ($stillCopying -eq $true) {
         $stillCopying = $false
@@ -209,7 +209,7 @@ if ($copyblobs.Count -gt 0) {
         while ($reset_copyblobs -eq $true) {
             $reset_copyblobs = $false
             foreach ($blob in $copyblobs) {
-                $status = Get-AzureStorageBlobCopyState -Blob $blob -Container $destContainer -ErrorAction SilentlyContinue
+                $status = Get-AzStorageBlobCopyState -Blob $blob -Container $destContainer -ErrorAction SilentlyContinue
                 if ($? -eq $false) {
                     Write-Host "        Could not get copy state for job $blob.  Job may not have started." -ForegroundColor Yellow
                 } elseif ($status.Status -eq "Pending") {
@@ -243,14 +243,14 @@ if ($copyblobs.Count -gt 0) {
     }
 }
 
-# Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA 
-# $blobs=get-AzureStorageBlob -Container $destContainer
+# Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
+# $blobs=Get-AzStorageBlob -Container $destContainer
 Set-Location C:\azure-linux-automation
 $launched_machines = 0
 
 foreach ($oneblob in $successfulCopies) {
     $fullName=$oneblob.Name
-            
+
     $configFileName="c:\temp\bvt_configs\bvt_exec_" + $fullName + ".xml"
     $jobName=$fullName + "_BVT_Runner"
 
@@ -288,10 +288,10 @@ while ($completed_machines -lt $launched_machines) {
         write-host "Update as of $updateTime.  There were $launched_machines started..."
         $logThisOne=$true
     }
-    
+
     foreach ($oneblob in $blobs) {
         $fullName=$oneblob.Name
-        
+
         $jobName=$fullName + "_BVT_Runner"
 
         $jobStatus=get-job -Name $jobName
@@ -303,7 +303,7 @@ while ($completed_machines -lt $launched_machines) {
                 $failed_machines += 1
                 if ($logThisOne -eq $true) {
                     Write-Host " >>>> BVT job $jobName exited with FAILED state!" -ForegroundColor red
-                }   
+                }
             }
             elseif ($jobState -eq "Completed")
             {
@@ -316,7 +316,7 @@ while ($completed_machines -lt $launched_machines) {
             {
                 $running_machines += 1
                 if ($logThisOne -eq $true) {
-                    Write-Host "      BVT job $jobName is still in progress." -ForegroundColor green                
+                    Write-Host "      BVT job $jobName is still in progress." -ForegroundColor green
                 }
             }
             else
@@ -326,7 +326,7 @@ while ($completed_machines -lt $launched_machines) {
             }
         }
     }
-    
+
     if ($logThisOne -eq $true) {
        write-host "$launched_machines BVT jobs were launched.  Of those: completed = $completed_machines, Running = $running_machines, Failed = $failed_machines, and unknown = $other_machines" -ForegroundColor green
     }

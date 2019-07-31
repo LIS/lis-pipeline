@@ -60,7 +60,7 @@ class Instance {
         return $this.Backend.GetVM($this.Name)
     }
 
-    [String] SetupAzureRG() 
+    [String] SetupAzureRG()
     {
         write-verbose "Setting up Azure RG"
         return $this.Backend.SetupAzureRG()
@@ -92,7 +92,7 @@ class HypervInstance : Instance {
     }
 
     [Object] GetVMDisk () {
-        return $this.Backend.GetVMDisk($this.Name) 
+        return $this.Backend.GetVMDisk($this.Name)
     }
 
     [void] AddVMDisk ($VMDisk) {
@@ -109,7 +109,7 @@ class Backend {
     [String] $Name="BaseBackend"
 
     Backend ($Params) {
-        write-verbose ("Initialized backend " + $this.Name) 
+        write-verbose ("Initialized backend " + $this.Name)
     }
 
     [string] Serialize() {
@@ -227,7 +227,7 @@ write-verbose  "Checkpoint 1"
             Write-Warning "NOTE:  Image name $imageName is too long"
             $imageName = $imageName.substring(0, 62)
             Write-Warning "NOTE:  Image name is now $imageName"
-            if ($imageName.EndsWith("-") -eq $true) {                
+            if ($imageName.EndsWith("-") -eq $true) {
                 $imageName = $imageName -Replace ".$","X"
                 Write-Warning "NOTE:  Image name is ended in an illegal character.  Image name is now $imageName"
             }
@@ -240,7 +240,7 @@ write-verbose  "Checkpoint 1"
         } else {
             write-verbose "All good"
         }
-        
+
         return $instance
     }
 
@@ -262,15 +262,15 @@ write-verbose  "Checkpoint 1"
     [string] WaitForAzureRG( ) {
         $azureIsReady = $false
         while ($azureIsReady -eq $false) {
-            $sg = Get-AzureRmNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
+            $sg = Get-AzNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
             if (!$sg) {
                 Start-Sleep -Seconds 10
             } else {
-                $VMVNETObject = Get-AzureRmVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
+                $VMVNETObject = Get-AzVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
                 if (!$VMVNETObject) {
                     Start-Sleep -Seconds 10
                 } else {
-                    $VMSubnetObject = Get-AzureRmVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject
+                    $VMSubnetObject = Get-AzVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject
                     if (!$VMSubnetObject) {
                         Start-Sleep -Seconds 10
                     } else {
@@ -285,12 +285,12 @@ write-verbose  "Checkpoint 1"
 
     [void] StopInstance ($InstanceName) {
         write-verbose "Stopping machine $InstanceName"
-        Stop-AzureRmVM -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
+        Stop-AzVM -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
     }
 
-    [void] RemoveInstance ($InstanceName) { 
+    [void] RemoveInstance ($InstanceName) {
         write-verbose "Removing machine $InstanceName"
-        Remove-AzureRmVM -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
+        Remove-AzVM -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
     }
 
     [void] CleanupInstance ($InstanceName) {
@@ -300,37 +300,37 @@ write-verbose  "Checkpoint 1"
             write-verbose "Preserving existing PIP and NIC for future use."
         } else {
             write-verbose "Deleting NIC " $InstanceName
-            $VNIC = Get-AzureRmNetworkInterface -Name $InstanceName -ResourceGroupName $this.ResourceGroupName 
+            $VNIC = Get-AzNetworkInterface -Name $InstanceName -ResourceGroupName $this.ResourceGroupName
             if ($VNIC -and $this.UseExistingResources -ne "Yes") {
-                Remove-AzureRmNetworkInterface -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
+                Remove-AzNetworkInterface -Name $InstanceName -ResourceGroupName $this.ResourceGroupName -Force
             }
 
             write-verbose "Deleting PIP $InstanceName"
-            $pip = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $InstanceName
+            $pip = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $InstanceName
             if ($pip -and $this.UseExistingResources -ne "Yes") {
-                Remove-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $InstanceName -Force
-            }   
-        }     
+                Remove-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $InstanceName -Force
+            }
+        }
     }
 
     # Microsoft.Azure.Commands.Network.Models.PSNetworkSecurityGroup
     [object] getNSG()
     {
-        $sg = Get-AzureRmNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
+        $sg = Get-AzNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
         if (!$sg) {
-            # write-verbose "Network security group does not exist for this region.  Creating now..." 
-            $rule1 = New-AzureRmNetworkSecurityRuleConfig -Name "ssl-rule" -Description "Allow SSL over HTTP" `
+            # write-verbose "Network security group does not exist for this region.  Creating now..."
+            $rule1 = New-AzNetworkSecurityRuleConfig -Name "ssl-rule" -Description "Allow SSL over HTTP" `
                                                             -Access "Allow" -Protocol "Tcp" -Direction "Inbound" -Priority "100" `
                                                             -SourceAddressPrefix "Internet" -SourcePortRange "*" `
                                                             -DestinationAddressPrefix "*" -DestinationPortRange "443"
-            $rule2 = New-AzureRmNetworkSecurityRuleConfig -Name "ssh-rule" -Description "Allow SSH" `
+            $rule2 = New-AzNetworkSecurityRuleConfig -Name "ssh-rule" -Description "Allow SSH" `
                                                             -Access "Allow" -Protocol "Tcp" -Direction "Inbound" -Priority "101" `
                                                             -SourceAddressPrefix "Internet" -SourcePortRange "*" -DestinationAddressPrefix "*" `
                                                             -DestinationPortRange "22"
 
-            New-AzureRmNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName -Location $this.Location -SecurityRules $rule1,$rule2
+            New-AzNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName -Location $this.Location -SecurityRules $rule1,$rule2
 
-            $sg = Get-AzureRmNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
+            $sg = Get-AzNetworkSecurityGroup -Name $this.NetworkSecGroupName -ResourceGroupName $this.ResourceGroupName
             # write-verbose "Done."
         }
 
@@ -340,12 +340,12 @@ write-verbose  "Checkpoint 1"
     # Microsoft.Azure.Commands.Network.Models.PSVirtualNetwork
     [object] getNetwork($sg)
     {
-        $VMVNETObject = Get-AzureRmVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
+        $VMVNETObject = Get-AzVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
         if (!$VMVNETObject) {
-            # write-verbose "Network does not exist for this region.  Creating now..." 
-            $VMSubnetObject = New-AzureRmVirtualNetworkSubnetConfig -Name $this.SubnetName  -AddressPrefix $this.subnetPrefix -NetworkSecurityGroup $sg
-            New-AzureRmVirtualNetwork   -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName -Location $this.Location -AddressPrefix $this.addressPrefix -Subnet $VMSubnetObject
-            $VMVNETObject = Get-AzureRmVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
+            # write-verbose "Network does not exist for this region.  Creating now..."
+            $VMSubnetObject = New-AzVirtualNetworkSubnetConfig -Name $this.SubnetName  -AddressPrefix $this.subnetPrefix -NetworkSecurityGroup $sg
+            New-AzVirtualNetwork   -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName -Location $this.Location -AddressPrefix $this.addressPrefix -Subnet $VMSubnetObject
+            $VMVNETObject = Get-AzVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
         }
 
         return $VMVNETObject
@@ -354,13 +354,13 @@ write-verbose  "Checkpoint 1"
     # Microsoft.Azure.Commands.Network.Models.PSSubnet
     [object] getSubnet($sg,$VMVNETObject)
     {
-        $VMSubnetObject = Get-AzureRmVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject 
+        $VMSubnetObject = Get-AzVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject
         if (!$VMSubnetObject) {
-            # write-verbose "Subnet does not exist for this region.  Creating now..." 
-            Add-AzureRmVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject -AddressPrefix $this.subnetPrefix -NetworkSecurityGroup $sg
-            Set-AzureRmVirtualNetwork -VirtualNetwork $VMVNETObject 
-            $VMVNETObject = Get-AzureRmVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
-            $VMSubnetObject = Get-AzureRmVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject 
+            # write-verbose "Subnet does not exist for this region.  Creating now..."
+            Add-AzVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject -AddressPrefix $this.subnetPrefix -NetworkSecurityGroup $sg
+            Set-AzVirtualNetwork -VirtualNetwork $VMVNETObject
+            $VMVNETObject = Get-AzVirtualNetwork -Name $this.NetworkName -ResourceGroupName $this.ResourceGroupName
+            $VMSubnetObject = Get-AzVirtualNetworkSubnetConfig -Name $this.SubnetName -VirtualNetwork $VMVNETObject
         }
 
         return $VMSubnetObject
@@ -372,12 +372,12 @@ write-verbose  "Checkpoint 1"
         write-verbose "CALL TO GETPIP -- INCOMING PIPNAME IS $pipName"
 
         $pipName = $pipName.replace("_","-")
-        $pip = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName 
+        $pip = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
         if (!$pip) {
-            # write-verbose "Public IP does not exist for this region.  Creating now..." 
-            New-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Location $this.Location `
+            # write-verbose "Public IP does not exist for this region.  Creating now..."
+            New-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Location $this.Location `
                 -Name $pipName -AllocationMethod Dynamic -IdleTimeoutInMinutes 4
-            $pip = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
+            $pip = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
         }
 
         return $pip.IpAddress
@@ -385,32 +385,32 @@ write-verbose  "Checkpoint 1"
 
     # Microsoft.Azure.Commands.Network.Models.PSNetworkInterface
     [object] getNIC([string] $nicName,
-                    [object] $VMSubnetObject, 
+                    [object] $VMSubnetObject,
                     [object] $pip)
     {
         Write-Verbose "GetNIC CP 1"
-        $VNIC = Get-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName 
+        $VNIC = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName
         Write-Verbose "GetNIC CP 2"
         if (!$VNIC) {
-            # write-verbose "Creating new network interface" 
+            # write-verbose "Creating new network interface"
             #
             #  Get the PIP
-            $pip2 = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $nicName
+            $pip2 = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $nicName
             Write-Verbose "GetNIC CP 3"
 
-            New-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName `
+            New-AzNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName `
                 -Location $this.Location -SubnetId $VMSubnetObject.Id -publicipaddressid $pip2.Id
 
                 Write-Verbose "GetNIC CP 4"
-            $VNIC = Get-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName
+            $VNIC = Get-AzNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName
             Write-Verbose "GetNIC CP 5"
         }
         Write-Verbose "GetNIC CP 6"
         return $VNIC
     }
 
-    [void] CreateInstanceFromSpecialized ($InstanceName) {        
-        write-verbose "Creating a new VM config for $InstanceName..." 
+    [void] CreateInstanceFromSpecialized ($InstanceName) {
+        write-verbose "Creating a new VM config for $InstanceName..."
 
         $sg = $this.getNSG()
 
@@ -418,40 +418,40 @@ write-verbose  "Checkpoint 1"
 
         $VMSubnetObject = $this.getSubnet($sg, $VMVNETObject)
 
-        $vm = New-AzureRmVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
-        write-verbose "Assigning network $($this.NetworkName) and subnet config  $($this.SubnetName) with NSG  $($this.NetworkSecGroupName) to new machine" 
+        $vm = New-AzVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
+        write-verbose "Assigning network $($this.NetworkName) and subnet config  $($this.SubnetName) with NSG  $($this.NetworkSecGroupName) to new machine"
 
-        write-verbose "Assigning the public IP address" 
+        write-verbose "Assigning the public IP address"
         $ipName = $InstanceName
         write-verbose "------------------>>>>> -------------------->>>> 1111111 CAlling GETPIP with $ipName"
         $pip = $this.getPIP($ipName)
 
-        write-verbose "Assigning the network interface" 
+        write-verbose "Assigning the network interface"
         $nicName = $InstanceName
         $VNIC = $this.getNIC($nicName, $VMSubnetObject, $pip)
 
-        Get-AzureRmNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName 
+        Get-AzNetworkInterface -Name $nicName -ResourceGroupName $this.ResourceGroupName
         $VNIC.NetworkSecurityGroup = $sg
-        Set-AzureRmNetworkInterface -NetworkInterface $VNIC
+        Set-AzNetworkInterface -NetworkInterface $VNIC
 
-        write-verbose "Adding the network interface" 
-        Add-AzureRmVMNetworkInterface -VM $vm -Id $VNIC.Id
-        
+        write-verbose "Adding the network interface"
+        Add-AzVMNetworkInterface -VM $vm -Id $VNIC.Id
+
         #
         #  Code specific to a specialized blob
         $blobURIRaw = ("https://{0}.blob.core.windows.net/{1}/{2}.vhd" -f `
                        @($this.StorageAccountName, $this.ContainerName, $InstanceName))
 
-        $vm = Set-AzureRmVMOSDisk -VM $vm -Name $InstanceName -VhdUri $blobURIRaw -CreateOption Attach -Linux
+        $vm = Set-AzVMOSDisk -VM $vm -Name $InstanceName -VhdUri $blobURIRaw -CreateOption Attach -Linux
 
         if ($this.enableBootDiagnostics -ne "Yes") {
             write-verbose "Disabling boot diagnostics"
-            Set-AzureRmVMBootDiagnostics -VM $vm -Disable
+            Set-AzVMBootDiagnostics -VM $vm -Disable
         }
 
         try {
-            write-verbose "Starting the VM" 
-            $NEWVM = New-AzureRmVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
+            write-verbose "Starting the VM"
+            $NEWVM = New-AzVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
             if (!$NEWVM) {
                 Write-errpr "Failed to create VM"
             } else {
@@ -464,8 +464,8 @@ write-verbose  "Checkpoint 1"
         }
     }
 
-    [void] CreateInstanceFromURN ($InstanceName, $useInitialPW) {        
-        write-verbose "Creating a new VM config for $InstanceName..." 
+    [void] CreateInstanceFromURN ($InstanceName, $useInitialPW) {
+        write-verbose "Creating a new VM config for $InstanceName..."
 
         $sg = $this.getNSG()
 
@@ -473,24 +473,24 @@ write-verbose  "Checkpoint 1"
 
         $VMSubnetObject = $this.getSubnet($sg, $VMVNETObject)
 
-        $vm = New-AzureRmVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
+        $vm = New-AzVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
         write-verbose "Assigning network $($this.NetworkName) and subnet config $($this.SubnetName) with NSG $($this.NetworkSecGroupName) to new machine"
 
         write-verbose "Assigning the public IP address"
-        
+
         $ipName = $InstanceName
         write-verbose "------------------>>>>> -------------------->>>> 2222222 CAlling GETPIP with $ipName"
         $pip = $this.getPIP($ipName)
 
-        write-verbose "Assigning the network interface" 
+        write-verbose "Assigning the network interface"
         $nicName = $InstanceName
         $VNIC = $this.getNIC($nicName, $VMSubnetObject, $pip)
         $VNIC.NetworkSecurityGroup = $sg
-        
-        Set-AzureRmNetworkInterface -NetworkInterface $VNIC
+
+        Set-AzNetworkInterface -NetworkInterface $VNIC
 
         write-verbose "Adding the network interface"
-        Add-AzureRmVMNetworkInterface -VM $vm -Id $VNIC.Id
+        Add-AzVMNetworkInterface -VM $vm -Id $VNIC.Id
 
         write-verbose "Parsing the blob string $this.blobURN"
         $blobParts = $this.blobURN.split(":")
@@ -502,25 +502,25 @@ write-verbose  "Checkpoint 1"
         $tries = 0
         while ($trying -eq $true) {
             $trying = $false
-            
-            write-verbose "Starting the VM" 
+
+            write-verbose "Starting the VM"
             if ($this.useInitialPW -eq "Yes") {
                 $cred = make_cred_initial
             } else {
                 $cred = make_cred
             }
-            $vm = Set-AzureRmVMOperatingSystem -VM $vm -Linux -ComputerName $InstanceName -Credential $cred
-            $vm = Set-AzureRmVMSourceImage -VM $vm -PublisherName $blobParts[0] -Offer $blobParts[1] `
+            $vm = Set-AzVMOperatingSystem -VM $vm -Linux -ComputerName $InstanceName -Credential $cred
+            $vm = Set-AzVMSourceImage -VM $vm -PublisherName $blobParts[0] -Offer $blobParts[1] `
                 -Skus $blobParts[2] -Version $blobParts[3]
-            $vm = Set-AzureRmVMOSDisk -VM $vm -VhdUri $osDiskVhdUri -name $InstanceName -CreateOption fromImage -Caching ReadWrite
+            $vm = Set-AzVMOSDisk -VM $vm -VhdUri $osDiskVhdUri -name $InstanceName -CreateOption fromImage -Caching ReadWrite
 
             if ($this.enableBootDiagnostics -ne "Yes") {
                 write-verbose "Disabling boot diagnostics"
-                Set-AzureRmVMBootDiagnostics -VM $vm -Disable
+                Set-AzVMBootDiagnostics -VM $vm -Disable
             }
 
             try {
-                $NEWVM = New-AzureRmVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
+                $NEWVM = New-AzVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
                 if (!$NEWVM) {
                     write-error "Failed to create VM $InstanceName"
                     Start-Sleep -Seconds 30
@@ -530,7 +530,7 @@ write-verbose  "Checkpoint 1"
                         break
                     }
                 } else {
-                    write-verbose "VM $InstanceName started successfully..." 
+                    write-verbose "VM $InstanceName started successfully..."
                 }
             } catch {
                 Write-error "Caught exception attempting to start the new VM.  Aborting..."
@@ -538,8 +538,8 @@ write-verbose  "Checkpoint 1"
         }
     }
 
-    [void] CreateInstanceFromGeneralized ($InstanceName, $useInitialPW) {        
-        write-verbose "Creating a new VM config..." 
+    [void] CreateInstanceFromGeneralized ($InstanceName, $useInitialPW) {
+        write-verbose "Creating a new VM config..."
 
         $sg = $this.getNSG()
         if ($? -eq $false -or $sg -eq $null) {
@@ -556,34 +556,34 @@ write-verbose  "Checkpoint 1"
             Write-Error "FAILED to get getSubnet"
         }
 
-        $vm = New-AzureRmVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
-        write-verbose "Assigning network $($this.NetworkName) and subnet config $($this.SubnetName) with NSG $($this.NetworkSecGroupName) to new machine" 
+        $vm = New-AzVMConfig -VMName $InstanceName -VMSize $this.VMFlavor
+        write-verbose "Assigning network $($this.NetworkName) and subnet config $($this.SubnetName) with NSG $($this.NetworkSecGroupName) to new machine"
 
-        write-verbose "Assigning the public IP address" 
+        write-verbose "Assigning the public IP address"
         $ipName = $InstanceName
         write-verbose "------------------>>>>> -------------------->>>> 33333333 CAlling GETPIP with $ipName"
         $pip = $this.getPIP($ipName)
 
-        write-verbose "Assigning the network interface" 
+        write-verbose "Assigning the network interface"
         $nicName = $InstanceName
         $VNIC = $this.getNIC($nicName, $VMSubnetObject, $pip)
         $VNIC.NetworkSecurityGroup = $sg
-        
-        Set-AzureRmNetworkInterface -NetworkInterface $VNIC
 
-        write-verbose "Adding the network interface" 
-        Add-AzureRmVMNetworkInterface -VM $vm -Id $VNIC.Id
+        Set-AzNetworkInterface -NetworkInterface $VNIC
+
+        write-verbose "Adding the network interface"
+        Add-AzVMNetworkInterface -VM $vm -Id $VNIC.Id
 
         #
         #  Create an image from the URI that we can then instantiate
-        #$imageConfig = New-AzureRmImageConfig -Location $this.Location
-        #$imageConfig = Set-AzureRmImageOsDisk -Image $imageConfig -OsState Generalized -BlobUri $this.blobURI -OsType Linux 
+        #$imageConfig = New-AzImageConfig -Location $this.Location
+        #$imageConfig = Set-AzImageOsDisk -Image $imageConfig -OsState Generalized -BlobUri $this.blobURI -OsType Linux
 
-        #$image = New-AzureRmImage -ImageName $InstanceName -ResourceGroupName $this.ResourceGroupName -Image $imageConfig
-        
+        #$image = New-AzImage -ImageName $InstanceName -ResourceGroupName $this.ResourceGroupName -Image $imageConfig
+
         #
         #  Set up the OS disk
-        # $blobURIRaw = $this.blobURI        
+        # $blobURIRaw = $this.blobURI
         # write-verbose "Setting up the OS disk.  Image name is $InstanceName, from URI $blobURIRaw"
 
         # $blobURIRaw = ("https://{0}.blob.core.windows.net/{1}/{2}.vhd" -f `
@@ -596,39 +596,39 @@ write-verbose  "Checkpoint 1"
         $blobContainer = $this.ContainerName
         #$osDiskVhdUri = "https://$blobSA.blob.core.windows.net/$blobContainer/"+$InstanceName+".vhd"
         $osDiskVhdUri = ("https://{0}.blob.core.windows.net/{1}/{2}.vhd" -f `
-                            @($this.StorageAccountName, $this.ContainerName, $this.sourceImage)) 
+                            @($this.StorageAccountName, $this.ContainerName, $this.sourceImage))
         write-verbose "OSDIskVHD URI set to $osDiskVhdUri"
-        
+
 
         if ($this.useInitialPW -eq "Yes") {
             $cred = make_cred_initial
         } else {
             $cred = make_cred
         }
-        
-        #$vm = Set-AzureRmVMSourceImage -VM $vm -Id $image.Id
+
+        #$vm = Set-AzVMSourceImage -VM $vm -Id $image.Id
 
         write-verbose "Setting up the OS disk"
-        $vm = Set-AzureRmVMOSDisk -VM $vm -name $InstanceName -CreateOption fromImage  `
+        $vm = Set-AzVMOSDisk -VM $vm -name $InstanceName -CreateOption fromImage  `
                                                 -Caching ReadWrite -Linux -VhdUri $vhdURI -SourceImageUri $osDiskVhdUri
         write-verbose "Adding the operating system"
-        $vm = Set-AzureRmVMOperatingSystem -VM $vm -Linux -ComputerName $InstanceName -Credential $cred
-        # $vm = Set-AzureRmVMOSDisk -VM $vm -name $InstanceName -CreateOption fromImage -SourceImageUri $blobURIRaw `
+        $vm = Set-AzVMOperatingSystem -VM $vm -Linux -ComputerName $InstanceName -Credential $cred
+        # $vm = Set-AzVMOSDisk -VM $vm -name $InstanceName -CreateOption fromImage -SourceImageUri $blobURIRaw `
         #                          -Caching ReadWrite -Linux
-        # $vm = Set-AzureRmVMOSDisk -VM $vm -VhdUri $osDiskVhdUri -name $InstanceName -CreateOption fromImage -Caching ReadWrite
-        
+        # $vm = Set-AzVMOSDisk -VM $vm -VhdUri $osDiskVhdUri -name $InstanceName -CreateOption fromImage -Caching ReadWrite
+
         if ($this.enableBootDiagnostics -ne "Yes") {
-            write-verbose "Disabling boot diagnostics" 
-            Set-AzureRmVMBootDiagnostics -VM $vm -Disable
+            write-verbose "Disabling boot diagnostics"
+            Set-AzVMBootDiagnostics -VM $vm -Disable
         }
-  
+
         try {
-            write-verbose "Starting the VM" 
-            $NEWVM = New-AzureRmVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
+            write-verbose "Starting the VM"
+            $NEWVM = New-AzVM -ResourceGroupName $this.ResourceGroupName -Location $this.Location -VM $vm
             if (!$NEWVM) {
-                Write-error "Failed to create VM" 
+                Write-error "Failed to create VM"
             } else {
-                write-verbose "VM $InstanceName started successfully..." 
+                write-verbose "VM $InstanceName started successfully..."
             }
         } catch {
             Write-error "Caught exception attempting to start the new VM.  Aborting..."
@@ -639,14 +639,14 @@ write-verbose  "Checkpoint 1"
 
     [String] GetPublicIP ($InstanceName) {
         write-verbose "CALL TO GETPIP -- INCOMING PIPNAME IS $InstanceName"
-        
+
         $pipName = $InstanceName.replace("_","-")
-        $pip = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName 
+        $pip = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
         if (!$pip) {
             write-verbose "Public IP does not exist for this region.  Creating now..."
-            New-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Location $this.Location `
+            New-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Location $this.Location `
                 -Name $pipName -AllocationMethod Dynamic -IdleTimeoutInMinutes 4
-            $pip = Get-AzureRmPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
+            $pip = Get-AzPublicIpAddress -ResourceGroupName $this.ResourceGroupName -Name $pipName
         }
 
         return $pip.IpAddress
@@ -659,7 +659,7 @@ write-verbose  "Checkpoint 1"
     [Object] GetVM($instanceName) {
         write-verbose "GetVM looking for $InstanceName"
 
-        return Get-AzureRmVM -ResourceGroupName $this.ResourceGroupName -Name $InstanceName
+        return Get-AzVM -ResourceGroupName $this.ResourceGroupName -Name $InstanceName
     }
 }
 
@@ -825,7 +825,7 @@ class HypervBackend : Backend {
     }
 
     [void] CleanupInstance ($InstanceName) {
-        write-verbose ("Cleaning $InstanceName on backend " + $this.Name) 
+        write-verbose ("Cleaning $InstanceName on backend " + $this.Name)
         $this.RemoveInstance($InstanceName)
         if ($this.UseExistingResources) {
             write-verbose "Preserving existing VHD for future use."

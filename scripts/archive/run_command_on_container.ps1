@@ -1,4 +1,4 @@
-﻿#
+#
 #  Copies VHDs that have booted as expected to the test location where they will be prepped
 #  for Azure automation
 #
@@ -8,7 +8,7 @@ param (
     [Parameter(Mandatory=$false)] [string] $sourceSA="smokework",
     [Parameter(Mandatory=$false)] [string] $sourceRG="smoke_working_resource_group",
     [Parameter(Mandatory=$false)] [string] $sourceContainer="vhds-under-test",
-    
+
     [Parameter(Mandatory=$false)] [string] $suffix="-Runonce-Primed.vhd",
 
     [Parameter(Mandatory=$false)] [string] $command="unset",
@@ -38,7 +38,7 @@ $location = $location.Trim()
 
 login_azure $sourceRG $sourceSA $location
 
-$blobs = Get-AzureStorageBlob -Container $sourceContainer
+$blobs = Get-AzStorageBlob -Container $sourceContainer
 
 # Write-Host "Executing command on all running machines in resource group $sourceRG..."  -ForegroundColor green
 
@@ -63,8 +63,8 @@ $comandScript = {
     . C:\Framework-Scripts\secrets.ps1
 
     login_azure $sourceRG $sourceSA $location
-     
-    $runningVMs = Get-AzureRmVm -ResourceGroupName $sourceRG
+
+    $runningVMs = Get-AzVM -ResourceGroupName $sourceRG
     if ($runningVMs.Name -contains $blobName) {
         write-host "VM $blobName is running"
     } else {
@@ -146,7 +146,7 @@ while ($allDone -eq $false) {
 if ($Failed -eq $true) {
     Write-Host "Remote command execution failed because we could not !" -ForegroundColor Red
     exit 1
-} 
+}
 
 $name_list = ""
 foreach ($blob in $blobs) {

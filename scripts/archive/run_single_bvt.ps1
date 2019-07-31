@@ -1,4 +1,4 @@
-﻿param (
+param (
     [Parameter(Mandatory=$true)] [string] $sourceName="Unknown",
     [Parameter(Mandatory=$true)] [string] $configFileName="Unknown",
     [Parameter(Mandatory=$true)] [string] $distro="Smoke-BVT",
@@ -17,15 +17,15 @@ Start-Transcript $logFileName -Force
 
 #
 #  Launch the automation
-Write-Output "Starting execution of test $testCycles on machine $sourceName" 
+Write-Output "Starting execution of test $testCycles on machine $sourceName"
 
-Import-AzureRmContext -Path 'C:\Azure\ProfileContext.ctx'
-Select-AzureRmSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID" 
+Import-AzContext -Path 'C:\Azure\ProfileContext.ctx'
+Select-AzSubscription -SubscriptionId "$AZURE_SUBSCRIPTION_ID"
 
 $tests_failed = $false
 Set-Location C:\azure-linux-automation
 foreach ($testCycle in $testCycles) {
-    C:\azure-linux-automation\AzureAutomationManager.ps1 -xmlConfigFile $configFileName -runtests -email –Distro $distro -cycleName $testCycle -UseAzureResourceManager -EconomyMode
+    C:\azure-linux-automation\AzureAutomationManager.ps1 -xmlConfigFile $configFileName -runtests -email -Distro $distro -cycleName $testCycle -UseAzureResourceManager -EconomyMode
     if ($? -ne $true) {
         $tests_failed = $true
         break

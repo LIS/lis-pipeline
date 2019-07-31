@@ -23,25 +23,25 @@ Describe "Test Hyper-V Backend instance" {
 Describe "Test Azure Backend Instance" {
     Mock Write-Verbose -Verifiable {return}
     Mock login_azure -Verifiable {return}
-    Mock Stop-AzureRmVM -Verifiable {return}
-    Mock Remove-AzureRmVM -Verifiable {return}
-    Mock Get-AzureRmNetworkSecurityGroup -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSNetworkSecurityGroup]::new() }
-    Mock Get-AzureRmPublicIpAddress -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSPublicIpAddress]::new()}
-    Mock Get-AzureRmVirtualNetwork -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSVirtualNetwork]::new() }
-    Mock Get-AzureRmVirtualNetworkSubnetConfig -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSSubnet]::new()}
-    Mock New-AzureRmVMConfig -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
-    Mock Get-AzureRmNetworkInterface -Verifiable {$VNIC=[Microsoft.Azure.Commands.Network.Models.PSNetworkInterface]::new()
+    Mock Stop-AzVM -Verifiable {return}
+    Mock Remove-AzVM -Verifiable {return}
+    Mock Get-AzNetworkSecurityGroup -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSNetworkSecurityGroup]::new() }
+    Mock Get-AzPublicIpAddress -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSPublicIpAddress]::new()}
+    Mock Get-AzVirtualNetwork -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSVirtualNetwork]::new() }
+    Mock Get-AzVirtualNetworkSubnetConfig -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSSubnet]::new()}
+    Mock New-AzVMConfig -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
+    Mock Get-AzNetworkInterface -Verifiable {$VNIC=[Microsoft.Azure.Commands.Network.Models.PSNetworkInterface]::new()
         $VNIC.Id=1
         return $VNIC
     }
-    Mock Set-AzureRmVMOSDisk -Verifiable {return $vm}
-    Mock Set-AzureRmNetworkInterface -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSNetworkInterface]::new()}
-    Mock Get-AzureRmVM -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
-    Mock Add-AzureRmVMNetworkInterface -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
+    Mock Set-AzVMOSDisk -Verifiable {return $vm}
+    Mock Set-AzNetworkInterface -Verifiable {return [Microsoft.Azure.Commands.Network.Models.PSNetworkInterface]::new()}
+    Mock Get-AzVM -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
+    Mock Add-AzVMNetworkInterface -Verifiable {return [Microsoft.Azure.Commands.Compute.Models.PSVirtualMachine]::new()}
     Mock Write-Error -Verifiable {return}
     Mock Stop-Transcript -Verifiable {return}
-    Mock Set-AzureRmVMSourceImage -Verifiable { return $vm }
-    Mock Set-AzureRmVMOperatingSystem -Verifiable {return $vm }
+    Mock Set-AzVMSourceImage -Verifiable { return $vm }
+    Mock Set-AzVMOperatingSystem -Verifiable {return $vm }
 
     $backendFactory = [BackendFactory]::new()
     $azureBackend = $backendFactory.GetBackend("AzureBackend",@(1))
