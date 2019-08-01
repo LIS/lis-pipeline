@@ -14,7 +14,10 @@ param(
     [string] $secretsFile,
 
     # On/Off
-    [string] $Operation
+    [string] $Operation,
+
+    # Architecture
+    [string] $Arch
 )
 
 try {
@@ -34,6 +37,9 @@ try {
     # Perform the Power ON/OFF operation
     $Jobs = @()
     foreach ($VM in $VMs) {
+        if($VM.Name -inotmatch $Arch) {
+            continue
+        }
         if ($Operation -imatch "off") {
             Write-LogInfo "Stopping $($VM.Name)..."
             $Jobs += $VM | Stop-AzVm -AsJob -Force
@@ -70,6 +76,9 @@ try {
         # We're iterating through all VMs without breaking out after detecting 1st offline VM.
         # This is done to print all the VMs which were offline and it helps in debugging.
         foreach ($Rule in $NatRules) {
+            if ($Rule.Name -inotmatch $Arch) {
+                continue
+            }
             if (Test-SSH -PublicIP $PublicIP.IpAddress -SSHPort $Rule.FrontendPort) {
                 Write-LogInfo "$($Rule.Name) : VM Online"
             } else {
