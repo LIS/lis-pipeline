@@ -354,7 +354,7 @@ if (env.ValidationHyperV == 'yes') {
                                         echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${test_location}'" +
-                                            " -RGIdentifier 'ubuntuAzure${distro}'" +
+                                            " -RGIdentifier 'ubuntuHV${distro}'" +
                                             " -TestPlatform 'HyperV'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
                                             " -OsVHD '${HYPERV_VHD_PATH}'" +
