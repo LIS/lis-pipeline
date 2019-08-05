@@ -1,5 +1,36 @@
 #!/usr/bin/env groovy
 
+def build_distro5 = 'no'
+def build_distro6 = 'no'
+def build_distro7 = 'no'
+def architecture = "x86_64"
+
+if(arch == "x32")
+        architecture = "i686"
+
+switch(distro) {
+    case 'all':
+        if(arch == "x64") {
+            build_distro5 = 'yes'
+            build_distro6 = 'yes'
+            build_distro7 = 'yes'
+        } else {
+            build_distro5 = 'yes'
+            build_distro6 = 'yes'
+        }
+        break;
+    case 'rh7':
+        if(arch == "x64")
+            build_distro7 = 'yes'
+        break;
+    case 'rh6':
+        build_distro6 = 'yes'
+        break;
+    case 'rh5':
+        build_distro5 = 'yes'
+        break
+}
+
 // Wrapper to execute powershell scripts / commands
 def RunPowershellCommand(psCmd) {
     bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
@@ -50,7 +81,8 @@ node ("meta_slave") {
                 RunPowershellCommand(".\\scripts\\lis_hotfix_pipeline\\lis-build-vm-power-on-off.ps1"+
                                 " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
                                 " -secretsFile '${Azure_Secrets_File_LIS_Val}' " +
-                                " -Operation On"
+                                " -Operation On" +
+                                " -Arch '${arch}' "
                                 )
             }
         }
@@ -62,7 +94,8 @@ node ("meta_slave") {
             withCredentials([file(credentialsId: 'Azure_Secrets_File_LIS_Val', variable: 'Azure_Secrets_File_LIS_Val')]) {
                 RunPowershellCommand(".\\CreatePBuild-IP-Files.ps1"+
                                 " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
-                                " -secretsFile '${Azure_Secrets_File_LIS_Val}' "
+                                " -secretsFile '${Azure_Secrets_File_LIS_Val}' " +
+                                " -arch '${arch}' "
                                 )
             }
             stash includes: '*.pbuild', name: 'LISISO_PBUILD'
@@ -72,7 +105,7 @@ node ("meta_slave") {
 
     stage ('Build RPM') {
         def Distros = [:]
-        if( ( distro == 'all') || ( distro == 'rh5')) {
+        if( build_distro5 == 'yes' ) {
             Distros["RH5"] = {
                 node('lis-rpm-build-controller-vm') {
                     try {
@@ -92,7 +125,7 @@ node ("meta_slave") {
                 }
             }
         }
-        if( ( distro == 'all') || ( distro == 'rh6')) {
+        if( build_distro6 == 'yes' ) {
             Distros["RH6"] = {
                 node('lis-rpm-build-controller-vm') {
                     try {
@@ -111,7 +144,7 @@ node ("meta_slave") {
                 }
             }
         }
-        if( ( distro == 'all') || ( distro == 'rh7')) {
+        if( build_distro7 == 'yes') {
             Distros["RH7"] =  {
                 node("lis-rpm-build-controller-vm") {
                     try {
@@ -138,9 +171,9 @@ node ("meta_slave") {
             cleanWs()
             git branch: "${build_rpm_source_branch}", url: "${build_rpm_source}"
             unstash 'LISISO_IP'
-            def cmdline = "today=`date +%Y-%m-%d.%H.%M` ; cd ${WORKSPACE} ; dos2unix ips.sh; ./copyall.sh ; tar -cvzf lis-rpm-${buildname}-" + '${today}' + ".tar.gz LISISO"
+            def cmdline = "today=`date +%Y-%m-%d.%H.%M` ; cd ${WORKSPACE} ; dos2unix ips.sh; ./copyall.sh ${arch}; tar -cvzf lis-rpm-${buildname}-" + '${today}' + ".${architecture}.tar.gz LISISO"
             println cmdline
-            def cmdline1 = "today=`date +%Y-%m-%d.%H.%M` ; cd ${WORKSPACE} ;  dos2unix ips.sh; ./copyall.sh ; mkisofs -r -iso-level 4 -o lis-rpm-${buildname}-" + '${today}' + ".iso LISISO"
+            def cmdline1 = "today=`date +%Y-%m-%d.%H.%M` ; cd ${WORKSPACE} ;  dos2unix ips.sh; ./copyall.sh ${arch}; mkisofs -r -iso-level 4 -o lis-rpm-${buildname}-" + '${today}' + ".${architecture}.iso LISISO"
             sh "${cmdline}"
             sh "${cmdline1}"
             stash includes: '*.tar.gz', name: 'lisrpmtarball'
@@ -185,7 +218,8 @@ node ("meta_slave") {
                 RunPowershellCommand(".\\scripts\\lis_hotfix_pipeline\\lis-build-vm-power-on-off.ps1"+
                                 " -ResourceGroupName '${RESOURCE_GROUP_NAME}'" +
                                 " -secretsFile '${Azure_Secrets_File_LIS_Val}' " +
-                                " -Operation Off"
+                                " -Operation Off" +
+                                " -Arch '${arch}' "
                                 )
             }
         }
