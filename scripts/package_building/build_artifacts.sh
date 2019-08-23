@@ -298,7 +298,13 @@ function prepare_daemons_debian (){
         if [[ -e "${lsvmbus_path}" ]]; then
           rm -f "${lsvmbus_path}"
         fi
-        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
+        if grep "srctree" "${base_dir}/daemons/$build_folder/Makefile" > /dev/null 2>&1; then
+            toolpath="$source/tools"
+            sed -i "s#\.\.#$toolpath#g" "${base_dir}/daemons/$build_folder/Makefile"
+            sed -i "/sharedstatedir.*/a srctree=$source" "${base_dir}/daemons/$build_folder/Makefile"
+        else
+            sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
+        fi
     fi
     popd
     pushd "${base_dir}/daemons/$build_folder"
@@ -348,7 +354,13 @@ function prepare_daemons_rhel (){
         exit 3
     else 
         cp -f ./tools/hv/* "${base_dir}/daemons/rpmbuild/SOURCES"
-        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        if grep "srctree" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile" > /dev/null 2>&1; then
+            toolpath="$source/tools"
+            sed -i "s#\.\.#$toolpath#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+            sed -i "/sharedstatedir.*/a srctree=$source" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        else
+            sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        fi
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
