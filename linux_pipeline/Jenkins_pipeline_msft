@@ -183,6 +183,7 @@ pipeline {
 		KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
 		BUILD_PATH = '/mnt/tmp/kernel-build-folder'
 		KERNEL_CONFIG = 'Microsoft/config-azure'
+		KERNEL_CONFIG_CENTOS = 'Microsoft/config-azure-centos'
 		CLEAN_ENV = 'True'
 		USE_CCACHE = 'True'
 		BUILD_NAME = 'm'
@@ -293,7 +294,7 @@ pipeline {
 						--install_deps "True" \\
 						--thread_number "x3" \\
 						--build_path "${BUILD_PATH}" \\
-						--kernel_config "${KERNEL_CONFIG}" \\
+						--kernel_config "${KERNEL_CONFIG_CENTOS}" \\
 						--clean_env "${CLEAN_ENV}" \\
 						--use_ccache "${USE_CCACHE}" \\
 						--enable_kernel_debug "${KERNEL_DEBUG}"
