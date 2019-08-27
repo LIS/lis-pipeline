@@ -94,7 +94,7 @@ properties ([
             description: 'On which platform to run LISAv2 functional tests.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
-            defaultValue: "FUNCTIONAL",
+            defaultValue: "Functional",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_AREA',
