@@ -262,7 +262,12 @@ function prepare_kernel_rhel (){
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S	Source: /\$S	Source: ${package_prefix}-/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S\$M	%description -n kernel-devel/\$S\$M	%description -n ${package_prefix}-kernel-devel/g" "./scripts/package/mkspec"
-        sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/package/Makefile"
+        if [[ -f "./scripts/Makefile.package" ]]; then
+            sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/Makefile.package"
+        fi
+        if [[ -f "./scripts/package/Makefile" ]]; then
+            sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/package/Makefile"
+        fi
     fi
     popd
 }
