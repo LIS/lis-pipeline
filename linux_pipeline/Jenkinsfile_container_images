@@ -24,49 +24,10 @@ properties ([
             defaultValue: true, 
             description: 'Run binaries version test', 
             name: 'binaries_check'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true, 
-            description: 'Test kernel boot speed in VM', 
-            name: 'Boot_Test'],
-        // Functional
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true, 
-            description: 'Run full linuxkit test suite', 
-            name: 'linuxkit'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Test docker using wsl scripts',
-            name: 'WSL_Docker'],
-		[$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Run full hyper-v docker test',
-            name: 'docker_test'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            description: 'Test kernel in Hyper-V VM',
-            name: 'kernel_hyperv_test'],
         [$class: 'BooleanParameterDefinition',
             defaultValue: true,
             description: 'Run ltp tests in docker container',
             name: 'LTP'],
-        // Stress
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Run docker-stress test', 
-            name: 'docker_stress'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Build latest opengcs from github', 
-            name: 'opengcs_build'],
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Build kernel in docker container', 
-            name: 'kernel_builder'],
-        // Performace
-        [$class: 'BooleanParameterDefinition', 
-            defaultValue: true,
-            description: 'Run lkp tests in docker container', 
-            name: 'LKP'],
         [$class: 'ChoiceParameterDefinition',
             choices: "RS5\nRS4",
             name: 'HOST_VERSION',
@@ -104,8 +65,7 @@ HYPERV_TEST_JOB = "lcow-hyperv-testing,LKP"
 STAGES_RESULTS = [:]
 STAGES_SUMMARY = [:]
 versionsMap = ["RS4":"lcow-win-rs4","RS5":"lcow_windows_rs5"]
-testMap = ["smoke_tests":"binaries_check,Boot_Test","test_functional":"linuxkit,docker_test,WSL_Docker,LTP",
-           "test_stress":"docker_stress,opengcs_build,kernel_builder","performance":"LKP"]
+testMap = ["smoke_tests":"binaries_check","test_functional":"LTP"]
 def hostName = versionsMap[env.HOST_VERSION]
 ignoreReport = "kernel_hyperv_test,LKP"
 skipBuild = false
@@ -274,7 +234,7 @@ def runBootSpeedTest() {
                     & ".\\lisa.ps1 -cmdVerb run -cmdNoun .\\xml\\boot_test.xml"
                         -dbgLevel "9"
                         -CLImageStorDir "${env:IMAGE_PATH}"
-                        -testParams ('BASE_TIME=300ms;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
+                        -testParams ('BASE_TIME=10s;REMOTE_DIR=/tmp/kernel;ARTIFACTS_DIR=' + "$(pwd)" + '\\lcow-artifacts\\packages\\')
                         ''')
                 STAGES_RESULTS["Boot_Test"] = exitCode
                 archiveArtifacts artifacts: "TestResults\\**\\*", allowEmptyArchive: true
@@ -546,7 +506,7 @@ if (!skipBuild) {
         node (hostName) {
             dir ("lisa-clone-dir") {
                 withCredentials(bindings: [string(credentialsId: 'LISA_DEPS_PATH', variable: 'LISA_DEPS_PATH')]) {
-                    git branch: 'lcow-testing', url: 'https://github.com/mbivolan/lis-test'
+                    git branch: 'lcow-testing', url: 'https://github.com/vyadavmsft/lis-test'
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\bin\\*" ".\\WS2012R2\\lisa\\bin"')
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\tools\\*" ".\\WS2012R2\\lisa\\tools"')
                     PowerShellWrapper('Copy-Item -Recurse -Force "${env:LISA_DEPS_PATH}\\ssh\\*" ".\\WS2012R2\\lisa\\ssh"')

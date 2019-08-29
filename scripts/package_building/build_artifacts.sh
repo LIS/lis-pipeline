@@ -2,7 +2,7 @@
 
 set -xe -o pipefail
 BASEDIR=$(dirname $0)
-BASEDIR=$(readlink -f ./$BASEDIR)
+BASEDIR=$(readlink -f $BASEDIR)
 . "${BASEDIR}/utils.sh"
 
 KERNEL_VERSION_FILE="${BASEDIR}/kernel_versions.ini"
@@ -42,7 +42,7 @@ function install_deps_debian {
     devscripts build-essential lintian debhelper git wget bc fakeroot crudini flex bison  \
     asciidoc libdw-dev systemtap-sdt-dev libunwind-dev libaudit-dev libslang2-dev \
     libperl-dev python-dev binutils-dev libiberty-dev liblzma-dev libnuma-dev openjdk-8-jdk \
-    libbabeltrace-ctf-dev libbabeltrace-dev)
+    libbabeltrace-ctf-dev libbabeltrace-dev rename)
     DEBIAN_FRONTEND=noninteractive sudo apt-get -y install ${deb_packages[@]}
 }
 
@@ -110,7 +110,7 @@ function build_kernel_metapackages_deb () {
     changelog_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name changelog))
     debian_rules_loc=$(readlink -f $(find "${BASEDIR}/kernel_metapackages" -name linux-latest))
     update_changelog "$kernel_version" "$commit_message" "$changelog_loc"
-    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc"
+    build_metapackages "$kernel_version" "$destination_path" "$debian_rules_loc" "${BASEDIR}"
 }
 
 function get_sources_http (){
@@ -187,13 +187,13 @@ function get_sources_local (){
     pushd "${base_dir}/kernel"
     cp -rf "$source_path" .
     source="${base_dir}/kernel/$(ls)"
-    echo "$source"
     popd
     pushd "$source"
     if [[ -d ".git" ]];then
-        git checkout $git_branch||true
+        git checkout $git_branch > /dev/null||true
     fi
     popd
+    echo "$source"
 }
 
 function prepare_kernel_debian (){
@@ -262,7 +262,12 @@ function prepare_kernel_rhel (){
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S	Source: /\$S	Source: ${package_prefix}-/g" "./scripts/package/mkspec"
         sed -i -e "s/\$S\$M	%description -n kernel-devel/\$S\$M	%description -n ${package_prefix}-kernel-devel/g" "./scripts/package/mkspec"
-        sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/package/Makefile"
+        if [[ -f "./scripts/Makefile.package" ]]; then
+            sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/Makefile.package"
+        fi
+        if [[ -f "./scripts/package/Makefile" ]]; then
+            sed -i -e "s/KERNELPATH := /KERNELPATH := ${package_prefix}-/g" "./scripts/package/Makefile"
+        fi
     fi
     popd
 }
@@ -293,7 +298,18 @@ function prepare_daemons_debian (){
             mv "${base_dir}/daemons/hyperv-daemons" "${base_dir}/daemons/$build_folder"
         fi
         cp ./tools/hv/* "${base_dir}/daemons/$build_folder"
-        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
+        # Note(v-advlad): remove lsvmbus from daemons, as it conflicts with tools one
+        lsvmbus_path="${base_dir}/daemons/$build_folder/lsvmbus"
+        if [[ -e "${lsvmbus_path}" ]]; then
+          rm -f "${lsvmbus_path}"
+        fi
+        if grep "srctree" "${base_dir}/daemons/$build_folder/Makefile" > /dev/null 2>&1; then
+            toolpath="$source/tools"
+            sed -i "s#\.\.#$toolpath#g" "${base_dir}/daemons/$build_folder/Makefile"
+            sed -i "/sharedstatedir.*/a srctree=$source" "${base_dir}/daemons/$build_folder/Makefile"
+        else
+            sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/$build_folder/Makefile"
+        fi
     fi
     popd
     pushd "${base_dir}/daemons/$build_folder"
@@ -343,7 +359,13 @@ function prepare_daemons_rhel (){
         exit 3
     else 
         cp -f ./tools/hv/* "${base_dir}/daemons/rpmbuild/SOURCES"
-        sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        if grep "srctree" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile" > /dev/null 2>&1; then
+            toolpath="$source/tools"
+            sed -i "s#\.\.#$toolpath#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+            sed -i "/sharedstatedir.*/a srctree=$source" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        else
+            sed -i "s#\.\./\.\.#'$source'#g" "${base_dir}/daemons/rpmbuild/SOURCES/Makefile"
+        fi
     fi
     popd
     pushd "${base_dir}/daemons/rpmbuild"
@@ -523,7 +545,7 @@ function prepare_perf_debian (){
         dirs=(bin lib64 libexec)
         for dir in ${dirs[@]};do
             files=$(ls ./$dir)
-            IFS=$'\n' files=($files)
+            IFS=$'\n' files=($files); unset IFS;
             for file in ${files[@]};do
                 mv "./$dir/$file" "./$dir/${file}_${kernel_version%.*}"
             done
@@ -875,7 +897,6 @@ function main {
 
     # Optional:
     GIT_BRANCH='master'
-    BASE_DIR="$(pwd)/temp_build"
     DEBIAN_OS_VERSION="${os_RELEASE%.*}"
     FOLDER_PREFIX='msft'
     THREAD_NUMBER='x2'
@@ -925,7 +946,7 @@ function main {
             --local_path)
                 case "$2" in
                     "") shift 2 ;;
-                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='local' shift 2 ;;
+                    *) SOURCE_PATH="$2" ; DOWNLOAD_METHOD='local' ; shift 2 ;;
                 esac;;
             --build_path)
                 case "$2" in

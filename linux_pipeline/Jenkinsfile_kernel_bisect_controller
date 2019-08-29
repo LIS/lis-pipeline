@@ -3,7 +3,7 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonBuilder
 
-env.SLAVE_PIPELINE_NAME = "pipeline-kernel-bisect-runner"
+env.SLAVE_PIPELINE_NAME = "Developers/pipeline-kernel-bisect-runner"
 env.BUILD_KERNEL_ARTIFACTS = "true"
 env.PARAM_SEPARATOR_STYLE = 'font-size: 15px; font-weight: 600;'
 
@@ -17,12 +17,19 @@ env.BISECT_CLONE_KERNEL_REPO = "true"
 env.BISECT_VALIDATE_INITIAL_GOOD_BAD = "true"
 env.GOOD_COMMIT_PERF_RESULTS = ""
 
+env.BISECT_RESULT_TYPE = 'bad'
+env.BISECT_RESULT_TYPE_GOOD = 'good'
+env.BISECT_RESULT_TYPE_BAD = 'bad'
+env.LAST_GOOD_COMMIT = ""
+env.ANCESTOR_COMMIT = ""
+env.DESCENDANT_COMMIT = ""
+
 properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure""",
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure\nhttps://github.com/openSUSE/kernel-source""",
             name: 'KERNEL_GIT_URL',
             description: 'What Kernel tree repo.'],
         [$class: 'StringParameterDefinition',
@@ -42,13 +49,25 @@ properties ([
             name: 'DISTRO_VERSION',
             description: 'Distro version to be tested.'],
         [$class: 'ChoiceParameterDefinition',
+            choices: 'False\nTrue',
+            name: 'REVERSE_BISECT',
+            description: 'If True, the bisect will be performed in reverse, returning the first good commit that fixes the BAD_COMMIT (the GOOD_COMMIT is after the BAD_COMMIT, on the same tree). If REVERSE_BISECT is set to false, the GOOD_COMMIT has to be before the bad commit, on the same tree.'],
+        [$class: 'ChoiceParameterDefinition',
             choices: 'Boot\nFunctional\nPerformance',
             name: 'BISECT_TYPE',
             description: 'Type of bisect that will be performed.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: 'Standard_A2\nStandard_E64_v3\nStandard_F72s_v2',
-            name: 'AZURE_BOOT_VM_SIZE',
-            description: 'The Azure flavor size used for boot validation'],
+            choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
+                        canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
+                        japaneast\njapanwest\nkoreacentral\nkoreasouth\nnorthcentralus\nnortheurope
+                        southcentralus\nsoutheastasia\nsouthindia\nuksouth\nukwest\nwestcentralus
+                        westeurope\nwestindia\nwestus\nsepremium""",
+            name: 'LISAV2_AZURE_REGION',
+            description: 'Azure Region to be used for all tests'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_VM_SIZE',
+            defaultValue: "",
+            description: 'LISAv2 VM size. If set, all the boot/functional/performance tests will use that VM size. If not set, the default test case VM size will be used. Make sure that the vm size exists and that the region supports it. '],
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE_NAME',
             defaultValue: '',
@@ -68,6 +87,7 @@ properties ([
             description: 'What Azure Performance tests to run. Applies only if the bisect type is performance. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """4k
+                    4k-NVME
                     1024k""",
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
@@ -186,30 +206,36 @@ def validateCommit(String commit) {
             def perfResultsRaw = readFile("aggregate_results_" + commit + "/bisect_run/Report/perf_results.json")
             def jsonSlurper = new JsonSlurper()
             def perfResults = jsonSlurper.parseText(perfResultsRaw)
-            def isPerfValid = false
             println("Raw performance results for commit " + commit + " are: " + perfResults)
-            for (key in currentPerfResults.keySet()) {
-                def perfValue = perfResults[key]
-                if (perfValue) {
-                    try {
-                        perfValue = Float.valueOf(perfValue)
-                    } catch (Exception e) {}
-                    if (perfValue > 0.0000001) {
-                        currentPerfResults[key] = perfValue
-                        isPerfValid = true
+            if (perfResults) {
+                for (perfResult in perfResults) {
+                    def isPerfValid = false
+                    for (key in currentPerfResults.keySet()) {
+                        def perfValue = perfResult[key]
+                        if (perfValue) {
+                            try {
+                                perfValue = Float.valueOf(perfValue)
+                            } catch (Exception e) {}
+                            if (perfValue > 0.0000001) {
+                                currentPerfResults[key] = perfValue
+                                isPerfValid = true
+                            }
+                        }
+                    }
+                    println("Parsed performance results for commit " + commit + " are: " + currentPerfResults)
+                    if (isPerfValid) {
+                        def isPerfBetter = compareGoodAndCurrentPerfResults(currentPerfResults)
+                        if (isPerfBetter) {
+                            validationResult = "SUCCESS"
+                        } else {
+                            validationResult = "FAILURE"
+                            break
+                        }
+                    } else {
+                        validationResult = "INVALID_PERF_RESULTS"
+                        break
                     }
                 }
-            }
-            println("Parsed performance results for commit " + commit + " are: " + currentPerfResults)
-            if (isPerfValid) {
-                def isPerfBetter = compareGoodAndCurrentPerfResults(currentPerfResults)
-                if (isPerfBetter) {
-                    validationResult = "SUCCESS"
-                } else {
-                    validationResult = "FAILURE"
-                }
-            } else {
-                validationResult = "INVALID_PERF_RESULTS"
             }
         } catch (Exception e) {
             echo e.toString()
@@ -280,7 +306,10 @@ String getCommit(String passed) {
         returnStdout: true
     )
     if (commit.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + commit.split(" ")[0])
+        if (params.REVERSE_BISECT) {
+            commit = env.LAST_GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit.split(" ")[0])
         currentBuild.displayName = "$BUILD_NUMBER-" + commit.substring(0,7)
         return false
     }
@@ -293,7 +322,7 @@ def getCurrentCommitId() {
            set -e
            pushd "$BISECT_BUILD_DIR/$BISECT_CLONE_DIR" 2>&1 > /dev/null
            unwanted_output=$(git bisect reset)
-           output=$(git bisect start "$BAD_COMMIT" "$GOOD_COMMIT")
+           output=$(git bisect start "$DESCENDANT_COMMIT" "$ANCESTOR_COMMIT")
            output=${output%%]*}
            output=${output##*[}
            echo $output
@@ -309,7 +338,8 @@ def getCommonParams(buildTag, commit) {
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: commit),
         string(name: 'DISTRO_VERSION', value: params.DISTRO_VERSION),
-        string(name: 'AZURE_BOOT_VM_SIZE', value: params.AZURE_BOOT_VM_SIZE),
+        string(name: 'LISAV2_VM_SIZE', value: params.LISAV2_VM_SIZE),
+        string(name: 'LISAV2_AZURE_REGION', value: params.LISAV2_AZURE_REGION),
         string(name: 'FUNCTIONAL_TESTS_PLATFORM', value: getFunctionalTestsPlatform()),
         string(name: 'FUNCTIONAL_TESTS_NAME', value: params.TEST_CASE_NAME),
         booleanParam(name: 'BUILD_KERNEL_ARTIFACTS', value: env.BUILD_KERNEL_ARTIFACTS.toBoolean()),
@@ -350,7 +380,7 @@ def getPerfTests() {
 
 node ("bisect_kernel_builder") {
     def currentCommitId = ""
-    def passed = ""
+    def result = ""
 
     if (!params.GOOD_COMMIT) {
         throw new Exception("GOOD_COMMIT must be set.")
@@ -374,9 +404,18 @@ node ("bisect_kernel_builder") {
         }
     }
 
-    if (env.BISECT_CLONE_KERNEL_REPO.equals("true")) {
-        println "Clone kernel repo."
-        cloneKernelRepo()
+    if (params.REVERSE_BISECT.equals("True")) {
+        println "Performing reverse bisect. The quest for the first good commmit begins."
+        env.LAST_GOOD_COMMIT = params.GOOD_COMMIT
+        env.ANCESTOR_COMMIT = params.BAD_COMMIT
+        env.DESCENDANT_COMMIT = params.GOOD_COMMIT
+        env.BISECT_RESULT_TYPE = 'good'
+        env.BISECT_RESULT_TYPE_GOOD = 'bad'
+        env.BISECT_RESULT_TYPE_BAD = 'good'
+    } else {
+        println "Performing bisect. The quest for the first bad commmit begins."
+        env.ANCESTOR_COMMIT = params.GOOD_COMMIT
+        env.DESCENDANT_COMMIT = params.BAD_COMMIT
     }
 
     if (env.BISECT_VALIDATE_INITIAL_GOOD_BAD.equals("true")) {
@@ -384,10 +423,19 @@ node ("bisect_kernel_builder") {
         validateInitialCommits()
     }
 
+    if (env.BISECT_CLONE_KERNEL_REPO.equals("true")) {
+        println "Clone kernel repo."
+        cloneKernelRepo()
+    }
+
     currentCommitId = getCurrentCommitId()
     if (currentCommitId.contains("first bad commit")) {
-        println("Bisect finished succesfully. Bad commit is " + currentCommitId.split(" ")[0])
-        currentBuild.displayName = "$BUILD_NUMBER-" + currentCommitId.substring(0,7)
+        def commit_id_result = currentCommitId.split(" ")[0]
+        if (params.REVERSE_BISECT.equals("True")) {
+            commit_id_result = params.GOOD_COMMIT
+        }
+        println("Bisect finished succesfully. ${env.BISECT_RESULT_TYPE} commit is " + commit_id_result)
+        currentBuild.displayName = "$BUILD_NUMBER-" + commit_id_result.substring(0,7)
         return
     }
     println("Initial bisection commit is " + currentCommitId)
@@ -398,22 +446,25 @@ node ("bisect_kernel_builder") {
             println "Check if the following commit is good or bad: " + currentCommitId
             def commitStatus = validateCommit(currentCommitId)
             if (commitStatus.status == 'SUCCESS') {
+                env.LAST_GOOD_COMMIT = currentCommitId
                 println "The following commit is good: " + currentCommitId
-                passed = 'good'
+                result = env.BISECT_RESULT_TYPE_GOOD
             } else if (commitStatus.status == 'FAILURE') {
                 println "The following commit is bad: " + currentCommitId
-                passed = 'bad'
+                result = env.BISECT_RESULT_TYPE_BAD
             } else {
                 println "Bisect has been aborted because slave build result is not FAILURE or SUCCESS"
                 println "Slave build result is: " + commitStatus.status
                 break
             }
         }
-        currentCommitId = getCommit(passed)
+        currentCommitId = getCommit(result)
         if (currentCommitId.equals(false)) {
             break
         }
     }
+
+    println "The quest for the first ${env.BISECT_RESULT_TYPE} commit has ended."
 
     if (env.BISECT_RUNS.equals(env.BISECT_MAX_RUNS)) {
         throw new Exception("Failed to finish bisection in the maximum allowed retries.")

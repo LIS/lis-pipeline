@@ -1,11 +1,12 @@
 #!/usr/bin/env groovy
 
 properties ([
+    overrideIndexTriggers(false),
     pipelineTriggers([cron('H */4 * * *')])
 ])
 
 env.VERSION_TO_TEST = "/home/lisa/version_to_test.sh"
-env.PIPELINE_NAME = "pipeline-ubuntu-azure-kernel-validation"
+env.PIPELINE_NAME = "Distro-Partner-Kernels-Ubuntu/pipeline-ubuntu-azure-kernel-validation"
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 SEND_MAIL = "no"
 MESSAGE_LIST = ""
@@ -42,9 +43,11 @@ node ("meta_slave") {
                     build (job: "${env.PIPELINE_NAME}/master",
                         parameters: [
                             string(name: 'Distro', value: "${distro}"),
-                            string(name: 'Kernel', value: "${kernel}"),
-                            string(name: 'Platform', value: "all"),
-                            string(name: 'Performance', value: "yes"),
+                            string(name: 'KernelType', value: "${kernel}"),
+                            string(name: 'KernelVersion', value: "${latest_kernel_version}"),
+                            string(name: 'ValidationAzure', value: "yes"),
+                            string(name: 'ValidationHyperV', value: "yes"),
+                            string(name: 'PerformanceAzure', value: "yes"),
                             string(name: 'sendMail', value: "yes"),
                         ],
                         wait: false, propagate: false)

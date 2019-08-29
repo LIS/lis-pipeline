@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-env.SLAVE_PIPELINE_NAME = "pipeline-developer-patch-runner"
+env.SLAVE_PIPELINE_NAME = "Developers/pipeline-developer-patch-runner"
 env.SEND_EMAIL = true
 env.BUILD_KERNEL_ARTIFACTS = true
 env.KERNEL_ARTIFACTS_SMB_PATH = ""
@@ -14,10 +14,10 @@ properties ([
             separatorStyle: "",
             sectionHeader: "KERNEL BUILD CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
-        [$class: 'ChoiceParameterDefinition',
+        [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_URL',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel""",
-            description: 'Kernel tree repo'],
+            defaultValue: 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git',
+            description: 'Use the default or\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git or\nAny other valid git url or\nUse "azure_kernel"'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
             defaultValue: 'master',
@@ -42,6 +42,10 @@ properties ([
                         westeurope\nwestindia\nwestus\nsepremium""",
             name: 'LISAV2_AZURE_REGION',
             description: 'Azure Region'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_VM_SIZE',
+            defaultValue: "",
+            description: 'LISAv2 VM size. If set, all the boot/functional/performance tests will use that VM size. If not set, the default test case VM size will be used. Make sure that the vm size exists and that the region supports it. '],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE BOOT TEST CONFIGURATION",
@@ -58,10 +62,6 @@ properties ([
             defaultValue: false,
             name: 'RUN_AZURE_BOOT_STRESS_TEST',
             description: 'Whether to run Azure Boot Stress test.'],
-        [$class: 'ChoiceParameterDefinition',
-            name: 'AZURE_BOOT_STRESS_VM_SIZE',
-            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
-            description: 'Azure Boot Stress vm size'],
         [$class: 'StringParameterDefinition',
             name: 'AZURE_BOOT_STRESS_PROVISIONING_NUMBER',
             defaultValue: "3",
@@ -174,7 +174,7 @@ def getCommonParams(patches, buildTag) {
         string(name: 'LISAV2_AZURE_REGION', value: params.LISAV2_AZURE_REGION),
         booleanParam(name: 'RUN_AZURE_BOOT_TEST', value: params.RUN_AZURE_BOOT_TEST),
         booleanParam(name: 'RUN_AZURE_BOOT_STRESS_TEST', value: params.RUN_AZURE_BOOT_STRESS_TEST),
-        string(name: 'AZURE_BOOT_STRESS_VM_SIZE', value: params.AZURE_BOOT_STRESS_VM_SIZE),
+        string(name: 'LISAV2_VM_SIZE', value: params.LISAV2_VM_SIZE),
         string(name: 'AZURE_BOOT_STRESS_PROVISIONING_NUMBER', value: params.AZURE_BOOT_STRESS_PROVISIONING_NUMBER),
         string(name: 'AZURE_BOOT_STRESS_REBOOT_NUMBER', value: params.AZURE_BOOT_STRESS_REBOOT_NUMBER),
         string(name: 'FUNCTIONAL_TESTS_PLATFORM', value: params.FUNCTIONAL_TESTS_PLATFORM),

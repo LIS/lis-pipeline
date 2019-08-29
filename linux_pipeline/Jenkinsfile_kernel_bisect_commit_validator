@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-env.LISAV2_BRANCH = "stable"
+env.LISAV2_BRANCH = "master"
 env.LISAV2_RG_IDENTIFIER = "bisectk"
 
 env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
@@ -10,7 +10,7 @@ env.DISTRO_TYPE = "deb"
 env.DISTRO_PACKAGE_TYPE = "deb"
 env.DISTRO_AZURE_IMAGE = env.DISTRO_AZURE_UBUNTU_IMAGE_BIONIC
 
-env.LISAV2_FUNCTIONAL_BOOT_TEST = "BVT-CORE-VERIFY-LIS-MODULES"
+env.LISAV2_FUNCTIONAL_BOOT_TEST = "VERIFY-DEPLOYMENT-PROVISION"
 env.LISAV2_AZURE_STRESS_TEST = "STRESSTEST-VERIFY-RESTART"
 env.LISAV2_PERFORMANCE_TEST = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC"
 env.KERNEL_ARTIFACTS_PATH = "dev-patch-kernels"
@@ -29,7 +29,7 @@ properties ([
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
             name: 'KERNEL_GIT_URL',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel""",
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\nazure_kernel\nhttps://github.com/openSUSE/kernel-source""",
             description: 'Kernel tree repo'],
         [$class: 'StringParameterDefinition',
             name: 'KERNEL_GIT_BRANCH',
@@ -75,10 +75,10 @@ properties ([
             defaultValue: true,
             name: 'RUN_AZURE_BOOT_TEST',
             description: 'Whether to run Azure Boot test'],
-        [$class: 'ChoiceParameterDefinition',
-            name: 'AZURE_BOOT_VM_SIZE',
-            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
-            description: 'Azure Boot vm size'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_VM_SIZE',
+            defaultValue: "",
+            description: 'LISAv2 VM size. If set, all the boot/functional/performance tests will use that VM size. If not set, the default test case VM size will be used. Make sure that the vm size exists and that the region supports it. '],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "AZURE BOOT STRESS TEST CONFIGURATION",
@@ -95,10 +95,6 @@ properties ([
             name: 'AZURE_BOOT_STRESS_REBOOT_NUMBER',
             defaultValue: "10",
             description: 'Azure VM reboot number for each provisioning iteration. The total reboot number will be: AZURE_BOOT_STRESS_PROVISIONING_NUMBER * AZURE_BOOT_STRESS_REBOOT_NUMBER.'],
-        [$class: 'ChoiceParameterDefinition',
-            name: 'AZURE_BOOT_STRESS_VM_SIZE',
-            choices: "Standard_A2\nStandard_E64_v3\nStandard_F72s_v2",
-            description: 'Azure Boot Stress vm size'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
@@ -115,7 +111,7 @@ properties ([
             description: 'LISAv2 test case name. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the tests will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_CATEGORY',
-            defaultValue: "BVT",
+            defaultValue: "Functional",
             description: 'LISAv2 test case category. Available options can be retrieved using LISAv2\\Utilities\\Get-LISAv2Statistics.ps1. If left empty, all the test categories will be run.'],
         [$class: 'StringParameterDefinition',
             name: 'FUNCTIONAL_TESTS_AREA',
@@ -137,6 +133,7 @@ properties ([
             description: 'What Azure Performance tests to run. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
             choices: """4k
+                    4k-NVME
                     1024k""",
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
@@ -261,7 +258,7 @@ def buildKernel() {
                   --debian_os_version "16" \\
                   --build_path "${KERNEL_BUILD_DIR}" \\
                   --kernel_config "Microsoft/config-azure" \\
-                  --clean_env "False" \\
+                  --clean_env "True" \\
                   --use_ccache "True" \\
                   --use_kernel_folder_prefix "True" \\
                   --patch_file "developer_patches" \\
@@ -304,11 +301,8 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         echo "No stash ${env.KERNEL_ARTIFACTS_PATH} found"
     }
 
-    if (testName.equals(env.LISAV2_AZURE_STRESS_TEST)) {
-        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_STRESS_VM_SIZE}'"
-    }
-    if (testName.equals(env.LISAV2_FUNCTIONAL_BOOT_TEST)) {
-        vmSize = "-OverrideVMSize '${params.AZURE_BOOT_VM_SIZE}'"
+    if (params.LISAV2_VM_SIZE) {
+        vmSize = "-OverrideVMSize '${params.LISAV2_VM_SIZE}'"
     }
     if (platform.equals('HyperV')) {
         region = "localhost"
@@ -340,9 +334,9 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -TestCategory '${testCategory}'" +
         " -TestArea '${testArea}'" +
         " -TestTag '${testTag}'" +
-        " -CustomParameters '${customTestParams}'" +
+        " -CustomTestParameters '${customTestParams}'" +
         " ${storageType}" +
-        " -ForceDeleteResources" +
+        " -ResourceCleanup Delete" +
         " -XMLSecretFile '${secrets}'"
 
     )
@@ -434,6 +428,7 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
     def netIperfSyntBufferLengthParam = "PERF-NETWORK-TCP-SINGLE-CONNECTION-THROUGHPUT-SYNTHETIC-BUFFER-LENGTHS"
 
     def storIo4KTestCase = "PERF-STORAGE-4K-IO"
+    def storIo4KNVMETestCase = "PERF-NVME-4K-IO"
     def storIo1024KTestCase = "PERF-STORAGE-1024K-IO"
     def storIo4kParam = "PERF-STORAGE-4K-IO-MODES"
     def storIo1024kParam = "PERF-STORAGE-1024K-IO-MODES"
@@ -452,6 +447,10 @@ def getPerfTestInfo(perfType, netType, netIperfType, netIperfBufferLength, storI
             switch (storIoSize) {
                 case "4k":
                     perfTestInfo["test_case_name"] = storIo4KTestCase
+                    storIoParam = storIo4kParam
+                    break;
+                case "4k-NVME":
+                    perfTestInfo["test_case_name"] = storIo4KNVMETestCase
                     storIoParam = storIo4kParam
                     break;
                 case "1024k":

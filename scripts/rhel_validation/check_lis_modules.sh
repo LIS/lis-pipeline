@@ -8,7 +8,7 @@ main() {
 
     LIS_MODULES=(hv_vmbus hv_balloon hyperv_keyboard hv_netvsc hid_hyperv \
                  hv_utils hyperv_fb hv_storvsc pci_hyperv)
-    if [[ "$(lsb_release -r | grep "6")" ]];then
+    if [[ "$(lsb_release -r | grep "6.")" ]];then
             LIS_MODULES=(hv_vmbus hv_balloon hyperv_keyboard hv_netvsc hid_hyperv \
                  hv_utils hyperv_fb hv_storvsc)
     fi
@@ -21,7 +21,11 @@ main() {
         mod_found=$?
         if [[ $mod_found -eq 0 ]];then
             mod_ver="$(modinfo $module | grep -w version)"
-            mod_ver=${mod_ver#*:}
+            # build-in (inbox) driver does not have version field in the modinfo command.
+            # so in order to differential between LIS driver and in-build driver,
+            # "build-in driver" is shown in the output. This will make clear that LIS
+            # drivers were not tested.
+            [[ -z $mod_ver ]] && mod_ver="built-in driver" || mod_ver=${mod_ver#*:}
             echo "${module}: ${mod_ver}"
         else
             UNSET_MOD[${#UNSET_MOD[@]}]="$module"
@@ -31,7 +35,7 @@ main() {
         printf "\nLoaded LIS modules after modprobe:\n"
     fi
     for module in ${UNSET_MOD[@]};do
-        dmesg --clear
+        dmesg -c 1> /dev/null 2>&1
         mod_out=$(modprobe $module)
         mod_exit=$?
         mod_log="$(dmesg)"
@@ -39,7 +43,7 @@ main() {
         mod_found=$?
         if [[ $mod_exit -eq 0 ]] && [[ $mod_found -eq 0 ]];then
             mod_ver="$(modinfo $module | grep -w version)"
-            mod_ver=${mod_ver#*:}
+            [[ -z $mod_ver ]] && mod_ver="built-in driver" || mod_ver=${mod_ver#*:}
             printf "${module}: ${mod_ver}\n"
             if [[ "$mod_out" != "" ]];then
                 printf "modprobe output:\n${mod_out}\n\n"

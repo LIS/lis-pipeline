@@ -1,4 +1,4 @@
-﻿#
+#
 #  Copies VHDs that have booted as expected to the test location where they will be prepped
 #  for Azure automation
 #
@@ -66,7 +66,7 @@ $machineFullNames = {$full_names_array}.Invoke()
 $machineFullNames.Clear()
 
 login_azure $sourceRG $sourceSA $location
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
 
 $vmName = $vmNameArray[0]
 if ($generalizeAll -eq $false -and $vmNameArray.Count -eq 0) {
@@ -75,7 +75,7 @@ if ($generalizeAll -eq $false -and $vmNameArray.Count -eq 0) {
     exit 1
 } else {
     $requestedNames = ""
-    $runningVMs = Get-AzureRmVm -ResourceGroupName $sourceRG
+    $runningVMs = Get-AzVM -ResourceGroupName $sourceRG
 
     if ($generalizeAll -eq $true) {
         Write-Host "Generalizing all running machines..."
@@ -107,7 +107,7 @@ if ($generalizeAll -eq $false -and $vmNameArray.Count -eq 0) {
 
 $systemContainer = "system"
 
-Remove-AzureStorageContainer -Name $systemContainer -Force
+Remove-AzStorageContainer -Name $systemContainer -Force
 
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
@@ -145,7 +145,7 @@ Write-Host "It required $elapsed generalize and stop the machines"
 $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
 $scriptBlockText = {
-    
+
     param (
         [string] $machine_name,
         [string] $sourceRG,
@@ -156,11 +156,11 @@ $scriptBlockText = {
 
     . C:\Framework-Scripts\common_functions.ps1
     . C:\Framework-Scripts\secrets.ps1
-  
+
     $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 
     login_azure $sourceRG $sourceSA $location
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $rg –StorageAccountName $s
+    Set-AzCurrentStorageAccount -ResourceGroupName $rg -StorageAccountName $s
     #
     #  This might not be the best way, but I only have 23 characters here, so we'll go with what the user entered
     $bar=$machine_name.Replace("---","{")
@@ -168,22 +168,22 @@ $scriptBlockText = {
     if ($vhdPrefix.Length -gt 22) {
         $vhdPrefix = $vhdPrefix.substring(0,23)
     }
-    Write-Host "Set the VHD Prefix to " $vhdPrefix        
+    Write-Host "Set the VHD Prefix to " $vhdPrefix
 
     $logName = "C:\temp\transcripts\generalize_vhds_scriptblock-" + $machine_name + "-" + (Get-Date -Format s).replace(":","-")
     Start-Transcript -path $logName -force
 
     write-host "Stopping machine $machine_name for VHD generalization"
-    Stop-AzureRmVM -Name $machine_name -ResourceGroupName $sourceRG -Force
+    Stop-AzVM -Name $machine_name -ResourceGroupName $sourceRG -Force
 
     write-host "Settng machine $machine_name to Generalized"
-    Set-AzureRmVM -Name $machine_name -ResourceGroupName $sourceRG -Generalized
+    Set-AzVM -Name $machine_name -ResourceGroupName $sourceRG -Generalized
 
     write-host "Saving image for machnine $machine_name to container $sourceContainer in RG $sourceRG"
-    Save-AzureRmVMImage -VMName $machine_name -ResourceGroupName $sourceRG -DestinationContainerName $sourceContainer -VHDNamePrefix $vhdPrefix
+    Save-AzVMImage -VMName $machine_name -ResourceGroupName $sourceRG -DestinationContainerName $sourceContainer -VHDNamePrefix $vhdPrefix
 
     write-host "Deleting machine $machine_name"
-    Remove-AzureRmVM -Name $machine_name -ResourceGroupName $sourceRG -Force
+    Remove-AzVM -Name $machine_name -ResourceGroupName $sourceRG -Force
 
     Write-Host "Generalization of machine $machine_name complete."
 
@@ -256,7 +256,7 @@ if ($Failed -eq $true) {
     Write-Host "Machine generalization failed.  Please check the logs." -ForegroundColor Red
     Stop-Transcript
     exit 1
-} 
+}
 
 $commandTimer.Stop()
 $elapsed = $commandTimer.Elapsed
@@ -266,23 +266,23 @@ $commandTimer = [Diagnostics.Stopwatch]::StartNew()
 #
 #  The generalization process, if successful, placed the VHDs in a location below the current
 #  storage container, with the prefix we gave it but some random junk on the back.  We will copy those
-#  VHDs, and their associated JSON files, to the output storage container, renaming them 
+#  VHDs, and their associated JSON files, to the output storage container, renaming them
 # to <user supplied>---no_loc-no_flav-generalized.vhd
 
 Write-Host "Copying generalized VHDs in container $systemContainer (from $sourceContainer) from region $location."-ForegroundColor Magenta
 
-$destKey=Get-AzureRmStorageAccountKey -ResourceGroupName $destRG -Name $destSA
-$destContext=New-AzureStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
+$destKey=Get-AzStorageAccountKey -ResourceGroupName $destRG -Name $destSA
+$destContext=New-AzStorageContext -StorageAccountName $destSA -StorageAccountKey $destKey[0].Value
 
-$sourceKey=Get-AzureRmStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
-$sourceContext=New-AzureStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
+$sourceKey=Get-AzStorageAccountKey -ResourceGroupName $sourceRG -Name $sourceSA
+$sourceContext=New-AzStorageContext -StorageAccountName $sourceSA -StorageAccountKey $sourceKey[0].Value
 
 $copyBlobs = @()
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
 Write-Host "Copying generalized VHDs in container $systemContainer from region $location to $destRG / $destSA / $destContainer"
 if ($generalizeAll -eq $true) {
-    $blobs=get-AzureStorageBlob -Container $systemContainer  -Blob "*.vhd"
+    $blobs=Get-AzStorageBlob -Container $systemContainer  -Blob "*.vhd"
     $blobCount = $blobs.Count
     Write-Host "Copying generalized VHDs in container / $sourceRG / $sourceSA / $systemContainer from region $location.  There will be $blobCount VHDs :"-ForegroundColor Magenta
     foreach ($blob in $blobs) {
@@ -291,12 +291,12 @@ if ($generalizeAll -eq $true) {
         write-host "                       $blobName" -ForegroundColor Magenta
     }
 } else {
-    $blobs=get-AzureStorageBlob -Container $systemContainer -Blob "*.vhd"
+    $blobs=Get-AzStorageBlob -Container $systemContainer -Blob "*.vhd"
     foreach ($blob in $blobs) {
         write-host "Blobs name :" $blob.Name
     }
 
-    foreach ($vmName in $vmNameArray) {        
+    foreach ($vmName in $vmNameArray) {
         Write-Host "Looking for a match of $vmName in the blobs"
         $foundIt = $false
         foreach ($blob in $blobs) {
@@ -309,19 +309,19 @@ if ($generalizeAll -eq $true) {
                 $foundIt = $true
             }
         }
-            
+
         if ($foundIt -eq $false) {
             Write-Host " ***** ??? Could not find source blob $theName in container $systemContainer.  This request is skipped" -ForegroundColor Red
         }
     }
 }
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 
-Get-AzureStorageBlob -Container $destContainer -Prefix "*"
+Get-AzStorageBlob -Container $destContainer -Prefix "*"
 if ($? -eq $false) {
     Write-Host "creating the generalization destination container" -ForegroundColor Yellow
-    New-AzureStorageContainer -Name $destContainer -Permission Blob
+    New-AzStorageContainer -Name $destContainer -Permission Blob
 }
 
 foreach ($blob in $copyblobs) {
@@ -329,15 +329,15 @@ foreach ($blob in $copyblobs) {
     $longName=($blobName -split "$sourceContainer/")[1]
     $baseName=($longName -split "-osdisk")[0]
     $targetName = $baseName + "-generalized.vhd"
-    
+
     Write-Host "Initiating job to copy VHD $blobName from $sourceRG and $systemContainer to $targetName in $destRG and $destSA, container $destContainer" -ForegroundColor Yellow
     # if ($overwriteVHDs -eq $true) {
         Write-Host "Clearing destination container of all VHDs with prefix $baseName"
-        get-AzureStorageBlob -Container $destContainer -Blob "$baseName*" | ForEach-Object {Remove-AzureStorageBlob -Blob $_.Name -Container $destContainer }
+        Get-AzStorageBlob -Container $destContainer -Blob "$baseName*" | ForEach-Object {Remove-AzStorageBlob -Blob $_.Name -Container $destContainer }
 
-        $blob = Start-AzureStorageBlobCopy -SrcBlob $blobName -DestContainer $destContainer -SrcContainer $systemContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
+        $blob = Start-AzStorageBlobCopy -SrcBlob $blobName -DestContainer $destContainer -SrcContainer $systemContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext -Force
     # } else {
-    #     $blob = Start-AzureStorageBlobCopy -SrcBlob $blobName -DestContainer $destContainer -SrcContainer $systemContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext
+    #     $blob = Start-AzStorageBlobCopy -SrcBlob $blobName -DestContainer $destContainer -SrcContainer $systemContainer -DestBlob $targetName -Context $sourceContext -DestContext $destContext
     # }
 
     if ($? -eq $false) {
@@ -363,7 +363,7 @@ while ($stillCopying -eq $true) {
         $baseName=($longName -split "-osdisk")[0]
         $targetName = $baseName + "-generalized.vhd"
 
-        $copyStatus = Get-AzureStorageBlobCopyState -Blob $targetName -Container $destContainer -ErrorAction SilentlyContinue
+        $copyStatus = Get-AzStorageBlobCopyState -Blob $targetName -Container $destContainer -ErrorAction SilentlyContinue
         $status = $copyStatus.Status
         if ($? -eq $false) {
             Write-Host "        Could not get copy state for job $targetName.  Job may not have started." -ForegroundColor Yellow
@@ -380,7 +380,7 @@ while ($stillCopying -eq $true) {
             $stillCopying = $true
         } else {
             if ($status -eq "Success") {
-                Write-Host "   **** Job $targetName has completed successfully." -ForegroundColor Green                    
+                Write-Host "   **** Job $targetName has completed successfully." -ForegroundColor Green
             } else {
                 Write-Host "   **** Job $targetName has failed with state $Status." -ForegroundColor Red
             }

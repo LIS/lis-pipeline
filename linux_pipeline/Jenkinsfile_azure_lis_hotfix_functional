@@ -1,0 +1,153 @@
+#!/usr/bin/env groovy
+
+def FunctionalTests = FUNCTIONAL_TESTS.replaceAll("[\n\r]", "");
+def ExcludeTests = EXCLUDE_TESTS.replaceAll("[\n\r]", "");
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+def CleanWorkspace() {
+    retry(5) {
+        cleanWs()
+    }
+}
+
+def Prepare() {
+    retry(5) {
+        CleanWorkspace()
+        unstash 'LISAv2'
+    }
+}
+
+def ReportException(stagename, exc) {
+    def body = "<pre>"
+    body += "\nStage Name        : ${stagename}\n"
+    body += "\nException Message : ${exc}\n"
+    body += "\nBuild URL         : ${env.BUILD_URL}\n"
+    withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+    emailext (
+        subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
+        to: "${env.HOTFIX_DEV_MAIL}",
+        mimeType : "text/html",
+        body: body
+        )
+    }
+}
+
+stage ("Prerequisite") {
+    node ("meta_slave") {
+        CleanWorkspace()
+        git branch: env.GIT_BRANCH, url: env.GIT_REPO
+        stash includes: '**', name: 'LISAv2'
+        CleanWorkspace()
+    }
+}
+
+stageTimeout = 240
+def currentStage = "Deploy Tests"
+stage ("${currentStage}") {
+    def currentVHD = "${BASE_VHD}"
+    println "VHD for Deploy tests ${currentVHD}"
+    try {
+        timeout(time: stageTimeout, unit: 'MINUTES') {
+            node('azure') {
+                CleanWorkspace()
+                withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+                Prepare()
+                def Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier 'LISDEPLOY${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                Command += " -TestArea 'LIS_DEPLOY'"
+                Command += " -OverrideVMSize 'Standard_D2_v2'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
+                junit "Report\\*-junit.xml"
+                archiveArtifacts '*-TestLogs.zip'
+                archiveArtifacts('Report\\*-junit.xml')
+                }
+            }
+        }
+    }
+    catch (exc) {
+        currentBuild.result = 'FAILURE'
+        println "Install Upgrade Scenarios: STAGE_FAILED_EXCEPTION."
+        ReportException("${currentStage}", "${exc}")
+    }
+}
+
+
+stageTimeout = 420
+currentStage = "FunctionalTests"
+stage ("${currentStage}") {
+    def currentVHD = "${LIS_VHD}"
+    println "Run Functional Tests using VHD ${currentVHD}"
+    try {
+        timeout(time: stageTimeout, unit: 'MINUTES') {
+            node('azure') {
+                CleanWorkspace()
+                withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+                Prepare()
+                def Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier  'RPMTEST${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                Command += " -TestPriority '0'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -ExcludeTests '${ExcludeTests}'"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
+
+                println "Priority 0 tests finished, running remaining pre-defined tests"
+                Command = ".\\Run-LisaV2.ps1"
+                Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                Command += " -TestPlatform 'Azure'"
+                Command += " -TestLocation '${TEST_LOCATION}'"
+                Command += " -RGIdentifier 'RPMTEST${BUILD_ID}'"
+                Command += " -TestCategory 'Functional'"
+                def SelectedTests = FunctionalTests.replaceAll("[\n\r]", "");
+                Command += " -TestNames '${SelectedTests}'"
+                Command += " -StorageAccount 'ExistingStorage_Standard'"
+                Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
+                Command += " -DeployVMPerEachTest"
+                Command += " -TestIterations 1"
+                Command += " -ExitWithZero"
+                Command += " -EnableTelemetry"
+                Command += " -OsVHD '${currentVHD}'"
+                println Command
+                RunPowershellCommand(Command)
+
+                junit "Report\\*-junit.xml"
+                archiveArtifacts '*-TestLogs.zip'
+                archiveArtifacts('Report\\*-junit.xml')
+                }
+            }
+        }
+    }
+    catch (exc) {
+        currentBuild.result = 'FAILURE'
+        println "Functional Test Scenarios: STAGE_FAILED_EXCEPTION."
+        ReportException("${currentStage}", "${exc}")
+    }
+}

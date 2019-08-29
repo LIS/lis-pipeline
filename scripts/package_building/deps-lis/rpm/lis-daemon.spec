@@ -29,6 +29,7 @@ Source9:		hv_fcopy_daemon.c
 Source10:		hypervfcopy.rules	
 Source11:		hypervfcopyd.service
 Source12:		Makefile	
+Source13:		Build
 BuildRoot:		%{_tmppath}/%{name}-%{version}-build
 Requires:		kernel >= 3.10.0-123
 BuildRequires:		systemd, kernel-headers
@@ -55,7 +56,10 @@ cp -pvL %{SOURCE9} hv_fcopy_daemon.c
 cp -pvL %{SOURCE10} %{hv_fcopy_daemon}.service
 
 cp -pvL %{SOURCE12} Makefile
-
+if [ ! -e "%{SOURCE13}" ]; then
+  touch %{SOURCE13}
+fi
+cp -pvL %{SOURCE13} Build
 %build
 make clean
 make

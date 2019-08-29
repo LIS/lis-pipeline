@@ -1,4 +1,4 @@
-﻿#
+#
 #  Create a set of macines based on variants.  Variants are different machine types (standard_d2_v2), so a set of variant
 #  machines all share the same base VHD image, but are (potentially) using different hardware configurations.#
 #  Copies VHDs that have booted as expected to the test location where they will be prepped
@@ -17,7 +17,7 @@ param (
     [Parameter(Mandatory=$false)] [string] $destImage="TestBase.vhd",
     [Parameter(Mandatory=$false)] [string[]] $Flavors="",
     [Parameter(Mandatory=$false)] [string[]] $requestedNames = "",
-    
+
     [Parameter(Mandatory=$false)] [string] $currentSuffix="-booted-and-verified.vhd",
     [Parameter(Mandatory=$false)] [string] $newSuffix="-variant.vhd",
 
@@ -85,47 +85,47 @@ login_azure $sourceRG $sourceSA $location
 
 $timeStarted = (Get-Date -Format s).replace(":","-")
 
-$existingGroup = Get-AzureRmResourceGroup -Name $destRG
-$status = $? 
+$existingGroup = Get-AzResourceGroup -Name $destRG
+$status = $?
 if ($status -eq $true -and $existingGroup -ne $null -and $useExistingResources -eq "False") {
     write-host "Resource group already existed.  Deleting resource group." -ForegroundColor Yellow
-    Remove-AzureRmResourceGroup -Name $destRG -Force
+    Remove-AzResourceGroup -Name $destRG -Force
 
     write-host "Creating new resource group $destRG in loction $location"
-    New-AzureRmResourceGroup -Name $destRG -Location $location
+    New-AzResourceGroup -Name $destRG -Location $location
 } elseif ($status -eq $false -and $existingGroup -eq $null) {
     write-host "Creating new resource group $destRG in loction $location"
-    New-AzureRmResourceGroup -Name $destRG -Location $location
+    New-AzResourceGroup -Name $destRG -Location $location
 } else {
     write-host "Using existing resource group $destRG"
 }
 
 #
 #  Make sure the target exists.  Create if necessary.
-$existingRG=Get-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA 
+$existingRG=Get-AzStorageAccount -ResourceGroupName $destRG -Name $destSA
 if ($? -eq $false -or $existingRG -eq $null) {
     Write-Host "Storage account $destSA did not exist.  Creating it and populating with the right containers..." -ForegroundColor Yellow
-    New-AzureRmStorageAccount -ResourceGroupName $destRG -Name $destSA -Location $location -SkuName Standard_LRS -Kind Storage
+    New-AzStorageAccount -ResourceGroupName $destRG -Name $destSA -Location $location -SkuName Standard_LRS -Kind Storage
 
     write-host "Selecting it as the current SA" -ForegroundColor Yellow
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG –StorageAccountName $destSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -StorageAccountName $destSA
 
     Write-Host "creating the containers" -ForegroundColor Yellow
-    New-AzureStorageContainer -Name $destContainer -Permission Blob
+    New-AzStorageContainer -Name $destContainer -Permission Blob
     Write-Host "Complete." -ForegroundColor Green
 }
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $destRG -Name $destSA
+Set-AzCurrentStorageAccount -ResourceGroupName $destRG -Name $destSA
 
-$existingContainer = Get-AzureStorageContainer -Name $destContainer
+$existingContainer = Get-AzStorageContainer -Name $destContainer
 if ($? -eq $false -or $existingContainer -eq $null) {
     Write-Host "creating the container" -ForegroundColor Yellow
-    New-AzureStorageContainer -Name $destContainer -Permission Blob
+    New-AzStorageContainer -Name $destContainer -Permission Blob
 }
 
-Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG -Name $sourceSA
+Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -Name $sourceSA
 
-# Look for vhd in destination storage account 
-$blobArray = Get-AzureStorageBlob -Container $sourceContainer
+# Look for vhd in destination storage account
+$blobArray = Get-AzStorageBlob -Container $sourceContainer
 $vhdExists = $false
 foreach($blob in $blobArray)
 {
@@ -198,9 +198,9 @@ $comandScript = {
 
     login_azure $sourceRG $sourceSA $location
 
-    Set-AzureRmCurrentStorageAccount –ResourceGroupName $sourceRG –StorageAccountName $sourceSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $sourceRG -StorageAccountName $sourceSA
 
-    $blobs = Get-AzureStorageBlob -Container $sourceContainer
+    $blobs = Get-AzStorageBlob -Container $sourceContainer
 
     $blobName = "Unset"
     foreach ($blob in $blobs) {
@@ -217,10 +217,10 @@ $comandScript = {
         exit 1
     }
 
-    Set-AzureRmCurrentStorageAccount -ResourceGroupName $destRG -Name $destSA
+    Set-AzCurrentStorageAccount -ResourceGroupName $destRG -Name $destSA
 
     Write-verbose "Deallocating machine $vmName, if it is up"
-    $runningMachines = Get-AzureRmVm -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*"
+    $runningMachines = Get-AzVM -ResourceGroupName $destRG -status | Where-Object -Property Name -Like "$vmName*"
     deallocate_machines_in_group $runningMachines $destRG $destSA $location
 
     $sourceURI = ("https://{0}.blob.core.windows.net/{1}/{2}" -f @($sourceSA, $sourceContainer, $blobName))
@@ -253,7 +253,7 @@ $comandScript = {
         $machineIsUp = $true
         $sleepCount = $sleepCount + 1
         $pipName = $imageName
-        $ip=(Get-AzureRmPublicIpAddress -ResourceGroupName $destRG -Name $pipName).IpAddress
+        $ip=(Get-AzPublicIpAddress -ResourceGroupName $destRG -Name $pipName).IpAddress
         if ($ip -eq $null -or $ip.ToLower() -eq "not assigned") {
             $machineIsIP = $false
             start-sleep -Seconds 10
@@ -301,16 +301,16 @@ while ($allDone -eq $false) {
     $vmsFinished = 0
 
     foreach ($vmName in $vmNameArray) {
-        
+
         $blobName = $vmName
-        
+
         $blobName = $blobName.replace(".vhd","")
 
         foreach ($oneFlavor in $flavorsArray) {
             $vmJobName = "start_" + $oneFlavor + $blobName
             $job = Get-Job -Name $vmJobName
             $jobState = $job.State
-            
+
             if ($jobState -eq "Running") {
                 write-host "    Job $vmJobName is in state $jobState" -ForegroundColor Yellow
                 $allDone = $false

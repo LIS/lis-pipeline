@@ -1,0 +1,103 @@
+#!/usr/bin/env groovy
+
+def TestLocation = TEST_LOCATION
+def PerfTestList = PERFORMANCE_TESTS.replaceAll("[\n\r]", "").split(',');
+
+def PerfTestCount = PerfTestList.length
+
+def RunPowershellCommand(psCmd) {
+    bat "powershell.exe -NonInteractive -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;$psCmd;EXIT \$global:LastExitCode\""
+}
+
+def CleanWorkspace() {
+    retry(5) {
+        cleanWs()
+    }
+}
+
+def Prepare() {
+    retry(5) {
+        CleanWorkspace()
+        unstash 'LISAv2'
+    }
+}
+
+def ReportException(stagename, exc) {
+    def body = "<pre>"
+    body += "\nStage Name        : ${stagename}\n"
+    body += "\nException Message : ${exc}\n"
+    body += "\nBuild URL         : ${env.BUILD_URL}\n"
+    withCredentials([string(credentialsId: 'HOTFIX_DEV_MAIL', variable: 'HOTFIX_DEV_MAIL')]) {
+    emailext (
+        subject: "JOB: ${env.JOB_NAME} BUILD:${env.BUILD_NUMBER} Exception",
+        to: "${env.HOTFIX_DEV_MAIL}",
+        mimeType : "text/html",
+        body: body
+        )
+    }
+}
+
+currentStage = "Prerequisites"
+stage ("${currentStage}") {
+    node ("meta_slave") {
+        CleanWorkspace()
+        git branch: env.GIT_BRANCH, url: env.GIT_REPO
+        stash includes: '**', name: 'LISAv2'
+        CleanWorkspace()
+    }
+}
+
+node ("azure") {
+    currentStage = "PerformanceTests"
+    def parellel_jobs = [:]
+    def delay = 0
+    stage ("${currentStage}") {
+        for (counter=0; counter < PerfTestCount; counter++) {
+            def performanceTest = PerfTestList[counter]
+            if (performanceTest != null && performanceTest != "" ) {
+                parellel_jobs ["${performanceTest}"] =
+                {
+                    stage ("${performanceTest}") {
+                        try {
+                            node ("azure") {
+                                delay += 5
+                                println "Sleeping ${delay} seconds..."
+                                sleep "${delay}"
+                                withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File', variable: 'Azure_Secrets_TESTONLY_File')]) {
+                                    println "Current Performance Test ${performanceTest} location ${TestLocation}"
+                                    Prepare()
+                                    def Command = ".\\Run-LisaV2.ps1"
+                                    Command += " -XMLSecretFile ${Azure_Secrets_TESTONLY_File}"
+                                    Command += " -TestPlatform 'Azure'"
+                                    Command += " -RGIdentifier 'RPMBUILD-${BUILD_NUMBER}'"
+                                    Command += " -TestCategory 'Performance'"
+                                    Command += " -TestNames '${performanceTest}'"
+                                    Command += " -StorageAccount 'ExistingStorage_Standard'"
+                                    Command += " -CustomTestParameters 'LIS_OLD_URL=${OLD_LIS_RPM_URL};LIS_CURRENT_URL=${NEW_LIS_RPM_URL}'"
+                                    Command += " -ResultDBTestTag '${EXECUTION_TAG}'"
+                                    Command += " -DeployVMPerEachTest 1"
+                                    Command += " -ExitWithZero"
+                                    Command += " -EnableTelemetry"
+                                    Command += " -TestIterations 3"
+                                    Command += " -OsVHD '${LIS_VHD}'"
+                                    Command += " -TestLocation '${TestLocation}'"
+                                    println Command
+                                    RunPowershellCommand(Command)
+                                    junit "Report\\*-junit.xml"
+                                    archiveArtifacts('Report\\*-junit.xml')
+                                    archiveArtifacts '*-TestLogs.zip'
+                                }
+                            }
+                        }
+                        catch (exc) {
+                            currentBuild.result = 'SUCCESS'
+                            println exc
+                            ReportException("$performanceTest}", "${exc}")
+                        }
+                    }
+                }
+            }
+        }
+    parallel parellel_jobs
+    }
+}

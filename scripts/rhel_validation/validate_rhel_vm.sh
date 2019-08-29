@@ -19,7 +19,7 @@ run_remote_az_commands() {
     COMMANDS="$4"
     PARAMS="$5"
     
-    TIMEOUT=600
+    TIMEOUT=1800
     
     IFS=';'; COMMANDS=($COMMANDS); unset IFS;
     for comm in "${COMMANDS[@]}"; do
@@ -99,6 +99,18 @@ main() {
             --sku)
                 AZURE_SKU="$2"
                 shift 2;;
+            --kernelrepolist)
+                KERNEL_REPO_LIST="$2"
+                shift 2;;
+            --storage_account)
+                STORAGE_ACCOUNT="$2"
+                shift 2;;
+            --storage_token)
+                STORAGE_TOKEN="$2"
+                shift 2;;
+            --azcopy_download_link)
+                AZCOPY_DOWNLOAD_LINK="$2"
+                shift 2;;
             --azure_token)
                 AZURE_TOKEN="$2"
                 shift 2;;
@@ -133,8 +145,9 @@ main() {
     # Install the desired kernel version
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "@prepare_lis_vm.sh" \
-        "sec=install_kernel os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
-            kernel_ver=\"$KERNEL_VERSION\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
+        "sec=install_kernel kernel_repolist=\"$KERNEL_REPO_LIST\" os_ver=\"$OS_VERSION\" workdir=\"/root/\" \
+            kernel_ver=\"$KERNEL_VERSION\" storage_account=\"$STORAGE_ACCOUNT\" storage_token=\"$STORAGE_TOKEN\" \
+            azcopy_download_link=\"$AZCOPY_DOWNLOAD_LINK\" rhel_user=\"$USERNAME\" rhel_pass=\"$PASSWORD\""
     
     # Reboot vm
     az vm restart --resource-group "$RESOURCE_GROUP" --name "$FULL_VM_NAME"
@@ -148,7 +161,7 @@ main() {
     echo "LIS modules install:" > "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
     run_remote_az_commands "$RESOURCE_GROUP" "$FULL_VM_NAME" "full_output" \
         "@prepare_lis_vm.sh" \
-        "sec=install_lis workdir=\"/root/\" os_ver=\"$OS_VERSION\" lis_path=\"/root/LISISO\"" \
+        "sec=install_lis workdir=\"/root/\" kernel_ver=\"$KERNEL_VERSION\" os_ver=\"$OS_VERSION\" lis_path=\"/root/LISISO\"" \
         >> "${LOG_DEST}/${OS_TYPE}_${OS_VERSION}_lis_install.log"
 
     # Reboot vm

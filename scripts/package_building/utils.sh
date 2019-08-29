@@ -253,7 +253,7 @@ get_stable_branches() {
     git_dir="$1"
 
     pushd "$git_dir"
-    branches=$(git branch -r | sort | grep "y")
+    branches=$(git branch -r | sort | grep "origin/linux-msft.*y" | grep -v "staging" | grep -v "proposed" | grep -v "wsl")
     for branch in $branches;do
         small_branch="${branch/origin\//}"
         tag=$(get_git_tag "." $branch)
@@ -278,7 +278,9 @@ get_latest_unstable_branch() {
     tag=$(get_git_tag "." $branch)
     result="${small_branch}#${tag}"
     popd
-    echo "${result}"
+    #echo "${result}"
+    # NOTE(avladu): temp fix until RCs are back in repo
+    echo "msft-4.14-rc6#80d3389"
 }
 
 custom_mkdir () {
@@ -309,13 +311,14 @@ build_metapackages () {
     KERNEL_VERSION=$1
     DESTINATION_FOLDER=$2
     DEBIAN_FOLDER=$3
+    BASEDIR=$4
 
-    custom_builddeb=$(dirname $(find $(pwd) -name "dh_builddeb"))
+    custom_builddeb="${BASEDIR}/kernel_metapackages"
     aux_PATH="$PATH"
     export PATH="$custom_builddeb:$PATH"
 
     custom_mkdir $DESTINATION_FOLDER "meta_packages"
-    DESTINATION_FOLDER="$DESTINATION_FOLDER/meta_packages"
+    DESTINATION_FOLDER=$(readlink -f "$DESTINATION_FOLDER/meta_packages")
 
     pushd "$DEBIAN_FOLDER"
     fakeroot debian/rules clean
@@ -342,9 +345,9 @@ create_deb_changelog() {
 
     pushd "$repo"
     tags=$(git tag --sort version:refname | grep -i -B 1 $(git describe --tags --abbrev=0))
-    IFS=$'\n' tags=($tags)
+    IFS=$'\n' tags=($tags); unset IFS;
     commit_ids=$(git log HEAD...${tags[0]} --pretty=format:"%h")
-    IFS=$'\n' commit_ids=($commit_ids)
+    IFS=$'\n' commit_ids=($commit_ids); unset IFS;
     for i in ${commit_ids[@]};do
         git_entry=$(git show $i)
         #Get the commit tag
@@ -385,7 +388,6 @@ $commit_message
 
 EOF
     done
-    export IFS=$' '
     popd
 }
 
@@ -393,7 +395,7 @@ change_perf_options(){
     perf_makefile="$1"
     perf_options="$2"
 
-    IFS=$';' perf_options=($perf_options)
+    IFS=$';' perf_options=($perf_options); unset IFS;
 
     for i in ${perf_options[@]};do
         entry="$i"
