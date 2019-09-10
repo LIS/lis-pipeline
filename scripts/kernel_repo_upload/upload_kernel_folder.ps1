@@ -5,10 +5,9 @@ param(
     [String] $RepoType,
     [parameter(Mandatory=$true)]
     [String] $RepoUrl,
-    [parameter(Mandatory=$true)]
     [String] $RepoApiKey,
-    [parameter(Mandatory=$true)]
-    [String] $RepoCertPath
+    [String] $RepoCertPath,
+    [String] $SASToken
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,16 +25,25 @@ function Upload-FileToKernelRepo {
     [String] $RepoType,
     [parameter(Mandatory=$true)]
     [String] $RepoUrl,
-    [parameter(Mandatory=$true)]
     [String] $RepoApiKey,
-    [parameter(Mandatory=$true)]
-    [String] $RepoCertPath
+    [String] $RepoCertPath,
+    [String] $SASToken
     )
-
-    & $CURL_PATH -v --fail -X PUT -T $File "$RepoUrl/$RepoType" `
-        -H "Authorization: Bearer ${RepoApiKey}" --cacert $RepoCertPath
+    if($RepoApiKey -and $RepoCertPath) {
+        & $CURL_PATH -v --fail -X PUT -T $File "$RepoUrl/$RepoType" `
+            -H "Authorization: Bearer ${RepoApiKey}" --cacert $RepoCertPath
+    }
     if ($LASTEXITCODE) {
-        throw "Could not upload file $File to repo!"
+        throw "Could not upload file $File to repo $RepoUrl/$RepoType!"
+    }
+
+    if($SASToken) {
+        $fileName = (Get-Item $File).Name
+        & $CURL_PATH -v --fail -X PUT -T $File "$RepoUrl/$RepoType/$($fileName)$SASToken" `
+            -H "x-ms-blob-type: BlockBlob"
+    }
+    if ($LASTEXITCODE) {
+        throw "Could not upload file $File to repo $RepoUrl/$RepoType!"
     }
 }
 
@@ -50,17 +58,19 @@ function Upload-KernelToRepo {
         Write-Host "Uploading following file to the repo: $fileFullPath"
         Upload-FileToKernelRepo -File $fileFullPath -RepoUrl $RepoUrl `
             -RepoType $RepoType -RepoApiKey $RepoApiKey `
-            -RepoCertPath $RepoCertPath
+            -RepoCertPath $RepoCertPath -SASToken $SASToken
     }
 
     $metaPackages = (Join-Path $KernelFolderPath "meta_packages")
-    $allFilesMeta = Get-ChildItem $metaPackages -Attributes "!Directory+!System"
-    foreach ($file in $allFilesMeta) {
-        $fileFullPath = Join-Path $metaPackages $file
-        Write-Host "Uploading following file to the repo: $fileFullPath"
-        Upload-FileToKernelRepo -File $fileFullPath -RepoUrl $RepoUrl `
-            -RepoType $RepoType -RepoApiKey $RepoApiKey `
-            -RepoCertPath $RepoCertPath
+    if(Test-Path $metaPackages) {
+        $allFilesMeta = Get-ChildItem $metaPackages -Attributes "!Directory+!System"
+        foreach ($file in $allFilesMeta) {
+            $fileFullPath = Join-Path $metaPackages $file
+            Write-Host "Uploading following file to the repo: $fileFullPath"
+            Upload-FileToKernelRepo -File $fileFullPath -RepoUrl $RepoUrl `
+                -RepoType $RepoType -RepoApiKey $RepoApiKey `
+                -RepoCertPath $RepoCertPath -SASToken $SASToken
+        }
     }
 }
 
