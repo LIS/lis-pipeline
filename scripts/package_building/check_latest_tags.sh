@@ -20,7 +20,11 @@ function get_latest_versions {
 
     pushd "./${repo_name}"
     # Get latest 2 versions
-    ver="$(git tag | sort --version-sort --reverse | grep -E "^v[0-9]{1,3}\.[0-9]{1,3}$" -m2)"
+    if [[ $kernel_tree =~ "dpdk" ]];then
+        ver="$(git tag | sort --version-sort --reverse | grep -E "^v([1][8-9]\.[0-9]{1,3}|[2-9][0-9]\.[0-9]{1,3})$" -m2)"
+    else
+        ver="$(git tag | sort --version-sort --reverse | grep -E "^v[0-9]{1,3}\.[0-9]{1,3}$" -m2)"
+    fi
 
     versions=""
     for i in $ver;do
