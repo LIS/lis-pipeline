@@ -180,12 +180,12 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   disco: 'ubuntu_19.04\\ubuntu_19.04_gen1_gen2.vhdx',
                   eoan: 'ubuntu_19.10\\ubuntu_19.10.vhdx']
 
-def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS'",
-    HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY'",
+def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS,^LIS-DEPLOY*'",
+    HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY,^LIS-PREINSTALL*'",
     HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
 
-def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE'",
-    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM'",
+def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE,^LIS-DEPLOY*,^LIS-DRIVER*'",
+    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
     AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
     AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
 
@@ -324,21 +324,12 @@ if (env.ValidationHyperV == 'yes') {
                     }
                     node ("${LABEL_NAME}") {
                         try {
-                            timeout (time: 24, unit: 'HOURS')  {
+                            timeout (time: 24, unit: 'HOURS') {
                                 withCredentials(bindings: [
                                 string(credentialsId:'SRIOV_TEST_LOCATION', variable: 'SRIOV_TEST_LOCATION'),
                                 string(credentialsId:'LISAV2_IMAGES_SHARE_URL', variable: 'LISAV2_IMAGES_SHARE_URL'),
                                 file(credentialsId:'HYPERV_LISAV2_SECRETS', variable: 'HYPERV_LISAV2_SECRETS')]) {
                                     dir ("${test_type}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
-                                        cleanWs()
-                                        git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        if (test_type == "HV_SRIOV_VALIDATION" && test_cmd.contains("TestArea 'SRIOV'")){
-                                            test_location = "${SRIOV_TEST_LOCATION}"
-                                        } else {
-                                            test_location = "localhost"
-                                        }
-                                        HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
-
                                         def stageInfo = [:]
                                         stageInfo["Name"] = "HyperV-Validation-${env.distro}-${env.KernelType}-${test_type}"
                                         stageInfo["StartDate"] = new java.sql.Timestamp(new Date().getTime()).toString()
@@ -353,18 +344,42 @@ if (env.ValidationHyperV == 'yes') {
                                             println exc
                                         }
 
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
-                                        RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                            " -TestLocation '${test_location}'" +
-                                            " -RGIdentifier 'ubuntuHV${distro}'" +
-                                            " -TestPlatform 'HyperV'" +
-                                            " -CustomKernel '${KERNEL_TYPE}'" +
-                                            " -OsVHD '${HYPERV_VHD_PATH}'" +
-                                            " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
-                                            " -EnableTelemetry" +
-                                            " -ExitWithZero" +
-                                            " ${test_cmd}"
-                                        )
+                                        cleanWs()
+                                        git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
+                                        if (test_type == "HV_SRIOV_VALIDATION") {
+                                            test_location_sriov = "${SRIOV_TEST_LOCATION}"
+                                            println "${test_type} - ${test_cmd} - ${test_location_sriov}"
+                                            HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location_sriov}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${test_location_sriov}'" +
+                                                " -RGIdentifier 'ubuntuHV${distro}'" +
+                                                " -TestPlatform 'HyperV'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                                " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero" +
+                                                " ${test_cmd}"
+                                            )
+                                        } else {
+                                            test_location = "localhost"
+                                            println "${test_type} - ${test_cmd} - ${test_location}"
+                                            HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${test_location}'" +
+                                                " -RGIdentifier 'ubuntuHV${distro}'" +
+                                                " -TestPlatform 'HyperV'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -OsVHD '${HYPERV_VHD_PATH}'" +
+                                                " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero" +
+                                                " ${test_cmd}"
+                                            )
+                                        }
+
                                         archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
                                         junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
 
