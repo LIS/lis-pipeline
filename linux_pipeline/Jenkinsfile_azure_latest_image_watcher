@@ -18,9 +18,10 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "16.04-LTS"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "18.04-LTS"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "7.6"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "8.0"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-RAW"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-LVM"
-
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "8" "RHEL"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "15" "SLES"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "12" "SLES"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "9-backports"
