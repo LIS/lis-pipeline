@@ -30,8 +30,9 @@ function Upload-FileToKernelRepo {
     [String] $SASToken
     )
     if($RepoApiKey -and $RepoCertPath) {
-        & $CURL_PATH -v --fail -X PUT -T $File "$RepoUrl/$RepoType" `
-            -H "Authorization: Bearer ${RepoApiKey}" --cacert $RepoCertPath
+        & $CURL_PATH -k -v --fail -X PUT -T $File "$RepoUrl/$RepoType" `
+            -H "Authorization: Bearer ${RepoApiKey}"
+            #--cacert $RepoCertPath
     }
     if ($LASTEXITCODE) {
         throw "Could not upload file $File to repo $RepoUrl/$RepoType!"

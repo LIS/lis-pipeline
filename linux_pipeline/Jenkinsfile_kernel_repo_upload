@@ -79,7 +79,7 @@ node("meta_slave") {
 if (params.UPLOAD_TO_SKYPE) {
     node("hyper-v") {
         stage('upload_kernel_to_skype') {
-          withCredentials([string(credentialsId: 'REPO_URL', variable: 'REPO_URL'),
+          withCredentials([string(credentialsId: 'UPDATE_REPO_URL', variable: 'REPO_URL'),
                            string(credentialsId: 'REPO_API_KEY', variable: 'REPO_API_KEY'),
                            file(credentialsId: 'REPO_CERT', variable: 'REPO_CERT_PATH'),
                            ]) {
