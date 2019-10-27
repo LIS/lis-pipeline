@@ -315,7 +315,7 @@ if (env.ValidationHyperV == 'yes') {
             def test_cmd = it.value
             runs["${test_type}"] = {
                 stage ("${test_type}") {
-                    if (test_cmd.contains("TestArea 'SRIOV'")){
+                    if (test_type == "HV_SRIOV_VALIDATION" && test_cmd.contains("TestArea 'SRIOV'")){
                         LABEL_NAME = LABEL_SRIOV
                     } else {
                         LABEL_NAME = LABEL_WS2016
@@ -330,7 +330,7 @@ if (env.ValidationHyperV == 'yes') {
                                     dir ("${test_type}-${env.BUILD_NUMBER}-${env.BRANCH_NAME}") {
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        if (test_cmd.contains("TestArea 'SRIOV'")){
+                                        if (test_type == "HV_SRIOV_VALIDATION" && test_cmd.contains("TestArea 'SRIOV'")){
                                             test_location = "${SRIOV_TEST_LOCATION}"
                                         } else {
                                             test_location = "localhost"
