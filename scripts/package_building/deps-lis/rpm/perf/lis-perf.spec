@@ -5,6 +5,8 @@ BuildArch:         x86_64
 Release:           1
 Version:           1
 Source0:           tools
+Source1:           include
+Source2:           scripts
 BuildRoot:         %{_tmppath}/%{name}-%{version}-build
 Requires:          kernel >= 3.10.0-123
 BuildRequires:     kernel-headers
@@ -15,6 +17,8 @@ Perf tool for the linux kernel.
 %prep
 %setup -Tc
 sudo cp -r %{SOURCE0} .
+sudo cp -r %{SOURCE1} .
+sudo cp -r %{SOURCE2} .
 
 %install
 cd ./tools/perf
