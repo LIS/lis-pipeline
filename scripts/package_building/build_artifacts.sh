@@ -28,7 +28,7 @@ function install_deps_rhel {
     asciidoc audit-devel binutils-devel xmlto bison flex gtk2-devel xz-devel \
     newt-devel openssl-devel xmlto zlib-devel elfutils-devel systemtap-sdt-devel \
     libunwind audit-libs-devel perl-ExtUtils-Embed python-devel numactl-devel \
-    java-1.8.0-openjdk-devel)
+    java-1.8.0-openjdk-devel python3)
     sudo yum groups mark install "Development Tools"
     sudo yum -y groupinstall "Development Tools"
     sudo yum -y install ${rpm_packages[@]}
@@ -490,6 +490,9 @@ function prepare_perf_rhel (){
         exit 3
     else 
         cp -fr ./tools "${base_dir}/perf/rpmbuild/SOURCES"
+        cp -fr ./include "${base_dir}/perf/rpmbuild/SOURCES"
+        mkdir "${base_dir}/perf/rpmbuild/SOURCES/scripts"
+        cp -fr ./scripts/bpf_helpers_doc.py "${base_dir}/perf/rpmbuild/SOURCES/scripts"
     fi
     popd
     pushd "${base_dir}/perf/rpmbuild"
