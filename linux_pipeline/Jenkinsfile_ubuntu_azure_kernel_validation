@@ -178,7 +178,7 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   disco: 'ubuntu_19.04\\ubuntu_19.04_gen1_gen2.vhdx']
 
-def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*'",
+def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS'",
     HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY'",
     HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
 
