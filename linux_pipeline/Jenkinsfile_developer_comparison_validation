@@ -35,11 +35,11 @@ properties ([
             sectionHeader: "TEST CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: """westus2\naustraliaeast\naustraliasoutheast\nbrazilsouth\ncanadacentral
-                        canadaeast\ncentralindia\ncentralus\neastasia\neastus\neastus2\nfrancecentral
-                        japaneast\njapanwest\nkoreacentral\nkoreasouth\nnorthcentralus\nnortheurope
-                        southcentralus\nsoutheastasia\nsouthindia\nuksouth\nukwest\nwestcentralus
-                        westeurope\nwestindia\nwestus\nsepremium""",
+            choices: ['westus2', 'australiaeast', 'australiasoutheast', 'brazilsouth', 'canadacentral',
+                      'canadaeast', 'centralindia', 'centralus', 'eastasia', 'eastus', 'eastus2', 'francecentral',
+                      'japaneast', 'japanwest', 'koreacentral', 'koreasouth', 'northcentralus', 'northeurope',
+                      'southcentralus', 'southeastasia', 'southindia', 'uksouth', 'ukwest', 'westcentralus',
+                      'westeurope', 'westindia', 'westus', 'sepremium'],
             name: 'LISAV2_AZURE_REGION',
             description: 'Azure Region'],
         [$class: 'StringParameterDefinition',
@@ -75,9 +75,9 @@ properties ([
             sectionHeader: "FUNCTIONAL TEST CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: """NONE
-                    Azure
-                    HyperV""",
+            choices: ['NONE',
+                      'Azure',
+                      'HyperV'],
             name: 'FUNCTIONAL_TESTS_PLATFORM',
             description: 'On which platform to run LISAv2 functional tests.'],
         [$class: 'StringParameterDefinition',
@@ -101,58 +101,55 @@ properties ([
             sectionHeader: "AZURE PERFOMANCE TEST CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'ChoiceParameterDefinition',
-            choices: """NONE
-                    STORAGE
-                    NETWORK""",
+            choices: ['NONE',
+                      'STORAGE',
+                      'NETWORK'],
             name: 'AZURE_PERF_TESTS',
             description: 'What Azure Performance tests to run. You can customize the test cases from the options below.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """4k
-                    1024k""",
+            choices: ['4k',
+                      '1024k'],
             name: 'AZURE_PERF_STORAGE_IO_SIZE',
             description: 'Azure Performance STORAGE IO SIZE.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """ALL
-                    randread
-                    randwrite
-                    read
-                    write""",
+            choices: ['ALL',
+                      'randread',
+                      'randwrite',
+                      'read',
+                      'write'],
             name: 'AZURE_PERF_STORAGE_IO_MODE',
             description: 'Azure Performance STORAGE IO MODE.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """IPERF3_1CONNECTION
-                    NTTTCP_TCP
-                    NTTTCP_UDP""",
+            choices: ['IPERF3_1CONNECTION',
+                      'NTTTCP_TCP',
+                      'NTTTCP_UDP'],
             name: 'AZURE_PERF_NETWORK_TEST_TYPE',
             description: 'Azure Performance Network testing type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """SYNTHETIC
-                    SRIOV""",
+            choices: ['SYNTHETIC',
+                      'SRIOV'],
             name: 'NET_IPERF3_TYPE',
             description: 'Azure Performance NETWORK IPERF3 1CONNECTION: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """ALL
-                    32\n64\n128\n256\n512\n1024\n2048\n4096\n8192\n16384\n32768\n65536""",
+            choices: """ALL\n32\n64\n128\n256\n512\n1024\n2048\n4096\n8192\n16384\n32768\n65536""",
             name: 'NET_IPERF3_BUFFER_LENGTH',
             description: 'Azure Performance NETWORK IPERF3 1CONNECTION BUFFER LENGTH.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """SYNTHETIC
-                    SRIOV""",
+            choices: ['SYNTHETIC',
+                      'SRIOV'],
             name: 'NTTTCP_TCP_TYPE',
             description: 'Azure Performance NETWORK NTTTCP TCP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """ALL
-                    1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
+            choices: """ALL\n1\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024\n2048\n4096\n6144\n8192\n10240""",
             name: 'NTTTCP_TCP_CONNECTIONS',
             description: 'Azure Performance NETWORK NTTTCP TCP number of connections.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """SYNTHETIC
-                    SRIOV""",
+            choices: ['SYNTHETIC',
+                      'SRIOV'],
             name: 'NTTTCP_UDP_TYPE',
             description: 'Azure Performance NETWORK NTTTCP UDP: SYNTHETIC or SRIOV type.'],
         [$class: 'ChoiceParameterDefinition',
-            choices: """ALL
-                    2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
+            choices: """ALL\n2\n4\n8\n16\n32\n64\n128\n256\n512\n1024""",
             name: 'NTTTCP_UDP_CONNECTIONS',
             description: 'Azure Performance NETWORK NTTTCP UDP number of connections.']
         ]
