@@ -78,11 +78,11 @@ def getTests(priority, platform) {
 
 	AZURE_VALIDATION_TESTS_HASH_P2 = [AZURE_P2_FUNCTIONAL_VALIDATION:"-TestPriority 2 -TestCategory Functional -ExcludeTests '*DPDK*'",
 										AZURE_P2_COMMUNITY_VALIDATION:"-TestPriority 2 -TestCategory Community",
-										AZURE_P2_STRESS_VALIDATION:"-TestPriority 2 -TestCategory Stress"]
+										AZURE_P2_STRESS_VALIDATION:"-TestPriority 2 -TestCategory Stress -ExcludeTests 'STRESSTEST-NVME-4K-IO'"]
 	HYPERV_VALIDATION_TESTS_HASH_P2= [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests 'SRIOV*,LIVE*,NVME*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS'",
 										HV_P1_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 1 -ExcludeTests 'LIVE*,DYNAMIC-MEMORY-HIGH-PRIORITY,SRIOV*,NVME*'",
 										HV_P2_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 2 -ExcludeTests 'LIVE*,SRIOV*,NVME*'",
-										HV_P2_STRESS_VALIDATION:"-TestPriority '0,1,2' -TestCategory Stress",
+										HV_P2_STRESS_VALIDATION:"-TestPriority '0,1,2' -TestCategory Stress -ExcludeTests 'STRESSTEST-NVME-4K-IO'",
 										HV_P2_COMMUNITY_VALIDATION:"-TestPriority '0,1,2' -TestCategory Community",
 										HV_P2_SRIOV_VALIDATION:"-TestPriority '0,1,2' -TestCategory Functional -TestArea SRIOV",
 										HV_P2_NVME_VALIDATION:"-TestPriority '0,1,2' -TestCategory Functional -TestArea NVME",
@@ -93,7 +93,7 @@ def getTests(priority, platform) {
 										HV_P1_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 1 -ExcludeTests 'LIVE*,DYNAMIC-MEMORY-HIGH-PRIORITY,SRIOV*,NVME*'",
 										HV_P2_FUNCTIONAL_VALIDATION:"-TestCategory Functional -TestPriority 2 -ExcludeTests 'LIVE*,SRIOV*,NVME*'",
 										HV_P3_VALIDATION:"-TestPriority 3 -ExcludeTests 'LIVE*,SRIOV*,NVME*'",
-										HV_P3_STRESS_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Stress",
+										HV_P3_STRESS_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Stress -ExcludeTests 'STRESSTEST-NVME-4K-IO'",
 										HV_P3_COMMUNITY_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Community",
 										HV_P3_SRIOV_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Functional -TestArea SRIOV",
 										HV_P3_NVME_VALIDATION:"-TestPriority '0,1,2,3' -TestCategory Functional -TestArea NVME",
