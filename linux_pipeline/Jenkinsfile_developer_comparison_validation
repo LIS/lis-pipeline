@@ -12,6 +12,18 @@ properties ([
         parameterDefinitions: [
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
+            sectionHeader: "LISAV2 CODE CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_GIT_URL',
+            defaultValue: 'https://github.com/LIS/LISAv2.git',
+            description: 'LISAV2 code URL'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_GIT_BRANCH',
+            defaultValue: 'master',
+            description: 'LISAV2 Branch Name'],
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
             sectionHeader: "KERNEL BUILD CONFIGURATION",
             sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
         [$class: 'StringParameterDefinition',
@@ -163,6 +175,8 @@ properties ([
 
 def getCommonParams(patches, buildTag) {
     return [
+        string(name: 'LISAV2_GIT_URL', value: params.LISAV2_GIT_URL),
+        string(name: 'LISAV2_GIT_BRANCH', value: params.LISAV2_GIT_BRANCH),
         string(name: 'KERNEL_GIT_URL', value: params.KERNEL_GIT_URL),
         string(name: 'KERNEL_GIT_BRANCH', value: params.KERNEL_GIT_BRANCH),
         string(name: 'KERNEL_ARTIFACTS_SMB_PATH', value: env.KERNEL_ARTIFACTS_SMB_PATH),
