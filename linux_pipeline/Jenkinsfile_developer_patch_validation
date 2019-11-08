@@ -1,7 +1,5 @@
 #!/usr/bin/env groovy
 
-env.LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-env.LISAV2_BRANCH = "stable"
 env.LISAV2_RG_IDENTIFIER = "developerk"
 env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC = "Canonical UbuntuServer 18.04-DAILY-LTS latest"
 env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC = "Ubuntu_18.04.1"
@@ -18,6 +16,18 @@ properties ([
     overrideIndexTriggers(false),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
+        [$class: 'ParameterSeparatorDefinition',
+            separatorStyle: "",
+            sectionHeader: "LISAV2 CODE CONFIGURATION",
+            sectionHeaderStyle: env.PARAM_SEPARATOR_STYLE],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_GIT_URL',
+            defaultValue: 'https://github.com/LIS/LISAv2.git',
+            description: 'LISAV2 code URL'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISAV2_GIT_BRANCH',
+            defaultValue: 'master',
+            description: 'LISAV2 Branch Name'],
         [$class: 'ParameterSeparatorDefinition',
             separatorStyle: "",
             sectionHeader: "KERNEL BUILD CONFIGURATION",
@@ -280,7 +290,7 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
     def vmSize = ""
     def customTestIterations = ""
 
-    prepareEnv(env.LISAV2_BRANCH, env.LISAV2_REMOTE)
+    prepareEnv(env.LISAV2_GIT_BRANCH, env.LISAV2_GIT_URL)
     try {
         unstashKernel(env.KERNEL_ARTIFACTS_PATH)
         customKernel = "-CustomKernel 'localfile:./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/deb/*.deb'"
