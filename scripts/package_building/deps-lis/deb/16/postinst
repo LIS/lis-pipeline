@@ -78,6 +78,6 @@ fi
 # Automatically added by dh_systemd_start
 if [ -d /run/systemd/system ]; then
         systemctl --system daemon-reload >/dev/null || true
-        deb-systemd-invoke start hv-fcopy-daemon.service hv-kvp-daemon.service hv-vss-daemon.service >/dev/null || true
+        deb-systemd-invoke start hv-fcopy-daemon.service hv-kvp-daemon.service hv-vss-daemon.service > /dev/null 2>&1 || true
 fi
 # End automatically added section

@@ -17,6 +17,6 @@ fi
 # End automatically added section
 # Automatically added by dh_systemd_start
 if [ -d /run/systemd/system ]; then
-        deb-systemd-invoke stop hv-fcopy-daemon.service hv-kvp-daemon.service hv-vss-daemon.service >/dev/null
+        deb-systemd-invoke stop hv-fcopy-daemon.service hv-kvp-daemon.service hv-vss-daemon.service > /dev/null 2>&1 || true
 fi
 # End automatically added section
