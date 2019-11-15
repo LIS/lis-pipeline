@@ -5,6 +5,15 @@ if [ "$1" = "remove" ]; then
         if [ -x "/usr/bin/deb-systemd-helper" ]; then
                 deb-systemd-helper mask hv-fcopy-daemon.service hv-kvp-daemon.service hv-vss-daemon.service >/dev/null
         fi
+        if [[ -e /etc/systemd/system/hv-kvp-daemon.service ]];then
+                rm -f /etc/systemd/system/hv-kvp-daemon.service
+        fi
+        if [[ -e /etc/systemd/system/hv-vss-daemon.service ]];then
+                rm -f /etc/systemd/system/hv-vss-daemon.service
+        fi
+        if [[ -e /etc/systemd/system/hv-fcopy-daemon.service ]];then
+                rm -f /etc/systemd/system/hv-fcopy-daemon.service
+        fi
 fi
 
 if [ "$1" = "purge" ]; then
