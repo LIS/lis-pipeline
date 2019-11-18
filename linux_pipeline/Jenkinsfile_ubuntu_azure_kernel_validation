@@ -153,8 +153,8 @@ def sendSignOffMail(mailType,warningMessage) {
 properties ([
     overrideIndexTriggers(false),
     parameters([
-        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\ndisco',
-                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> disco - 19.04 validation'),
+        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\ndisco\neoan',
+                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> disco - 19.04 validation <br> eoan - 19.10 validation'),
         choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
         string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the latest kernel version for the selected distro/kernel type will be used.'),
@@ -172,11 +172,13 @@ properties ([
 def ARM_DISTRO_HASH = [trusty:'Canonical UbuntuServer 14.04.5-LTS latest',
                   xenial:'Canonical UbuntuServer 16.04-LTS latest',
                   bionic:'Canonical UbuntuServer 18.04-LTS latest',
-                  disco:'Canonical UbuntuServer 19.04 latest']
+                  disco:'Canonical UbuntuServer 19.04 latest',
+                  eoan:'Canonical UbuntuServer 19.10-DAILY latest']
 def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   xenial:'ubuntu_16.04.5\\ubuntu_16.04.5.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
-                  disco: 'ubuntu_19.04\\ubuntu_19.04_gen1_gen2.vhdx']
+                  disco: 'ubuntu_19.04\\ubuntu_19.04_gen1_gen2.vhdx',
+                  eoan: 'ubuntu_19.10\\ubuntu_19.10.vhdx']
 
 def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS'",
     HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY'",
