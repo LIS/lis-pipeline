@@ -206,7 +206,7 @@ def prepareEnv(branch, remote) {
 def unstashKernel(kernelStash) {
     unstash kernelStash
     powershell """
-        \$rmPath = "\${env:ProgramFiles}\\Git\\usr\\bin\\rm.exe"
+        \$rmPath = "\${env:ProgramFiles(x86)}\\Git\\usr\\bin\\rm.exe"
         \$basePath = "./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.PACKAGE_TYPE}"
 
         & \$rmPath -rf "\${basePath}/*dbg*"
