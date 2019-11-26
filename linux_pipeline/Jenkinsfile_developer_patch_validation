@@ -205,16 +205,16 @@ def prepareEnv(branch, remote) {
 
 def unstashKernel(kernelStash) {
     unstash kernelStash
-    powershell """
-        \$rmPath = "\${env:ProgramFiles(x86)}\\Git\\usr\\bin\\rm.exe"
-        \$basePath = "./${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${kernelStash}/*/${env.PACKAGE_TYPE}"
-        if(![System.IO.File]::Exists(\$rmPath)) {
-            \$rmPath = "\${env:ProgramFiles}\\Git\\usr\\bin\\rm.exe"
-        }
-        & \$rmPath -rf "\${basePath}/*dbg*"
-        & \$rmPath -rf "\${basePath}/*devel*"
-        & \$rmPath -rf "\${basePath}/*debug*"
-    """
+    withEnv(["kernelStash=${kernelStash}", "BUILD_NUMBER=${env.BUILD_NUMBER}", "BRANCH_NAME=${env.BRANCH_NAME}", "PACKAGE_TYPE=${env.PACKAGE_TYPE}"]) {
+        def basePath = powershell returnStdout: true, script: '''
+            $basePath = ".\\$env:BUILD_NUMBER-$env:BRANCH_NAME-$env:kernelStash\\*\\$env:PACKAGE_TYPE"
+            Remove-Item "${basePath}\\*dbg*" -Force
+            Remove-Item "${basePath}\\*devel*" -Force
+            Remove-Item "${basePath}\\*debug*" -Force
+            return $basePath
+        '''
+        println("${basePath}")
+    }
 }
 // buildKernel method is using params:
 //     params.KERNEL_GIT_URL
