@@ -29,7 +29,7 @@ properties ([
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'ChoiceParameterDefinition',
-            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure\nhttps://github.com/openSUSE/kernel-source""",
+            choices: """git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git\nhttps://git.kernel.org/pub/scm/linux/kernel/git/davem/net-next.git\ngit://git.launchpad.net/~canonical-kernel/ubuntu/+source/linux-azure\nhttps://github.com/openSUSE/kernel-source\ngit://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git""",
             name: 'KERNEL_GIT_URL',
             description: 'What Kernel tree repo.'],
         [$class: 'StringParameterDefinition',
