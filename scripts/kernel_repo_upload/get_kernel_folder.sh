@@ -84,7 +84,7 @@ function main {
 
     sudo umount $MOUNT_POINT
 
-    if [[ $found_deb -ne 1 ]] || [[ $found_rpm -ne 1 ]]; then
+    if [[ $found_deb == 0 ]] && [[ $found_rpm == 0 ]]; then
         echo "KERNEL folder $KERNEL_FOLDER_PATH does not meet the requirements."
         exit 1
     fi
