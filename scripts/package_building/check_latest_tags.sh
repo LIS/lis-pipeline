@@ -33,13 +33,23 @@ function get_latest_commits {
     repo_name="$1"
     versions="$2"
     results_path="$3"
-    
-    pushd "./${repo_name}"
-    current_month="$(date +"%b" -d "yesterday")"
-    current_day="$(date +"%d" -d "yesterday" | sed 's/^0*//')"
-    current_year="$(date +"%Y" -d "yesterday")"
+    check="$4"
 
-    full_tags="$(git tag -l --format='%(refname) %(taggerdate)' | grep "${current_month} ${current_day}" | grep "${current_year}" || true)"
+    pushd "./${repo_name}"
+    if [[ "$check" == "hourly" ]]; then
+        current_month="$(date +"%b")"
+        current_day="$(date +"%d" | sed 's/^0*//')"
+        current_year="$(date +"%Y")"
+        last_hour="$(date -d '-70 minutes' +'%H:%M:%S')" # 10 mins buffer time to clone both the repo
+
+        full_tags="$(git tag -l --format='%(refname) %(taggerdate)' | grep "${current_month} ${current_day}" | grep "${current_year}" | awk '$5 > "${last_hour}"' || true)"
+    else
+        current_month="$(date +"%b" -d "yesterday")"
+        current_day="$(date +"%d" -d "yesterday" | sed 's/^0*//')"
+        current_year="$(date +"%Y" -d "yesterday")"
+
+        full_tags="$(git tag -l --format='%(refname) %(taggerdate)' | grep "${current_month} ${current_day}" | grep "${current_year}" || true)"
+    fi
     if [[ $versions ]];then
         full_tags="$(echo "$full_tags" | grep -E "$versions" || true)"
     fi
@@ -70,6 +80,9 @@ function main {
             --exclude_versions)
                 EXCLUDE_VERSIONS="$2"
                 shift 2;;
+            --checks)
+                CHECKS="$2"
+                shift 2;;
             *) break ;;
         esac
     done
@@ -95,7 +108,7 @@ function main {
         VERSIONS="$(get_latest_versions "$REPO_NAME")"
     fi
 
-    get_latest_commits "$REPO_NAME" "$VERSIONS" "$RESULTS_PATH"
+    get_latest_commits "$REPO_NAME" "$VERSIONS" "$RESULTS_PATH" "$CHECKS"
     popd
 }
 

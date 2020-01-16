@@ -144,7 +144,8 @@ if (!DPDK_SOURCE || DPDK_SOURCE == "") {
                         --work_dir "./" \\
                         --kernel_tree "$DPDK_REMOTE_URL" \\
                         --results "./latest_tags.txt" \\
-                        --exclude_versions "False"
+                        --exclude_versions "False" \\
+                        --checks "hourly"
                 '''
                 sh '''
                     #!/bin/bash
@@ -152,7 +153,8 @@ if (!DPDK_SOURCE || DPDK_SOURCE == "") {
                         --work_dir "./" \\
                         --kernel_tree "$DPDK_STABLE_REMOTE_URL" \\
                         --results "./stable_tags.txt" \\
-                        --exclude_versions "False"
+                        --exclude_versions "False" \\
+                        --checks "hourly"
                 '''
                 env.BUILD_TAGS_LATEST = readFile ("latest_tags.txt")
                 env.BUILD_TAGS_STABLE = readFile ("stable_tags.txt")
