@@ -1,12 +1,12 @@
 #!/usr/bin/env groovy
 
 properties ([
-    pipelineTriggers([cron('H 1 * * *')]),
+    pipelineTriggers([cron('H * * * *')]),
     [$class: 'ParametersDefinitionProperty',
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
             name: 'AZURE_IMAGES',
-            defaultValue: 'Canonical UbuntuServer 16.04-LTS latest,Canonical UbuntuServer 18.04-DAILY-LTS latest,RedHat RHEL 7-RAW latest,RedHat RHEL 7.5 latest,Openlogic CentOS 7.5 latest,SUSE SLES 15 latest',
+            defaultValue: 'Canonical UbuntuServer 16.04-LTS latest,Canonical UbuntuServer 18.04-DAILY-LTS latest,RedHat RHEL 7-RAW latest,RedHat RHEL 7.5 latest,Openlogic CentOS 7.5 latest,SLES 15 SP1',
             description: 'Azure images to be tested, comma separated.'],
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE',
@@ -169,7 +169,7 @@ if (env.BUILD_TAGS_LATEST && env.BUILD_TAGS_LATEST != "") {
         dpdkSource.add([it, 'latest'])
     }
 }
-if (env.BUILD_TAGS_STABLE && env.BUILD_TAGS_STABLE != "" && env.BUILD_TAGS_STABLE =~ dpdkVersionPattern) {
+if (env.BUILD_TAGS_STABLE && env.BUILD_TAGS_STABLE != "" && env.BUILD_TAGS_STABLE.replace("refs/tags/","") =~ dpdkVersionPattern) {
     env.BUILD_TAGS_STABLE.eachLine {
         dpdkSource.add([it, 'stable'])
     }
