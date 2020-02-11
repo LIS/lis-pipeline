@@ -15,17 +15,19 @@ node ("meta_slave") {
             checkout scm
 
             sh '''#!/bin/bash
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "16.04-LTS"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "18.04-LTS"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "7.6"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "8.0"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-RAW"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "7-LVM"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "8" "RHEL"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "UbuntuServer" "16.04-LTS"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "UbuntuServer" "18.04-LTS"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7.6"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8.0"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "7-RAW"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "7-LVM"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "8"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "8.1"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "81gen2"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "sles-15-sp1" "gen1"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "12" "SLES"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "9-backports"
-                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "CoreOS" "stable"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "SLES" "12-sp4-gen2"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "Debian" "9-backports"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "CoreOS" "CoreOS" "Stable"
             '''
 
             def runs = [:]
