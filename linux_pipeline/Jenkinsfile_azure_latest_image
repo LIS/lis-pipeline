@@ -53,6 +53,7 @@ azureImages.each {
                             " -ARMImageName '${currentImage}'" +
                             " -TestPriority '0'" +
                             " -XMLSecretFile '${Azure_Secrets_File}'" +
+                            " -CustomParameters 'DiskType=Managed'" +
                             " -ResourceCleanup Delete" +
                             " -EnableTelemetry" +
                             " -ExitWithZero"
@@ -95,6 +96,7 @@ azureImages.each {
                             " -TestPriority '1'" +
                             " -ExcludeTests '${P1_EXCLUDE}'" +
                             " -XMLSecretFile '${Azure_Secrets_File}'" +
+                            " -CustomParameters 'DiskType=Managed'" +
                             " -ResourceCleanup Delete" +
                             " -EnableTelemetry" +
                             " -ExitWithZero"
