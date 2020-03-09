@@ -25,7 +25,7 @@ def gitBranchName = "master"
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegions = env.AZURE_REGIONS.split(",")
 def sgxRegion = "uksouth".split(",")
-def P0_EXCLUDE = "VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"
+def SGX = "VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"
 def P1_EXCLUDE = "PERF-*,INFINIBAND-HPCX-MPI-2VM"
 
 if (!azureImages || !azureRegions) {
@@ -53,7 +53,6 @@ azureImages.each {
                             " -TestPlatform  'Azure'" +
                             " -ARMImageName '${currentImage}'" +
                             " -TestPriority '0'" +
-                            " -ExcludeTests '${P0_EXCLUDE}'" +
                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                             " -CustomParameters 'DiskType=Managed'" +
                             " -ResourceCleanup Delete" +
@@ -139,7 +138,7 @@ azureImages.each {
                                 " -RGIdentifier '${currentRegion}'" +
                                 " -TestPlatform  'Azure'" +
                                 " -ARMImageName '${currentImage}'" +
-                                " -TestNames '${P0_EXCLUDE}'" +
+                                " -TestNames '${SGX}'" +
                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                 " -CustomParameters 'DiskType=Managed'" +
                                 " -ResourceCleanup Delete" +
