@@ -24,7 +24,8 @@ def gitRemoteUrl = "https://github.com/lis/LISAv2.git"
 def gitBranchName = "master"
 def azureImages = env.AZURE_IMAGES.split(",")
 def azureRegions = env.AZURE_REGIONS.split(",")
-
+def sgxRegion = "uksouth".split(",")
+def SGX = "VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"
 def P1_EXCLUDE = "PERF-*,INFINIBAND-HPCX-MPI-2VM"
 
 if (!azureImages || !azureRegions) {
@@ -111,6 +112,52 @@ azureImages.each {
                 } finally {
                     echo "Cleaning up environment"
                 }
+            }
+        }
+
+        parallel ARMImage
+    }
+
+    stage("SGX-${it}") {
+        def currentImage = "${it}".trim()
+        ARMImage = [:]
+
+        sgxRegion.each {
+            def currentRegion = "${it}"
+            if (currentImage.contains("gen2") && (currentImage.contains("18_04-lts-gen2") || currentImage.contains("16_04-lts-gen2"))) {
+                ARMImage["${currentRegion}"] = {
+                   try {
+                        node('azure') {
+                            withCredentials([file(credentialsId: 'Azure_Secrets_TESTONLY_File',
+                                             variable: 'Azure_Secrets_File')]) {
+                                echo "Current Image: ${currentImage}, Current Region: ${currentRegion}"
+                                cleanWs()
+                                git branch: gitBranchName, url: gitRemoteUrl
+                                RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                " -TestLocation '${currentRegion}'" +
+                                " -RGIdentifier '${currentRegion}'" +
+                                " -TestPlatform  'Azure'" +
+                                " -ARMImageName '${currentImage}'" +
+                                " -TestNames '${SGX}'" +
+                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                " -CustomParameters 'DiskType=Managed'" +
+                                " -ResourceCleanup Delete" +
+                                " -EnableTelemetry" +
+                                " -ExitWithZero"
+                                )
+                                archiveArtifacts '*-TestLogs.zip'
+                                junit "Report\\*-junit.xml"
+                            }
+                        }
+                    } catch (exc) {
+                        println "${currentRegion}: STAGE_FAILED_EXCEPTION."
+                        currentBuild.result = 'FAILURE'
+                    } finally {
+                        echo "Cleaning up environment"
+                    }
+                }
+            } else {
+                println "${currentImage}: not support SGX."
             }
         }
 

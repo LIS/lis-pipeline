@@ -185,7 +185,8 @@ def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTe
 def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE,^LIS-DEPLOY*,^LIS-DRIVER*'",
     AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
     AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
-    AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'"]
+    AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'",
+    AZURE_SGX_VALIDATION:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"]
 
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
@@ -201,6 +202,7 @@ LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 LISAV2_BRANCH = "master"
 AZURE_LOCATION_DEFAULT = "westus2"
 AZURE_LOCATION_NVME = "eastus2"
+AZURE_LOCATION_SGX = "uksouth"
 AZURE_ID = "ubuntuAz"
 
 def ARM_DISTRO = ARM_DISTRO_HASH.find{it.key == env.distro}.value
@@ -240,6 +242,8 @@ if (env.ValidationAzure == 'yes') {
                     def AZURE_LOCATION = ""
                     if (test_cmd.contains("-TestArea 'NVME'")){
                         AZURE_LOCATION = AZURE_LOCATION_NVME
+                    } else if (test_type.contains("AZURE_SGX_VALIDATION")) {
+                        AZURE_LOCATION = AZURE_LOCATION_SGX
                     } else {
                         AZURE_LOCATION = AZURE_LOCATION_DEFAULT
                     }
@@ -264,7 +268,17 @@ if (env.ValidationAzure == 'yes') {
                                         } catch (exc) {
                                             println exc
                                         }
-
+                                        script {
+                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "bionic") {
+                                                ARM_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
+                                            }
+                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "xenial") {
+                                                ARM_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
+                                            }
+                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "eoan") {
+                                                ARM_DISTRO = "Canonical UbuntuServer 19_10-daily-gen2 latest"
+                                            }
+                                        }
                                         echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                             " -TestLocation '${AZURE_LOCATION}'" +
