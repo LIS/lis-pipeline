@@ -268,29 +268,45 @@ if (env.ValidationAzure == 'yes') {
                                         } catch (exc) {
                                             println exc
                                         }
+                                        def ARM_GEN2_DISTRO = ""
                                         script {
-                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "bionic") {
-                                                ARM_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
+                                            if ("${env.distro}" == "bionic") {
+                                                ARM_GEN2_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
                                             }
-                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "xenial") {
-                                                ARM_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
+                                            if ("${env.distro}" == "xenial") {
+                                                ARM_GEN2_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
                                             }
-                                            if (test_type.contains("AZURE_SGX_VALIDATION") && "${env.distro}" == "eoan") {
-                                                ARM_DISTRO = "Canonical UbuntuServer 19_10-daily-gen2 latest"
+                                            if ("${env.distro}" == "eoan") {
+                                                ARM_GEN2_DISTRO = "Canonical UbuntuServer 19_10-daily-gen2 latest"
                                             }
                                         }
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
-                                        RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                            " -TestLocation '${AZURE_LOCATION}'" +
-                                            " -RGIdentifier '${AZURE_ID}'" +
-                                            " -TestPlatform 'Azure'" +
-                                            " -CustomKernel '${KERNEL_TYPE}'" +
-                                            " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
-                                            " -EnableTelemetry" +
-                                            " -ExitWithZero" +
-                                            " ${test_cmd}"
-                                        )
+                                        if (test_type == "AZURE_SGX_VALIDATION") {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_GEN2_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero" +
+                                                " ${test_cmd}"
+                                            )
+                                        } else {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero" +
+                                                " ${test_cmd}"
+                                            )
+                                        }
                                         archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
                                         junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
 
@@ -348,7 +364,6 @@ if (env.ValidationHyperV == 'yes') {
                                         stageInfo["EndDate"] = ''
                                         stageInfo["Platform"] = "HyperV"
                                         try {
-                                            
                                             lock ('db_reporting') {
                                                 reportStageStatus(stageInfo, false)
                                             }
