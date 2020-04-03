@@ -309,15 +309,12 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
             region = "localhost," + env.HYPERV_SECOND_PERF_NODE
         }
         osVHD = "-OsVHD '" + getVhdLocation(env.LISAV2_IMAGES_SHARE_URL, env.LISAV2_HYPERV_UBUNTU_IMAGE_BIONIC) + "'"
+    } else {
+        osVHD = "-ARMImageName '${env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC}'"
     }
 
     if (testIterations) {
         customTestIterations = " -DeployVMPerEachTest -TestIterations " + testIterations
-    }
-
-    def storageType = "-StorageAccount 'ExistingStorage_Standard'"
-    if (env.AZURE_PERF_TESTS && AZURE_PERF_TESTS.contains('STORAGE')) {
-        storageType = "-StorageAccount 'ExistingStorage_Premium'"
     }
 
     RunPowershellCommand(".\\Run-LisaV2.ps1" +
@@ -325,7 +322,6 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
         " -TestPlatform '${platform}'" +
         " ${vmSize}" +
-        " -ARMImageName '${env.LISAV2_AZURE_UBUNTU_IMAGE_BIONIC}'" +
         " ${osVHD}" +
         " ${customKernel}" +
         "${customTestIterations}" +
@@ -334,7 +330,6 @@ def runLisa(platform, secrets, testName, testCategory, testArea, testTag, custom
         " -TestArea '${testArea}'" +
         " -TestTag '${testTag}'" +
         " -CustomTestParameters '${customTestParams}'" +
-        " ${storageType}" +
         " -XMLSecretFile '${secrets}'"
     )
 }
@@ -573,13 +568,20 @@ if (params.FUNCTIONAL_TESTS_PLATFORM && !params.FUNCTIONAL_TESTS_PLATFORM.equals
             stage (functionalStage) {
                 try {
                     echo "Running functional tests"
-                    withCredentials(bindings: [
-                      file(credentialsId: 'Azure_Secrets_File',
-                           variable: 'Azure_Secrets_File'),
-                      string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
-                             variable: 'LISAV2_IMAGES_SHARE_URL')
-                    ]) {
-                        runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '')
+                    if (functionPlatform.equals('HyperV')) {
+                        withCredentials(bindings: [
+                        string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                                variable: 'LISAV2_IMAGES_SHARE_URL'),
+                        file(credentialsId:'HYPERV_LISAV2_SECRETS',
+                            variable: 'HYPERV_LISAV2_SECRETS')
+                        ]) { runLisa(functionPlatform, env.HYPERV_LISAV2_SECRETS, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '') }
+                    } else {
+                        withCredentials(bindings: [
+                        file(credentialsId: 'Azure_Secrets_File',
+                            variable: 'Azure_Secrets_File'),
+                        string(credentialsId: 'LISAV2_IMAGES_SHARE_URL',
+                                variable: 'LISAV2_IMAGES_SHARE_URL')
+                        ]) { runLisa(functionPlatform, env.Azure_Secrets_File, params.FUNCTIONAL_TESTS_NAME, params.FUNCTIONAL_TESTS_CATEGORY, params.FUNCTIONAL_TESTS_AREA, params.FUNCTIONAL_TESTS_TAG, '', '') }
                     }
                 } catch (Exception e) {
                     echo e.toString()
