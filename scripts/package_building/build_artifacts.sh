@@ -254,9 +254,9 @@ function prepare_kernel_rhel (){
         ./scripts/kconfig/merge_config.sh .config "$debug_path"
     fi
 
-    sed -i "s|CONFIG_LOCALVERSION_AUTO=.*|CONFIG_LOCALVERSION_AUTO=n|" ".config"
-    sed -i "s|CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION=\"-$kernel_tag\"|" ".config"
-    touch .scmversion
+    #sed -i "s|CONFIG_LOCALVERSION_AUTO=.*|CONFIG_LOCALVERSION_AUTO=n|" ".config"
+    #sed -i "s|CONFIG_LOCALVERSION=.*|CONFIG_LOCALVERSION=\"-$kernel_tag\"|" ".config"
+    #touch .scmversion
 
     if [[ "$package_prefix" != "" ]];then
         sed -i -e "s/	Name: .*/	Name: ${package_prefix}-kernel/g" "./scripts/package/mkspec"
