@@ -705,9 +705,9 @@ function build_rhel {
         pushd "$source"
 
         if [[ "${light_build}" == "False" ]];then
-            make rpm-pkg -j"$thread_number"
+            make rpm-pkg -j"$thread_number" LOCALVERSION=-"$kernel_git_commit"
         else
-            make binrpm-pkg -j"$thread_number"
+            make binrpm-pkg -j"$thread_number" LOCALVERSION=-"$kernel_git_commit"
         fi
         sed -i -e "s/echo \"Name:.*/echo \"Name: kernel\"/g" "./scripts/package/mkspec"
         popd
