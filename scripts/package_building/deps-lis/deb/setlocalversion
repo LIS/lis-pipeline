@@ -2,3 +2,4 @@
 
 version="%version%"
 echo $version
+echo $version > .scmversion
