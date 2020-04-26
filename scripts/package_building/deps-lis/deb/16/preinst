@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [[ -e /etc/systemd/system/hv-kvp-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-kvp-daemon.service
+fi
+if [[ -e /etc/systemd/system/hv-vss-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-vss-daemon.service
+fi
+if [[ -e /etc/systemd/system/hv-fcopy-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-fcopy-daemon.service
+fi   

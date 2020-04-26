@@ -116,6 +116,19 @@ debian/hv-vss-daemon.service /etc/systemd/system
 debian/hv-fcopy-daemon.service /etc/systemd/system
 EOF
 
+        cat << EOF > preinst
+#!/bin/bash
+
+if [[ -e /etc/systemd/system/hv-kvp-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-kvp-daemon.service
+fi
+if [[ -e /etc/systemd/system/hv-vss-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-vss-daemon.service
+fi
+if [[ -e /etc/systemd/system/hv-fcopy-daemon.service ]];then
+    rm -f /etc/systemd/system/hv-fcopy-daemon.service
+fi     
+EOF
         cp "${BASE_DIR}/dependencies/DEBIAN/postinst" .
         cp "${BASE_DIR}/dependencies/DEBIAN/postrm" .
         cp "${BASE_DIR}/dependencies/DEBIAN/prerm" .
