@@ -169,6 +169,7 @@ pipeline {
 	parameters {
 		string(defaultValue: "stable", description: 'Branch to be built', name: 'KERNEL_GIT_BRANCH')
 		string(defaultValue: "stable", description: 'Branch label (stable or unstable)', name: 'KERNEL_GIT_BRANCH_LABEL')
+		choice(choices: 'config-azure\nconfig-azure-centos\nconfig-azure-centos-5.4\n', description: 'Build config file', name: 'KERNEL_CONFIG')
 		choice(choices: 'Ubuntu_18.04.1\nCentOS_7.5', description: 'Distro version.', name: 'DISTRO_VERSION')
 		choice(choices: 'False\nTrue', description: 'Enable kernel debug', name: 'KERNEL_DEBUG')
 		choice(choices: 'P0\nP1\nP2\nP3\n', description: 'Priority', name: 'PRIORITY')
@@ -184,8 +185,6 @@ pipeline {
 		LISAV2_AZURE_VM_SIZE_LARGE = "Standard_E64_v3"
 		KERNEL_ARTIFACTS_PATH = 'kernel-artifacts'
 		BUILD_PATH = '/mnt/tmp/kernel-build-folder'
-		KERNEL_CONFIG = 'Microsoft/config-azure'
-		KERNEL_CONFIG_CENTOS = 'Microsoft/config-azure-centos'
 		CLEAN_ENV = 'True'
 		USE_CCACHE = 'True'
 		BUILD_NAME = 'm'
@@ -238,7 +237,7 @@ pipeline {
 						--thread_number "x3" \\
 						--debian_os_version "16" \\
 						--build_path "${BUILD_PATH}" \\
-						--kernel_config "${KERNEL_CONFIG}" \\
+						--kernel_config "Microsoft/${KERNEL_CONFIG}" \\
 						--clean_env "${CLEAN_ENV}" \\
 						--use_ccache "${USE_CCACHE}" \\
 						--enable_kernel_debug "${KERNEL_DEBUG}"
@@ -296,7 +295,7 @@ pipeline {
 						--install_deps "True" \\
 						--thread_number "x3" \\
 						--build_path "${BUILD_PATH}" \\
-						--kernel_config "${KERNEL_CONFIG_CENTOS}" \\
+						--kernel_config "Microsoft/${KERNEL_CONFIG}" \\
 						--clean_env "${CLEAN_ENV}" \\
 						--use_ccache "${USE_CCACHE}" \\
 						--enable_kernel_debug "${KERNEL_DEBUG}"
