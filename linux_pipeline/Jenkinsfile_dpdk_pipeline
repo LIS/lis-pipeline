@@ -164,7 +164,7 @@ if (!DPDK_SOURCE || DPDK_SOURCE == "") {
     }
 }
 
-if (env.BUILD_TAGS_LATEST && env.BUILD_TAGS_LATEST != "") {
+if (env.BUILD_TAGS_LATEST && env.BUILD_TAGS_LATEST != "" && env.BUILD_TAGS_LATEST.replace("refs/tags/","") =~ dpdkVersionPattern) {
     env.BUILD_TAGS_LATEST.eachLine {
         dpdkSource.add([it, 'latest'])
     }
