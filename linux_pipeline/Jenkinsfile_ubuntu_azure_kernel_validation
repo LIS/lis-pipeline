@@ -271,8 +271,8 @@ if (env.ValidationAzure == 'yes') {
                                             println exc
                                         }
                                         def ARM_GEN2_DISTRO = ""
+                                        def custom_test_cmd = ""
                                         script {
-                                            custom_test_cmd = ""
                                             if ("${env.distro}" == "bionic") {
                                                 ARM_GEN2_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
                                                 custom_test_cmd = "-CustomTestParameters 'DPDK_SOURCE_URL=https://github.com/DPDK/dpdk.git'"
@@ -300,7 +300,7 @@ if (env.ValidationAzure == 'yes') {
                                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                                 " -EnableTelemetry" +
                                                 " -ExitWithZero" +
-                                                " ${test_cmd} ${custom_test_cmd}"
+                                                " ${test_cmd}"
                                             )
                                         } else {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
@@ -313,7 +313,7 @@ if (env.ValidationAzure == 'yes') {
                                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                                 " -EnableTelemetry" +
                                                 " -ExitWithZero" +
-                                                " ${test_cmd}"
+                                                " ${test_cmd} ${custom_test_cmd}"
                                             )
                                         }
                                         archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
