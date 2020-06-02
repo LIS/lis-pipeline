@@ -7,7 +7,7 @@ get_latest_image() {
     local sku=$3
     lastest_image_version=$(az vm image list -l westus2 \
                             --publisher $publisher --offer $offer --query "[?sku=='$sku'].*" --all -o tsv | \
-                            grep -iv "SAP\|CI\|DAILY\|BYOS\|HPC" | sort -r --version-sort | sed -n '1 p' | awk '{print $4}')
+                            grep -iv "SAP\|CI\|DAILY\|BYOS\|HPC\|-HA" | sort -r --version-sort | sed -n '1 p' | awk '{print $4}')
     if [[ $lastest_image_version != "" ]]; then
         echo "Last image for publisher ${publisher}, offer ${offer}, sku ${sku} and version ${lastest_image_version}"
         az vm image show --location westus2 --urn ${publisher}:${offer}:${sku}:${lastest_image_version}
