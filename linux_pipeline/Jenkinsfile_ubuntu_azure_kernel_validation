@@ -155,7 +155,7 @@ properties ([
     parameters([
         choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nfocal\ngroovy',
                 description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> focal - 20.04 validation <br> groovy - 20.10 validation'),
-        choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
+        choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge\nlinux-image-azure-lts-18.04',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
         string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the latest kernel version for the selected distro/kernel type will be used.'),
         choice (name: 'ValidationAzure', choices: 'yes\nno',
@@ -201,8 +201,8 @@ def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-TH
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 LABEL_SRIOV = "sriov_mlnx"
 LABEL_WS2016 = "ubuntu_azure_kernel_validation"
-LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-LISAV2_BRANCH = "master"
+LISAV2_REMOTE = "https://github.com/LiliDeng/LISAv2.git"
+LISAV2_BRANCH = "fix_issues"
 AZURE_LOCATION_DEFAULT = "westus2"
 AZURE_LOCATION_NVME = "eastus2"
 AZURE_LOCATION_SGX = "uksouth"
@@ -214,8 +214,11 @@ def HYPERV_VHD = HYPERV_VHD_HASH.find{it.key == env.distro}.value
 if (env.KernelType == "linux-azure") {
     env.KERNEL_TYPE = "proposed-azure"
 }
-if (env.KernelType == "linux-azure-edge"){
+if (env.KernelType == "linux-azure-edge") {
     env.KERNEL_TYPE = "proposed-edge"
+}
+if (env.KernelType == "linux-image-azure-lts-18.04") {
+    env.KERNEL_TYPE = "linux-image-azure-lts-18.04"
 }
 
 env.START_DATE = new java.sql.Timestamp(new Date().getTime())
@@ -535,8 +538,10 @@ node ("meta_slave") {
     echo "Send email with kernel validation results link"
     if (env.KernelType == "linux-azure") {
         version_identifier = "_azure"
-    } else {
+    } else if (env.KernelType == "linux-azure-edge") {
         version_identifier = "_edge"
+    } else if (env.KernelType == "linux-image-azure-lts-18.04") {
+        version_identifier = "_azure_lts_1804"
     }
     def kernels_info = ""
     try {

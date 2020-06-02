@@ -29,11 +29,12 @@ function Search_New_Kernel() {
     old_kernel_version=$3
     if [ ${kernel_type} == "linux-azure" ]; then
         kernel_type_short="_azure"
-    else
+    elif [ ${kernel_type} == "linux-azure-edge" ]; then
         kernel_type_short="_edge"
+    elif [ ${kernel_type} == "linux-image-azure-lts-18.04" ]; then
+        kernel_type_short="_azure_lts_1804"
     fi
-
-    latest_kernel=$(sudo apt-cache madison ${kernel_type} | grep ${release}-proposed | awk '{print $3}')
+    latest_kernel=$(sudo apt-cache madison ${kernel_type} 2>/dev/null | grep ${release}-proposed | awk '{print $2}')
     if [ ! -z $latest_kernel ]; then
         echo "Latest $kernel_type Kernel for $release is $latest_kernel"
         echo "Old $kernel_type kernel for $release : $old_kernel_version"
@@ -107,13 +108,19 @@ for release in ${RELEASES[@]}; do
     azure_release="${!variable_name}"
     variable_name="${release}_edge"
     edge_release="${!variable_name}"
+    variable_name="${release}_azure_lts_1804"
+    azure_lts_1804_release="${!variable_name}"
 
-    latest_azure=$(sudo apt-cache madison linux-azure | grep ${release}-proposed | awk '{print $3}')
-    latest_edge=$(sudo apt-cache madison linux-azure-edge | grep ${release}-proposed | awk '{print $3}')
+    latest_azure=$(sudo apt-cache madison linux-azure 2>/dev/null | grep ${release}-proposed | awk '{print $3}')
+    latest_edge=$(sudo apt-cache madison linux-azure-edge 2>/dev/null | grep ${release}-proposed | awk '{print $3}')
+    latest_azure_lts_1804=$(sudo apt search linux-image-azure-lts-18.04 2>/dev/null | grep ${release}-proposed | awk '{print $2}')
 
     # Check linux-azure proposed kernel for a new version
     Search_New_Kernel $release "linux-azure" $azure_release
 
     # Check linux-azure-edge proposed kernel for a new version
     Search_New_Kernel $release "linux-azure-edge" $edge_release
+
+    # Check linux-image-azure-lts-18.04 proposed kernel for a new version
+    Search_New_Kernel $release "linux-image-azure-lts-18.04" $azure_lts_1804_release
 done
