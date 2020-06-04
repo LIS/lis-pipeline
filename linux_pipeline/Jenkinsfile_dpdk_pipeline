@@ -170,7 +170,7 @@ if (env.BUILD_TAGS_LATEST && env.BUILD_TAGS_LATEST != "") {
     }
 }
 if (env.BUILD_TAGS_STABLE && env.BUILD_TAGS_STABLE != ""
-        && env.BUILD_TAGS_STABLE.split('v')[1].split('\\.')[0] >= dpdkMinSupportVersion) {
+        && env.BUILD_TAGS_STABLE.split('v')[1].split('\\.')[0].toInteger() >= dpdkMinSupportVersion) {
     env.BUILD_TAGS_STABLE.eachLine {
         dpdkSource.add([it, 'stable'])
     }
