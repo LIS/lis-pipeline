@@ -113,7 +113,7 @@ for release in ${RELEASES[@]}; do
 
     latest_azure=$(sudo apt-cache madison linux-azure 2>/dev/null | grep ${release}-proposed | awk '{print $3}')
     latest_edge=$(sudo apt-cache madison linux-azure-edge 2>/dev/null | grep ${release}-proposed | awk '{print $3}')
-    latest_azure_lts_1804=$(sudo apt search linux-image-azure-lts-18.04 2>/dev/null | grep ${release}-proposed | awk '{print $2}')
+    latest_azure_lts_1804=$(sudo apt madison linux-image-azure-lts-18.04 2>/dev/null | grep ${release}-proposed | awk '{print $2}')
 
     # Check linux-azure proposed kernel for a new version
     Search_New_Kernel $release "linux-azure" $azure_release
