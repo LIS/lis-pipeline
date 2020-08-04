@@ -21,6 +21,7 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7.6"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8.0"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8_1"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8_2"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "7-RAW"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "7-LVM"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "8"
@@ -29,6 +30,7 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "RedHat" "RHEL" "8.2"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "sles-15-sp1" "gen1"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "SLES" "12-sp4-gen2"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "sles-12-sp5" "gen1"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "Debian" "9-backports"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "CoreOS" "CoreOS" "Stable"
             '''
