@@ -91,7 +91,7 @@ binary-arch: debian/control install
 	dh_installdeb -s
 	dh_gencontrol -s -- $(gencontrol_flags)
 	dh_md5sums -s
-	dh_builddeb -s --destdir="${META_DESTINATION}" --filename="package"
+	dh_builddeb -s --destdir="${META_DESTINATION}"
 
 binary: binary-indep binary-arch
 
