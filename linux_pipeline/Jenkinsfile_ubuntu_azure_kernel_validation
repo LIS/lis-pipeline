@@ -291,7 +291,7 @@ if (env.ValidationAzure == 'yes') {
                                                 " -ARMImageName '${ARM_GEN2_DISTRO}'" +
                                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                                 " -EnableTelemetry" +
-                                                " -ExitWithZero" +
+                                                " -ExitWithZero -ForceCustom" +
                                                 " ${test_cmd}"
                                             )
                                         } else {
@@ -304,7 +304,7 @@ if (env.ValidationAzure == 'yes') {
                                                 " -ARMImageName '${ARM_DISTRO}'" +
                                                 " -XMLSecretFile '${Azure_Secrets_File}'" +
                                                 " -EnableTelemetry" +
-                                                " -ExitWithZero" +
+                                                " -ExitWithZero -ForceCustom" +
                                                 " ${test_cmd} ${custom_test_cmd}"
                                             )
                                         }
@@ -387,7 +387,7 @@ if (env.ValidationHyperV == 'yes') {
                                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
                                                 " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
                                                 " -EnableTelemetry" +
-                                                " -ExitWithZero" +
+                                                " -ExitWithZero -ForceCustom" +
                                                 " ${test_cmd}"
                                             )
                                         } else {
@@ -403,7 +403,7 @@ if (env.ValidationHyperV == 'yes') {
                                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
                                                 " -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'" +
                                                 " -EnableTelemetry" +
-                                                " -ExitWithZero" +
+                                                " -ExitWithZero -ForceCustom" +
                                                 " ${test_cmd}"
                                             )
                                         }
@@ -477,7 +477,7 @@ if (env.PerformanceAzure == "yes") {
                                             " -ARMImageName '${ARM_DISTRO}'" +
                                             " -XMLSecretFile '${Azure_Secrets_File}'" +
                                             " -EnableTelemetry" +
-                                            " -ExitWithZero" +
+                                            " -ExitWithZero -ForceCustom" +
                                             " -ResultDBTestTag '${env.distro}_${env.KernelType}_${env.BUILD_NUMBER}'" +
                                             " ${test_cmd}"
                                         )
