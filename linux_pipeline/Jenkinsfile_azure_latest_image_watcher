@@ -19,6 +19,7 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "UbuntuServer" "18.04-LTS"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "0001-com-ubuntu-server-focal" "20_04-lts"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7.6"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7_8"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8.0"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8_1"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "8_2"
@@ -33,6 +34,7 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "SLES" "12-sp4-gen2"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "SUSE" "sles-12-sp5" "gen1"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Credativ" "Debian" "9-backports"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Debian" "debian-10" "10-backports"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "CoreOS" "CoreOS" "Stable"
             '''
 
