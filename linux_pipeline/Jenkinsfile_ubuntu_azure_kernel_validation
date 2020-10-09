@@ -153,8 +153,8 @@ def sendSignOffMail(mailType,warningMessage) {
 properties ([
     overrideIndexTriggers(false),
     parameters([
-        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nfocal',
-                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> focal - 20.04 validation'),
+        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nfocal\ngroovy',
+                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> focal - 20.04 validation <br> groovy - 20.10 validation'),
         choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
         string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the latest kernel version for the selected distro/kernel type will be used.'),
@@ -172,21 +172,24 @@ properties ([
 def ARM_DISTRO_HASH = [trusty:'Canonical UbuntuServer 14.04.5-LTS latest',
                   xenial:'Canonical UbuntuServer 16.04-LTS latest',
                   bionic:'Canonical UbuntuServer 18.04-LTS latest',
-                  focal:'canonical 0001-com-ubuntu-server-focal-daily 20_04-daily-lts latest']
+                  focal:'canonical 0001-com-ubuntu-server-focal-daily 20_04-daily-lts latest',
+                  groovy:'canonical 0001-com-ubuntu-server-groovy-daily 20_10-daily latest']
 def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   xenial:'ubuntu_16.04.5\\ubuntu_16.04.5.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
-                  focal: 'ubuntu_20.04\\ubuntu_20.04.vhdx']
+                  focal: 'ubuntu_20.04\\ubuntu_20.04.vhdx',
+                  groovy: 'ubuntu_20.04\\ubuntu_20.04.vhdx']
 
 def HYPERV_VALIDATION_TESTS_HASH = [HV_P0:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS,^LIS-DEPLOY*'",
     HV_P1:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY,^LIS-PREINSTALL*'",
     HV_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
 
 def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE,^LIS-DEPLOY*,^LIS-DRIVER*'",
-    AZURE_P1:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
+    AZURE_P1:"-TestPriority 1 -ExcludeTests '*TVM*,^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
     AZURE_P2:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
     AZURE_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
-    AZURE_SGX:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"]
+    AZURE_SGX:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM",
+    AZURE_TVM:"-TestNames TVM-TEST-SECUREBOOT-COMPATIBILITY"]
 
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
@@ -280,8 +283,24 @@ if (env.ValidationAzure == 'yes') {
                                             if ("${env.distro}" == "focal") {
                                                 ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-focal-daily 20_04-daily-lts-gen2 latest"
                                             }
+                                            if ("${env.distro}" == "groovy") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-groovy-daily 20_10-daily-gen2 latest"
+                                            }
                                         }
                                         if (test_type == "AZURE_SGX") {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_GEN2_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero -ForceCustom" +
+                                                " ${test_cmd}"
+                                            )
+                                        } else if (test_type == "AZURE_TVM") {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${AZURE_LOCATION}'" +
