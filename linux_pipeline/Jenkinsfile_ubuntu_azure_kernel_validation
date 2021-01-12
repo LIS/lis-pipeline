@@ -178,15 +178,15 @@ def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   focal: 'ubuntu_20.04\\ubuntu_20.04.vhdx']
 
-def HYPERV_VALIDATION_TESTS_HASH = [HV_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS,^LIS-DEPLOY*'",
-    HV_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY,^LIS-PREINSTALL*'",
-    HV_SRIOV_VALIDATION:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
+def HYPERV_VALIDATION_TESTS_HASH = [HV_P0:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS,^LIS-DEPLOY*'",
+    HV_P1:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY,^LIS-PREINSTALL*'",
+    HV_SRIOV:"-TestCategory 'Functional' -TestArea 'SRIOV' -ExcludeTests 'SRIOV-MOVE-VHD'"]
 
-def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0_VALIDATION:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE,^LIS-DEPLOY*,^LIS-DRIVER*'",
-    AZURE_P1_VALIDATION:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
-    AZURE_P2_VALIDATION:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
-    AZURE_NVME_VALIDATION:"-TestCategory 'Functional' -TestArea 'NVME'",
-    AZURE_SGX_VALIDATION:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"]
+def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0:"-TestPriority 0 -ExcludeTests '^NVME-*,VERIFY-DPDK-COMPLIANCE,^LIS-DEPLOY*,^LIS-DRIVER*'",
+    AZURE_P1:"-TestPriority 1 -ExcludeTests '^NVME-*,^PERF-*,INFINIBAND-HPCX-MPI-2VM,^LIS-PREINSTALL*'",
+    AZURE_P2:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
+    AZURE_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
+    AZURE_SGX:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM"]
 
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
@@ -242,7 +242,7 @@ if (env.ValidationAzure == 'yes') {
                     def AZURE_LOCATION = ""
                     if (test_cmd.contains("-TestArea 'NVME'")){
                         AZURE_LOCATION = AZURE_LOCATION_NVME
-                    } else if (test_type.contains("AZURE_SGX_VALIDATION")) {
+                    } else if (test_type.contains("AZURE_SGX")) {
                         AZURE_LOCATION = AZURE_LOCATION_SGX
                     } else {
                         AZURE_LOCATION = AZURE_LOCATION_DEFAULT
@@ -281,7 +281,7 @@ if (env.ValidationAzure == 'yes') {
                                                 ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-focal-daily 20_04-daily-lts-gen2 latest"
                                             }
                                         }
-                                        if (test_type == "AZURE_SGX_VALIDATION") {
+                                        if (test_type == "AZURE_SGX") {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${AZURE_LOCATION}'" +
@@ -346,7 +346,7 @@ if (env.ValidationHyperV == 'yes') {
             def test_cmd = it.value
             runs["${test_type}"] = {
                 stage ("${test_type}") {
-                    if (test_type == "HV_SRIOV_VALIDATION" && test_cmd.contains("TestArea 'SRIOV'")){
+                    if (test_type == "HV_SRIOV" && test_cmd.contains("TestArea 'SRIOV'")){
                         LABEL_NAME = LABEL_SRIOV
                     } else {
                         LABEL_NAME = LABEL_WS2016
@@ -374,14 +374,14 @@ if (env.ValidationHyperV == 'yes') {
 
                                         cleanWs()
                                         git branch: LISAV2_BRANCH, url: LISAV2_REMOTE
-                                        if (test_type == "HV_SRIOV_VALIDATION") {
+                                        if (test_type == "HV_SRIOV") {
                                             test_location_sriov = "${SRIOV_TEST_LOCATION}"
                                             println "${test_type} - ${test_cmd} - ${test_location_sriov}"
                                             HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
-                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location_sriov}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'u${distro}' -TestLocation '${test_location_sriov}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${test_location_sriov}'" +
-                                                " -RGIdentifier 'ubuntuHV${distro}'" +
+                                                " -RGIdentifier 'u${distro}'" +
                                                 " -TestPlatform 'HyperV'" +
                                                 " -CustomKernel '${KERNEL_TYPE}'" +
                                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
@@ -394,10 +394,10 @@ if (env.ValidationHyperV == 'yes') {
                                             test_location = "localhost"
                                             println "${test_type} - ${test_cmd} - ${test_location}"
                                             HYPERV_VHD_PATH = "${LISAV2_IMAGES_SHARE_URL}${HYPERV_VHD}"
-                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'ubuntuAzure${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'HyperV' -OsVHD ${HYPERV_VHD_PATH} -RgIdentifier 'u${distro}' -TestLocation '${test_location}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${HYPERV_LISAV2_SECRETS}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${test_location}'" +
-                                                " -RGIdentifier 'ubuntuHV${distro}'" +
+                                                " -RGIdentifier 'u${distro}'" +
                                                 " -TestPlatform 'HyperV'" +
                                                 " -CustomKernel '${KERNEL_TYPE}'" +
                                                 " -OsVHD '${HYPERV_VHD_PATH}'" +
