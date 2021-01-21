@@ -71,20 +71,9 @@ function main {
         fi
     done
 
-    found_rpm=0
-    for line in $lines; do
-        if [[ -d "${MOUNT_POINT}/${line}/rpm" ]]; then
-             echo "$line has all the required files in it";
-             echo "$line" > "${KERNEL_TRANSLATED_FOLDER_PATH}"
-             cp -r "${MOUNT_POINT}/${line}/rpm" "${BASEDIR}/rpm"
-             found_rpm=1
-             break;
-        fi
-    done
-
     sudo umount $MOUNT_POINT
 
-    if [[ $found_deb == 0 ]] && [[ $found_rpm == 0 ]]; then
+    if [[ $found_deb == 0 ]]; then
         echo "KERNEL folder $KERNEL_FOLDER_PATH does not meet the requirements."
         exit 1
     fi

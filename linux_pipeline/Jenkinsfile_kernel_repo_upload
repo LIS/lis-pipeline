@@ -14,15 +14,7 @@ properties ([
             description: 'Kernel folder to be uploaded. Use latest for the last built version existent on the share.'],
         [$class: 'ChoiceParameterDefinition', choices: 'testing\nstable\n',
             name: 'REPO_TYPE',
-            description: 'The repo type where the kernel will be uploaded.'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            name: 'UPLOAD_TO_SKYPE',
-            description: 'Whether to upload into skpye repo.'],
-        [$class: 'BooleanParameterDefinition',
-            defaultValue: true,
-            name: 'UPLOAD_TO_LINKEDIN',
-            description: 'Whether to upload into linkedin repo.']
+            description: 'The repo type where the kernel will be uploaded.']
         ]
     ],
     pipelineTriggers([cron('H 12 * * 3')])
@@ -46,7 +38,6 @@ node("meta_slave") {
               env.KERNEL_TRANSLATED_FOLDER = readFile "${env.WORKSPACE}/${env.BUILD_NUMBER}-${env.BRANCH_NAME}/kernel_translated_folder"
             }
             stash includes: 'scripts/kernel_repo_upload/deb/**', name: 'deb_kernel_files'
-            stash includes: 'scripts/kernel_repo_upload/rpm/**', name: 'rpm_kernel_files'
           }
     }
     stage('send_email') {
@@ -76,48 +67,26 @@ node("meta_slave") {
     }
 }
 
-if (params.UPLOAD_TO_SKYPE) {
-    node("hyper-v") {
-        stage('upload_kernel_to_skype') {
-          withCredentials([string(credentialsId: 'UPDATE_REPO_URL', variable: 'REPO_URL'),
-                           string(credentialsId: 'REPO_API_KEY', variable: 'REPO_API_KEY'),
-                           file(credentialsId: 'REPO_CERT', variable: 'REPO_CERT_PATH'),
-                           ]) {
-            cleanWs()
-            checkout scm
-            unstash 'deb_kernel_files'
-            echo "Uploading kernel to repo ${env:REPO_URL}."
-            PowerShellWrapper('''
-              & "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\upload_kernel_folder.ps1"
-                  -KernelFolderPath "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\deb"
-                  -RepoType ${env:Repo_TYPE}
-                  -RepoUrl ${env:REPO_URL}
-                  -RepoApiKey ${env:REPO_API_KEY}
-                  -RepoCertPath ${env:REPO_CERT_PATH}
-            ''')
-          }
-        }
+
+node("hyper-v") {
+    stage('upload_kernel_to_skype') {
+      withCredentials([string(credentialsId: 'UPDATE_REPO_URL', variable: 'REPO_URL'),
+                        string(credentialsId: 'REPO_API_KEY', variable: 'REPO_API_KEY'),
+                        file(credentialsId: 'REPO_CERT', variable: 'REPO_CERT_PATH'),
+                        ]) {
+        cleanWs()
+        checkout scm
+        unstash 'deb_kernel_files'
+        echo "Uploading kernel to repo ${env:REPO_URL}."
+        PowerShellWrapper('''
+          & "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\upload_kernel_folder.ps1"
+              -KernelFolderPath "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\deb"
+              -RepoType ${env:Repo_TYPE}
+              -RepoUrl ${env:REPO_URL}
+              -RepoApiKey ${env:REPO_API_KEY}
+              -RepoCertPath ${env:REPO_CERT_PATH}
+        ''')
+      }
     }
 }
 
-if (params.UPLOAD_TO_LINKEDIN) {
-    node("hyper-v") {
-        stage('upload_kernel_to_linkedin') {
-          withCredentials([string(credentialsId: 'LINKEDIN_REPO_URL', variable: 'LINKEDIN_REPO_URL'),
-                           string(credentialsId: 'LINKEDIN_REPO_SASTOKEN', variable: 'LINKEDIN_REPO_SASTOKEN')
-                           ]) {
-            cleanWs()
-            checkout scm
-            echo "Uploading kernel to repo ${env:LINKEDIN_REPO_URL}."
-            unstash 'rpm_kernel_files'
-            PowerShellWrapper('''
-              & "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\upload_kernel_folder.ps1"
-                  -KernelFolderPath "${env:WORKSPACE}\\scripts\\kernel_repo_upload\\rpm"
-                  -RepoType ${env:Repo_TYPE}
-                  -RepoUrl ${env:LINKEDIN_REPO_URL}
-                  -SASToken "${env:LINKEDIN_REPO_SASTOKEN}"
-            ''')
-          }
-        }
-    }
-}
