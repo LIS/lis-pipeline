@@ -349,10 +349,10 @@ function prepare_daemons_rhel (){
     release="${kernel_version##*-}"
     if [[ "$release" != "$kernel_version" ]];then
         kernel_version="${kernel_version%-*}"
-        kernel_version="${kernel_version#*-}"
     else
         release=""
     fi
+    kernel_version="$(echo $kernel_version | sed "s/-/_/g")"
     # Copy daemons sources
     if [[ ! -d "tools/hv" ]];then
         printf "Linux source folder expected"
@@ -476,15 +476,13 @@ function prepare_perf_rhel (){
     mkdir -p "${base_dir}/perf/rpmbuild/"{RPMS,SRPMS,BUILD,SOURCES,SPECS,tmp}
     pushd "$source"
     kernel_version="$(make kernelversion)"
-    full_version="$kernel_version"
-    kernel_version="${kernel_version%-*}"
     release="${kernel_version##*-}"
     if [[ "$release" != "$kernel_version" ]];then
         kernel_version="${kernel_version%-*}"
-        kernel_version="${kernel_version#*-}"
     else
         release=""
     fi
+    kernel_version="$(echo $kernel_version | sed "s/-/_/g")"
     if [[ ! -d "tools/perf" ]];then
         printf "Linux source folder expected"
         exit 3
