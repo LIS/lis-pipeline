@@ -177,7 +177,7 @@ pipeline {
 		LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 		LISAV2_BRANCH = "master"
 		LISAV2_HYPERV_REGION = "hyper-v"
-		LISAV2_AZURE_REGION = "eastus2"
+		LISAV2_AZURE_REGION = "westus2"
 		LISAV2_RG_IDENTIFIER = "upstreamk"
 		KERNEL_ARTIFACTS_PATH = 'upstream-kernel-artifacts'
 		UBUNTU_VERSION = '16'
