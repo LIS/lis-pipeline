@@ -6,7 +6,7 @@ properties ([
         parameterDefinitions: [
         [$class: 'StringParameterDefinition',
             name: 'AZURE_IMAGES',
-            defaultValue: 'Canonical UbuntuServer 16.04-LTS latest,Canonical UbuntuServer 18.04-DAILY-LTS latest,RedHat RHEL 7-RAW latest,RedHat RHEL 7.5 latest,Openlogic CentOS 7.5 latest,SUSE SLES-15-sp1 gen1 latest',
+            defaultValue: 'Canonical UbuntuServer 18.04-DAILY-LTS latest,RedHat RHEL 7-RAW latest,RedHat RHEL 7.5 latest,Openlogic CentOS 7.5 latest,SUSE SLES-15-sp1 gen1 latest',
             description: 'Azure images to be tested, comma separated.'],
         [$class: 'StringParameterDefinition',
             name: 'TEST_CASE',
