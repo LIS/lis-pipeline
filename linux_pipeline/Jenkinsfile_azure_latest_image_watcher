@@ -19,6 +19,7 @@ node ("meta_slave") {
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "UbuntuServer" "18.04-LTS"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "0001-com-ubuntu-server-focal" "20_04-lts"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "0001-com-ubuntu-server-groovy" "20_10"
+                bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "Canonical" "0001-com-ubuntu-server-hirsute" "21_04"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7.6"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7.7"
                 bash ./scripts/azure_kernel_validation/get_latest_azure_image.sh "OpenLogic" "CentOS" "7_8"
