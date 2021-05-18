@@ -5,7 +5,7 @@
 # DESCRIPTION
 #
 #    This bash script is looking for linux-azure and linux-azure-edge proposed
-# kernels. The following Ubuntu versions are checked: Trusty, Xenial, Bionic, Focal, Groovy.
+# kernels. The following Ubuntu versions are checked: Trusty, Xenial, Bionic, Focal, Groovy, Hirsute.
 # It will take the latest version available for each using apt-cache and compare
 # it to latest known version.
 #
@@ -93,7 +93,7 @@ EOM
 }
 
 # Main
-RELEASES=(trusty xenial bionic focal groovy)
+RELEASES=(trusty xenial bionic focal groovy hirsute)
 VERSION_HISTORY_LOCATION="/home/lisa/latest_versions.sh"
 VERSION_TO_TEST_LOCATION="/home/lisa/version_to_test.sh"
 . $VERSION_HISTORY_LOCATION
