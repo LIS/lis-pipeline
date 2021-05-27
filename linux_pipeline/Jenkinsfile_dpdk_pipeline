@@ -28,7 +28,7 @@ properties ([
             name: 'CUSTOM_LIS_SOURCE',
             defaultValue: '',
             description: 'If set, the LIS drivers will be installed: Example: http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.3.0.tar.gz'],
-         [$class: 'BooleanParameterDefinition',
+        [$class: 'BooleanParameterDefinition',
             name: 'REQUIRE_SIGNOFF',
             defaultValue: True,
             description: 'Require signoff for run. Default is true, set to false for manual test runs.']
