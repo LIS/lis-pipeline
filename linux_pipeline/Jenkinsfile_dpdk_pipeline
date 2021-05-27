@@ -28,6 +28,11 @@ properties ([
             name: 'CUSTOM_LIS_SOURCE',
             defaultValue: '',
             description: 'If set, the LIS drivers will be installed: Example: http://download.microsoft.com/download/6/8/F/68FE11B8-FAA4-4F8D-8C7D-74DA7F2CFC8C/lis-rpms-4.3.0.tar.gz']
+        ],
+         [$class: 'BooleanParameterDefinition',
+            name: 'REQUIRE_SIGNOFF',
+            defaultValue: True,
+            description: 'Require signoff for run. Default is true, set to false for manual test runs.']
         ]
     ]
 ])
@@ -370,44 +375,46 @@ if (dpdkSource.size()) {
                 if (utils.isJobCronTriggered()) {
                     mailList = DPDK_MAIL_LIST_SIGNOFF
                 }
-                try {
-                    echo "Ask for manual sign-off from the owner"
-                    timeout(time: 72, unit: 'HOURS') {
-                        signoff = input(message: "Are you sure you want to sign off DPDK ${dpdkTagsFormatted}?",
-                            parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
-                            submitterParameter: "USER")
-                        owner = signoff["USER"].toString()
-                    }
-                    env.SIGNED_OFF_BY = owner
-                    env.SIGNED_OFF_RESULT = "true"
-                    emailext (
-                        subject: "DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}",
-                        to: mailList,
-                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                        mimeType : "text/html",
-                        body: """
-                            Hello,<br/><br/>
-                            DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}.<br/>
-                            URL: ${env.BUILD_URL}<br/><br/>
-                            Thank you,<br/>Jenkins CI
-                        """
-                    )
-                } catch (exc) {
-                    env.SIGNED_OFF_BY = exc.getCauses()[0].getUser().getId().toString()
-                    env.SIGNED_OFF_RESULT = "false"
+                if (REQUIRE_SIGNOFF) {
+                    try {
+                        echo "Ask for manual sign-off from the owner"
+                        timeout(time: 72, unit: 'HOURS') {
+                            signoff = input(message: "Are you sure you want to sign off DPDK ${dpdkTagsFormatted}?",
+                                parameters: [string(defaultValue: 'Press Proceed/Abort after verifying the test results', description: '', name: '')],
+                                submitterParameter: "USER")
+                            owner = signoff["USER"].toString()
+                        }
+                        env.SIGNED_OFF_BY = owner
+                        env.SIGNED_OFF_RESULT = "true"
+                        emailext (
+                            subject: "DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}",
+                            to: mailList,
+                            recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                            mimeType : "text/html",
+                            body: """
+                                Hello,<br/><br/>
+                                DPDK ${dpdkTagsFormatted} signed off by ${env.SIGNED_OFF_BY}.<br/>
+                                URL: ${env.BUILD_URL}<br/><br/>
+                                Thank you,<br/>Jenkins CI
+                            """
+                        )
+                    } catch (exc) {
+                        env.SIGNED_OFF_BY = exc.getCauses()[0].getUser().getId().toString()
+                        env.SIGNED_OFF_RESULT = "false"
 
-                    emailext (
-                        subject: "DPDK ${dpdkTagsFormatted} can't be signed off. ${env.SIGNED_OFF_BY}",
-                        to: mailList,
-                        recipientProviders: [[$class: 'RequesterRecipientProvider']],
-                        mimeType : "text/html",
-                        body: """
-                            Hello,<br/><br/>
-                            DPDK ${dpdkTagsFormatted} not signed off - ${env.SIGNED_OFF_BY}<br/>
-                            URL: ${env.BUILD_URL}<br/><br/>
-                            Thank you,<br/>Jenkins CI
-                        """
-                    )
+                        emailext (
+                            subject: "DPDK ${dpdkTagsFormatted} can't be signed off. ${env.SIGNED_OFF_BY}",
+                            to: mailList,
+                            recipientProviders: [[$class: 'RequesterRecipientProvider']],
+                            mimeType : "text/html",
+                            body: """
+                                Hello,<br/><br/>
+                                DPDK ${dpdkTagsFormatted} not signed off - ${env.SIGNED_OFF_BY}<br/>
+                                URL: ${env.BUILD_URL}<br/><br/>
+                                Thank you,<br/>Jenkins CI
+                            """
+                        )
+                    }
                 }
             }
         }
