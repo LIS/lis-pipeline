@@ -114,7 +114,7 @@ EOF
 
 
 def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
-def lisav2BranchName = LISA_BRANCH
+def lisav2BranchName = env.LISA_BRANCH
 
 env.DPDK_REMOTE_URL = "git://git.dpdk.org/dpdk"
 env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
