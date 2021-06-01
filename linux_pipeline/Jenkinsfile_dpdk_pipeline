@@ -31,7 +31,11 @@ properties ([
         [$class: 'BooleanParameterDefinition',
             name: 'REQUIRE_SIGNOFF',
             defaultValue: true,
-            description: 'Require signoff for run. Default is true, set to false for manual test runs.']
+            description: 'Require signoff for run. Default is true, set to false for manual test runs.'],
+        [$class: 'StringParameterDefinition',
+            name: 'LISA_BRANCH',
+            defaultValue: 'master',
+            description: 'Use a custom lisa branch if yet, default is master.']
         ]
     ]
 ])
@@ -110,7 +114,7 @@ EOF
 
 
 def lisav2RemoteUrl = "https://github.com/lis/LISAv2.git"
-def lisav2BranchName = "master"
+def lisav2BranchName = LISA_BRANCH
 
 env.DPDK_REMOTE_URL = "git://git.dpdk.org/dpdk"
 env.DPDK_STABLE_REMOTE_URL = "git://git.dpdk.org/dpdk-stable"
