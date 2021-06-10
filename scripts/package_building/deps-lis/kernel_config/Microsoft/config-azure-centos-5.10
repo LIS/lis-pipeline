@@ -112,7 +112,8 @@ CONFIG_HAVE_SCHED_AVG_IRQ=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_TASKSTATS=y
 CONFIG_TASK_DELAY_ACCT=y
-# CONFIG_TASK_XACCT is not set
+CONFIG_TASK_XACCT=y
+CONFIG_TASK_IO_ACCOUNTING=y
 # CONFIG_PSI is not set
 # end of CPU/Task time and stats accounting
 
@@ -6229,4 +6230,3 @@ CONFIG_CC_HAS_SANCOV_TRACE_PC=y
 # CONFIG_HYPERV_TESTING is not set
 # end of Kernel Testing and Coverage
 # end of Kernel hacking
-CONFIG_TASK_IO_ACCOUNTING=y

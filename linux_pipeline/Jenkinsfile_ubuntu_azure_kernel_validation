@@ -191,7 +191,7 @@ def AZURE_VALIDATION_TESTS_HASH = [AZURE_P0:"-TestPriority 0 -ExcludeTests '^NVM
     AZURE_P2:"-TestPriority 2 -ExcludeTests '^NVME-*,^PERF-*,TENSORFLOW*,NESTED*,VERIFY-DPDK-NFF-GO,VERIFY-DPDK-OVS,STRESSTEST-NVME-4K-IO'",
     AZURE_NVME:"-TestCategory 'Functional' -TestArea 'NVME'",
     AZURE_SGX:"-TestNames VALIDATE-INTEL-SGX-DRIVER-FOR-DC-VM",
-    AZURE_TVM:"-TestNames TVM-TEST-SECUREBOOT-COMPATIBILITY"]
+    AZURE_TVM:"-TestNames 'TVM-TEST-SECUREBOOT-COMPATIBILITY,TVM-TEST-MEASUREDBOOT-COMPATIBILITY'"]
 
 def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-TCP-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_TCP_Azure_DefaultKernel'",
     PERF_UDP:"-TestNames 'PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-Synthetic,PERF-NETWORK-UDP-1K-THROUGHPUT-MULTICONNECTION-NTTTCP-SRIOV' -ResultDBTable 'Perf_Network_UDP_Azure_DefaultKernel'",
@@ -205,7 +205,7 @@ LABEL_SRIOV = "sriov_mlnx"
 LABEL_WS2016 = "ubuntu_azure_kernel_validation"
 LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 LISAV2_BRANCH = "master"
-AZURE_LOCATION_DEFAULT = "westus2"
+AZURE_LOCATION_DEFAULT = ""
 AZURE_LOCATION_NVME = "westus2"
 AZURE_LOCATION_SGX = "uksouth"
 AZURE_LOCATION_TVM = "southcentralus"
@@ -286,13 +286,13 @@ if (env.ValidationAzure == 'yes') {
                                                 ARM_GEN2_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
                                             }
                                             if ("${env.distro}" == "focal") {
-                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-focal 20_04-lts latest"
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-focal 20_04-lts-gen2 latest"
                                             }
                                             if ("${env.distro}" == "groovy") {
-                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-groovy 20_10 latest"
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-groovy 20_10-gen2 latest"
                                             }
                                             if ("${env.distro}" == "hirsute") {
-                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-hirsute 21_04 latest"
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-hirsute 21_04-gen2 latest"
                                             }
                                         }
                                         if (test_type == "AZURE_SGX") {
