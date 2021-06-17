@@ -177,8 +177,8 @@ pipeline {
 		description: 'What stages to run', name: 'ENABLED_STAGES')
 	}
 	environment {
-		LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-		LISAV2_BRANCH = "master"
+		LISAV2_REMOTE = "https://github.com/LiliDeng/LISAv2.git"
+		LISAV2_BRANCH = "fix_issues815"
 		LISAV2_AZURE_REGION = "westus2"
 		LISAV2_RG_IDENTIFIER = "msftk"
 		LISAV2_AZURE_VM_SIZE_SMALL = "Standard_A2"
@@ -392,7 +392,7 @@ pipeline {
 							" -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
 							" -TestPlatform 'Azure'" +
 							" -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-							" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_LARGE}'" +
+							" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_LARGE}' -ForceCustom" +
 							" -ARMImageName '${env.AZURE_OS_IMAGE}'" +
 							" -TestNames 'VERIFY-LIS-MODULES-VERSION'" +
 							" -StorageAccount 'ExistingStorage_Standard'" +
@@ -428,7 +428,7 @@ pipeline {
 							" -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
 							" -TestPlatform 'Azure'" +
 							" -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-							" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
+							" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}' -ForceCustom" +
 							" -ARMImageName '${env.AZURE_OS_IMAGE}'" +
 							" -TestNames 'VERIFY-LIS-MODULES-VERSION'" +
 							" -StorageAccount 'ExistingStorage_Standard'" +
@@ -499,7 +499,7 @@ pipeline {
 					" -RGIdentifier '${env.LISAV2_RG_IDENTIFIER}'" +
 					" -TestPlatform 'Azure'" +
 					" -CustomKernel 'localfile:./scripts/package_building/${env.BUILD_NUMBER}-${env.BRANCH_NAME}-${env.KERNEL_ARTIFACTS_PATH}/*/${env.PACKAGE_TYPE}/*.${env.PACKAGE_TYPE}'" +
-					" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}'" +
+					" -OverrideVMSize '${env.LISAV2_AZURE_VM_SIZE_SMALL}' -ForceCustom" +
 					" -ARMImageName '${env.AZURE_OS_IMAGE}'" +
 					" -TestNames 'CAPTURE-VHD-BEFORE-TEST'" +
 					" -XMLSecretFile '${env.Azure_Secrets_File}'" +
