@@ -207,6 +207,7 @@ LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
 LISAV2_BRANCH = "master"
 AZURE_LOCATION_DEFAULT = ""
 AZURE_LOCATION_NVME = "westus2"
+AZURE_LOCATION_PERF = "westus2"
 AZURE_LOCATION_SGX = "uksouth"
 AZURE_LOCATION_TVM = "southcentralus"
 AZURE_ID = "ubuntuAz"
@@ -495,9 +496,9 @@ if (env.PerformanceAzure == "yes") {
                                             println exc
                                         }
 
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_PERF}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                         RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                            " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
+                                            " -TestLocation '${AZURE_LOCATION_PERF}'" +
                                             " -RGIdentifier '${AZURE_ID}'" +
                                             " -TestPlatform 'Azure'" +
                                             " -CustomKernel '${KERNEL_TYPE}'" +
