@@ -112,6 +112,8 @@ for release in ${RELEASES[@]}; do
     edge_release="${!variable_name}"
     variable_name="${release}_azure_lts_1804"
     azure_lts_1804_release="${!variable_name}"
+    variable_name="${release}_azure_lts_2004"
+    azure_lts_2004_release="${!variable_name}"
 
     latest_azure=$(sudo apt-cache madison linux-azure | grep ${release}-proposed | awk '{print $3}')
     latest_edge=$(sudo apt-cache madison linux-azure-edge | grep ${release}-proposed | awk '{print $3}')
