@@ -35,6 +35,8 @@ function Search_New_Kernel() {
         kernel_type_short="_azure_lts_1804"
     elif [ ${kernel_type} == "linux-image-azure-lts-20.04" ]; then
         kernel_type_short="_azure_lts_2004"
+    elif [ ${kernel_type} == "linux-image-azure-fde" ]; then
+        kernel_type_short="_azure_fde"
     fi
     latest_kernel=$(sudo apt-cache madison ${kernel_type} | grep ${release}-proposed | awk '{print $3}')
     if [ ! -z $latest_kernel ]; then
@@ -114,11 +116,14 @@ for release in ${RELEASES[@]}; do
     azure_lts_1804_release="${!variable_name}"
     variable_name="${release}_azure_lts_2004"
     azure_lts_2004_release="${!variable_name}"
+    variable_name="${release}_azure_fde"
+    azure_fde_release="${!variable_name}"
 
     latest_azure=$(sudo apt-cache madison linux-azure | grep ${release}-proposed | awk '{print $3}')
     latest_edge=$(sudo apt-cache madison linux-azure-edge | grep ${release}-proposed | awk '{print $3}')
     latest_azure_lts_1804=$(sudo apt-cache madison linux-image-azure-lts-18.04 | grep ${release}-proposed | awk '{print $3}')
     latest_azure_lts_2004=$(sudo apt-cache madison linux-image-azure-lts-20.04 | grep ${release}-proposed | awk '{print $3}')
+    latest_azure_fde=$(sudo apt-cache madison linux-image-azure-fde | grep ${release}-proposed | awk '{print $3}')
 
     # Check linux-azure proposed kernel for a new version
     Search_New_Kernel $release "linux-azure" $azure_release
@@ -131,4 +136,7 @@ for release in ${RELEASES[@]}; do
 
     # Check linux-image-azure-lts-20.04 proposed kernel for a new version
     Search_New_Kernel $release "linux-image-azure-lts-20.04" $latest_azure_lts_2004
+
+    # Check linux-image-azure-fde proposed kernel for a new version
+    Search_New_Kernel $release "linux-image-azure-fde" $latest_azure_fde
 done
