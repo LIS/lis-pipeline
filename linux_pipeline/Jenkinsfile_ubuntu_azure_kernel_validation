@@ -337,7 +337,7 @@ if (env.ValidationAzure == 'yes') {
                                                 " -ExitWithZero -ForceCustom" +
                                                 " ${test_cmd}"
                                             )
-                                        } else if ('${KERNEL_TYPE}' == "linux-image-azure-fde") {
+                                        } else if (KERNEL_TYPE == "linux-image-azure-fde") {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${AZURE_LOCATION}'" +
@@ -542,7 +542,7 @@ if (env.PerformanceAzure == "yes") {
                                             }
                                         }
 
-                                        if ('${KERNEL_TYPE}' == "linux-image-azure-fde") {
+                                        if (KERNEL_TYPE == "linux-image-azure-fde") {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
