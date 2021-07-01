@@ -379,7 +379,7 @@ create_deb_changelog() {
         commit_message=$(echo "$commit_message" | sed 's/^/    /')
         #Echo the entry
         cat << EOF >> "$changelog"
-$package_name-${package_version} ($build_date) ubuntu; urgency=low
+$package_name-${package_version} ($package_version) unstable; urgency=low
 
     $git_tag
 $commit_message
