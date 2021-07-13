@@ -40,7 +40,7 @@ node ("meta_slave") {
                     SEND_MAIL = "yes"
                     println "TRIGGERING the testing for ${distro} distro, ${kernel} kernel - ${latest_kernel_version}"
                     MESSAGE_LIST = MESSAGE_LIST + "<br>${distro} ${latest_kernel_version} ${kernel} kernel, "
-                    build (job: "${env.PIPELINE_NAME}/master",
+                    build (job: "${env.PIPELINE_NAME}/PR-624",
                         parameters: [
                             string(name: 'Distro', value: "${distro}"),
                             string(name: 'KernelType', value: "${kernel}"),
