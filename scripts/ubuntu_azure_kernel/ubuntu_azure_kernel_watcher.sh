@@ -98,7 +98,7 @@ EOM
 }
 
 # Main
-RELEASES=(trusty xenial bionic focal groovy hirsute)
+RELEASES=(trusty xenial bionic focal groovy hirsute impish)
 VERSION_HISTORY_LOCATION="/home/lisa/latest_versions.sh"
 VERSION_TO_TEST_LOCATION="/home/lisa/version_to_test.sh"
 . $VERSION_HISTORY_LOCATION
