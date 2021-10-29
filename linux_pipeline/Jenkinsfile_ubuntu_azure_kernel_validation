@@ -153,9 +153,9 @@ def sendSignOffMail(mailType,warningMessage) {
 properties ([
     overrideIndexTriggers(false),
     parameters([
-        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nfocal\ngroovy\nhirsute',
-                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> focal - 20.04 validation <br> groovy - 20.10 validation <br> hirsute - 21.04 validation '),
-        choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge',
+        choice (name: 'Distro', choices: 'trusty\nxenial\nbionic\nfocal\ngroovy\nhirsute\nimpish',
+                description: 'trusty - 14.04 validation <br> xenial - 16.04 validation <br> bionic - 18.04 validation <br> focal - 20.04 validation <br> groovy - 20.10 validation <br> hirsute - 21.04 validation <br> impish - 21.10 validation '),
+        choice (name: 'KernelType', choices: 'linux-azure\nlinux-azure-edge\nlinux-image-azure-lts-18.04\nesm\nlinux-azure-fips\nlinux-image-azure-lts-20.04\nlinux-image-azure-fde\n',
                 description: 'linux-azure - latest proposed linux-azure kernel validation <br> linux-azure-edge - latest proposed linux-azure-edge kernel validation'),
         string(name: 'KernelVersion', defaultValue: "", description: 'The exact kernel version to be tested. Example: 5.0.0.1010.9. If left empty, the latest kernel version for the selected distro/kernel type will be used.'),
         choice (name: 'ValidationAzure', choices: 'yes\nno',
@@ -174,13 +174,15 @@ def ARM_DISTRO_HASH = [trusty:'Canonical UbuntuServer 14.04.5-LTS latest',
                   bionic:'Canonical UbuntuServer 18.04-LTS latest',
                   focal:'canonical 0001-com-ubuntu-server-focal 20_04-lts latest',
                   groovy:'canonical 0001-com-ubuntu-server-groovy 20_10 latest',
-                  hirsute:'Canonical 0001-com-ubuntu-server-hirsute 21_04 latest']
+                  hirsute:'Canonical 0001-com-ubuntu-server-hirsute 21_04 latest',
+                  impish:'canonical 0001-com-ubuntu-server-impish 21_10 latest']
 def HYPERV_VHD_HASH = [trusty:'Ubuntu_14.04.5\\Ubuntu14.04.5-server.vhdx',
                   xenial:'ubuntu_16.04.5\\ubuntu_16.04.5.vhdx',
                   bionic:'ubuntu_18.04.1\\ubuntu_18.04.1_gen1_gen2.vhdx',
                   focal:'ubuntu_20.04\\ubuntu_20.04.vhdx',
                   groovy:'ubuntu_20.04\\ubuntu_20.04.vhdx',
-                  hirsute:'ubuntu_20.04\\ubuntu_20.04.vhdx']
+                  hirsute:'ubuntu_20.04\\ubuntu_20.04.vhdx',
+                  impish:'ubuntu_20.04\\ubuntu_20.04.vhdx']
 
 def HYPERV_VALIDATION_TESTS_HASH = [HV_P0:"-TestPriority 0 -ExcludeTests '^NVME,^SRIOV-*,^LIVE-MIGRATE*,ETHTOOL-OFFLOADING-SETTING,ETHTOOL-OFFLOADING-SETTING-3NICS,^LIS-DEPLOY*'",
     HV_P1:"-TestPriority 1 -ExcludeTests '^PERF-*,^NVME-*,^SRIOV-*,^LIVE-MIGRATE*,DYNAMIC-MEMORY-HIGH-PRIORITY,^LIS-PREINSTALL*'",
@@ -203,9 +205,9 @@ def AZURE_PERFORMANCE_TESTS_HASH = [PERF_NTTTCP:"-TestNames 'PERF-NETWORK-TCP-TH
 LATEST_VERSION_LOCATION="/home/lisa/latest_versions.sh"
 LABEL_SRIOV = "sriov_mlnx"
 LABEL_WS2016 = "ubuntu_azure_kernel_validation"
-LISAV2_REMOTE = "https://github.com/lis/LISAv2.git"
-LISAV2_BRANCH = "master"
-AZURE_LOCATION_DEFAULT = ""
+LISAV2_REMOTE = "https://github.com/LiliDeng/LISAv2.git"
+LISAV2_BRANCH = "fix_issues"
+AZURE_LOCATION_DEFAULT = "westus2"
 AZURE_LOCATION_NVME = "westus2"
 AZURE_LOCATION_PERF = "westus2"
 AZURE_LOCATION_SGX = "uksouth"
@@ -218,8 +220,23 @@ def HYPERV_VHD = HYPERV_VHD_HASH.find{it.key == env.distro}.value
 if (env.KernelType == "linux-azure") {
     env.KERNEL_TYPE = "proposed-azure"
 }
-if (env.KernelType == "linux-azure-edge"){
+if (env.KernelType == "linux-azure-edge") {
     env.KERNEL_TYPE = "proposed-edge"
+}
+if (env.KernelType == "linux-image-azure-lts-18.04") {
+    env.KERNEL_TYPE = "linux-image-azure-lts-18.04"
+}
+if (env.KernelType == "esm") {
+    env.KERNEL_TYPE = "esm"
+}
+if (env.KernelType == "linux-azure-fips") {
+    env.KERNEL_TYPE = "linux-azure-fips"
+}
+if (env.KernelType == "linux-image-azure-lts-20.04") {
+    env.KERNEL_TYPE = "linux-image-azure-lts-20.04"
+}
+if (env.KernelType == "linux-image-azure-fde") {
+    env.KERNEL_TYPE = "linux-image-azure-fde"
 }
 
 env.START_DATE = new java.sql.Timestamp(new Date().getTime())
@@ -283,6 +300,9 @@ if (env.ValidationAzure == 'yes') {
                                             if ("${env.distro}" == "bionic") {
                                                 ARM_GEN2_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
                                             }
+                                            if ("${env.distro}" == "impish") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-impish 21_10-gen2 latest"
+                                            }
                                             if ("${env.distro}" == "xenial") {
                                                 ARM_GEN2_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
                                             }
@@ -310,6 +330,19 @@ if (env.ValidationAzure == 'yes') {
                                                 " ${test_cmd}"
                                             )
                                         } else if (test_type == "AZURE_TVM") {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_GEN2_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero -ForceCustom" +
+                                                " ${test_cmd}"
+                                            )
+                                        } else if (KERNEL_TYPE == "linux-image-azure-fde") {
                                             echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
                                             RunPowershellCommand(".\\Run-LisaV2.ps1" +
                                                 " -TestLocation '${AZURE_LOCATION}'" +
@@ -495,20 +528,57 @@ if (env.PerformanceAzure == "yes") {
                                         } catch (exc) {
                                             println exc
                                         }
+                                        def ARM_GEN2_DISTRO = ""
+                                        script {
+                                            if ("${env.distro}" == "bionic") {
+                                                ARM_GEN2_DISTRO = "Canonical UbuntuServer 18_04-lts-gen2 latest"
+                                            }
+                                            if ("${env.distro}" == "impish") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-impish 21_10-gen2 latest"
+                                            }
+                                            if ("${env.distro}" == "xenial") {
+                                                ARM_GEN2_DISTRO = "Canonical UbuntuServer 16_04-lts-gen2 latest"
+                                            }
+                                            if ("${env.distro}" == "focal") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-focal 20_04-lts-gen2 latest"
+                                            }
+                                            if ("${env.distro}" == "groovy") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-groovy 20_10-gen2 latest"
+                                            }
+                                            if ("${env.distro}" == "hirsute") {
+                                                ARM_GEN2_DISTRO = "canonical 0001-com-ubuntu-server-hirsute 21_04-gen2 latest"
+                                            }
+                                        }
 
-                                        echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_PERF}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
-                                        RunPowershellCommand(".\\Run-LisaV2.ps1" +
-                                            " -TestLocation '${AZURE_LOCATION_PERF}'" +
-                                            " -RGIdentifier '${AZURE_ID}'" +
-                                            " -TestPlatform 'Azure'" +
-                                            " -CustomKernel '${KERNEL_TYPE}'" +
-                                            " -ARMImageName '${ARM_DISTRO}'" +
-                                            " -XMLSecretFile '${Azure_Secrets_File}'" +
-                                            " -EnableTelemetry" +
-                                            " -ExitWithZero -ForceCustom" +
-                                            " -ResultDBTestTag '${env.distro}_${env.KernelType}_${env.BUILD_NUMBER}'" +
-                                            " ${test_cmd}"
-                                        )
+                                        if (KERNEL_TYPE == "linux-image-azure-fde") {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_GEN2_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_GEN2_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero -ForceCustom" +
+                                                " -ResultDBTestTag '${env.distro}_${env.KernelType}_${env.BUILD_NUMBER}'" +
+                                                " ${test_cmd}"
+                                            )
+                                        } else {
+                                            echo "Run-LisaV2.ps1 -TestPlatform 'Azure' -ARMImageName '${ARM_DISTRO}' -RGIdentifier '${AZURE_ID}' -TestLocation '${AZURE_LOCATION_DEFAULT}' -CustomKernel '${KERNEL_TYPE}' ${test_cmd} -XMLSecretFile '${Azure_Secrets_File}'"
+                                            RunPowershellCommand(".\\Run-LisaV2.ps1" +
+                                                " -TestLocation '${AZURE_LOCATION_DEFAULT}'" +
+                                                " -RGIdentifier '${AZURE_ID}'" +
+                                                " -TestPlatform 'Azure'" +
+                                                " -CustomKernel '${KERNEL_TYPE}'" +
+                                                " -ARMImageName '${ARM_DISTRO}'" +
+                                                " -XMLSecretFile '${Azure_Secrets_File}'" +
+                                                " -EnableTelemetry" +
+                                                " -ExitWithZero -ForceCustom" +
+                                                " -ResultDBTestTag '${env.distro}_${env.KernelType}_${env.BUILD_NUMBER}'" +
+                                                " ${test_cmd}"
+                                            )
+                                        }
                                         archiveArtifacts artifacts: '*-TestLogs.zip', allowEmptyArchive: true
                                         junit testResults: "Report\\*-junit.xml", allowEmptyResults: true
 
@@ -544,8 +614,18 @@ node ("meta_slave") {
     echo "Send email with kernel validation results link"
     if (env.KernelType == "linux-azure") {
         version_identifier = "_azure"
-    } else {
+    } else if (env.KernelType == "linux-azure-edge") {
         version_identifier = "_edge"
+    } else if (env.KernelType == "linux-image-azure-lts-18.04") {
+        version_identifier = "_azure_lts_1804"
+    } else if (env.KernelType == "esm") {
+        version_identifier = "_esm"
+    } else if (env.KernelType == "linux-azure-fips") {
+        version_identifier = "_azure_fips"
+    } else if (env.KernelType == "linux-image-azure-lts-20.04") {
+        version_identifier = "_azure_lts_2004"
+    } else if (env.KernelType == "linux-image-azure-fde") {
+        version_identifier = "_azure_fde"
     }
     def kernels_info = ""
     try {
